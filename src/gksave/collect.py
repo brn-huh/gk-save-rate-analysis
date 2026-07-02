@@ -57,31 +57,33 @@ def _store_match(
     return True
 
 
-def seed(
+def seed_from_nicknames(
     con: duckdb.DuckDBPyConnection,
     client: ResilientClient,
+    nicknames: list[str],
     *,
-    pages: int = 5,
-    limit: int = 100,
     log: Logger = _log,
 ) -> int:
-    """전역 피드에서 pages*limit 개까지 시드 매치를 수집."""
-    stored = 0
-    for p in range(pages):
-        offset = p * limit
+    """닉네임들을 ouid로 바꿔 frontier에 시드로 넣는다.
+
+    T0 실측 결과 전역 피드(/v1/match)의 matchId는 match-detail 로 안 풀린다(400).
+    유효 경로는 닉네임 → /v1/id → ouid → /v1/user/match 뿐이므로, 시드는
+    ouid 로만 심고 나머지는 스노우볼(snowball)이 user/match 로 확장한다.
+    """
+    added = 0
+    for nick in nicknames:
         try:
-            ids = api.list_matches(client, offset=offset, limit=limit)
+            ouid = api.get_ouid(client, nick)
         except ApiError as e:
-            log(f"[seed] /v1/match offset={offset} 오류: {e} — 중단")
-            break
-        if not ids:
-            log(f"[seed] offset={offset} 고갈 — 중단")
-            break
-        for mid in ids:
-            if _store_match(con, client, mid):
-                stored += 1
-        log(f"[seed] offset={offset}: 누적 신규 {stored}건")
-    return stored
+            log(f"[seed] 닉네임 '{nick}' → ouid 실패: {e}")
+            continue
+        con.execute(
+            "INSERT INTO frontier (ouid, state) VALUES (?, 'pending') ON CONFLICT DO NOTHING",
+            [ouid],
+        )
+        added += 1
+        log(f"[seed] '{nick}' → ouid {ouid[:8]}… 큐 추가")
+    return added
 
 
 def snowball(
@@ -133,17 +135,25 @@ def snowball(
 def run(
     settings: Settings = DEFAULT,
     *,
-    seed_pages: int = 5,
+    seed_nicknames: list[str] | None = None,
     max_new_matches: int = 5000,
     log: Logger = _log,
 ) -> None:
+    """닉네임 시드 → 스노우볼 확장. frontier가 이미 차 있으면 시드 없이도 재개된다."""
     from .db import connect, raw_match_count
 
     con = connect(settings)
     try:
         with ResilientClient(settings) as client:
-            log("=== 시드 수집 ===")
-            seed(con, client, pages=seed_pages, log=log)
+            if seed_nicknames:
+                log("=== 시드(닉네임→ouid) ===")
+                seed_from_nicknames(con, client, seed_nicknames, log=log)
+            pending = con.execute(
+                "SELECT count(*) FROM frontier WHERE state = 'pending'"
+            ).fetchone()[0]
+            if pending == 0:
+                log("시드도 없고 pending ouid도 없음 — 닉네임을 넘겨 시드하세요.")
+                return
             log("=== 스노우볼 확장 ===")
             snowball(con, client, max_new_matches=max_new_matches, log=log)
         log(f"총 raw_match: {raw_match_count(con)}건")

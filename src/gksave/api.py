@@ -56,5 +56,9 @@ def list_user_matches(
 
 
 def get_metadata(client: ResilientClient, kind: str) -> list[dict[str, Any]]:
-    """kind ∈ {matchtype, spid, seasonid, spposition, division}."""
-    return client.get(f"/fconline/v1/metadata/{kind}")
+    """kind ∈ {matchtype, spid, seasonid, spposition, division}.
+
+    메타데이터는 라이브 API가 아니라 정적 JSON 파일로 제공된다:
+    /static/fconline/meta/{kind}.json
+    """
+    return client.get(f"/static/fconline/meta/{kind}.json")

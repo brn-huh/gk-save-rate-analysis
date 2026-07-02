@@ -74,7 +74,9 @@ def test_zero_division_guarded(con):
     card = next(r for r in lb if r["gk_sp_id"] == 700)
     assert card["save_pct"] is None
     assert card["matches"] == 1
-    assert card == lb[-1]      # None은 맨 뒤로 정렬
+    # None(유효슛 0)은 실수치 뒤로: None 카드 앞에 실수치 카드가 오면 안 됨
+    first_none = next(i for i, r in enumerate(lb) if r["save_pct"] is None)
+    assert all(r["save_pct"] is None for r in lb[first_none:])
 
 
 def test_within_ouid_grade_effect(con):

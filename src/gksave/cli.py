@@ -22,7 +22,8 @@ def _cmd_spike(_args) -> None:
 
 
 def _cmd_collect(args) -> None:
-    collect.run(DEFAULT, seed_pages=args.seed_pages, max_new_matches=args.max_matches)
+    nicks = [n.strip() for n in (args.seed_nicknames or "").split(",") if n.strip()]
+    collect.run(DEFAULT, seed_nicknames=nicks, max_new_matches=args.max_matches)
 
 
 def _cmd_build(_args) -> None:
@@ -74,8 +75,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("spike", help="T0 실측 검증").set_defaults(func=_cmd_spike)
 
-    c = sub.add_parser("collect", help="시드+스노우볼 수집")
-    c.add_argument("--seed-pages", type=int, default=5)
+    c = sub.add_parser("collect", help="시드(닉네임)+스노우볼 수집")
+    c.add_argument("--seed-nicknames", default="",
+                   help="쉼표로 구분한 시드 닉네임 (예: '아이콘,랭커2'). 재개 시 생략 가능")
     c.add_argument("--max-matches", type=int, default=5000)
     c.set_defaults(func=_cmd_collect)
 
