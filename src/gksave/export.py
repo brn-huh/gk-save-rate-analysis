@@ -14,7 +14,7 @@ from pathlib import Path
 
 import duckdb
 
-from . import agg, meta
+from . import agg, meta, render
 from .config import MIN_MATCHES_GATE
 
 WARNING = (
@@ -65,5 +65,8 @@ def export(con: duckdb.DuckDBPyConnection, out_dir: Path, *, gate: int = MIN_MAT
                 c.get("season_id", ""), c.get("season_name", ""),
                 c["matches"], c["saves"], c["goals"], pct,
             ])
+
+    # 공개용 정적 HTML (자기완결형, 그대로 열거나 호스팅)
+    (out_dir / "index.html").write_text(render.build_html(payload), encoding="utf-8")
 
     return payload

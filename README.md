@@ -22,8 +22,10 @@ export NEXON_API_KEY=발급키
 gksave spike                          # T0: 실제 API로 엔드포인트·선방정의·강화범위 실측 (선행 게이트)
 gksave collect --seed-pages 5 --max-matches 5000   # 시드 + 스노우볼 수집 (재개 가능)
 gksave build                          # raw_match 재파싱 → gk_match/shot 재생성
-gksave export --gate 50 --out out     # 리더보드 JSON/CSV
+gksave meta                           # 선수명·시즌 캐시 (최초 1회)
+gksave export --gate 50 --out out     # 리더보드 JSON/CSV + 공개용 index.html
 gksave leaderboard --gate 50 --top 20 # 콘솔 출력
+open out/index.html                   # 정적 페이지 미리보기 (GitHub Pages에 그대로 올려도 됨)
 ```
 
 ## 파이프라인
