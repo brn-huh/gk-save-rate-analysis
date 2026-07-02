@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import agg, collect, export as export_mod, meta, spike
@@ -18,13 +19,28 @@ from .db import connect, raw_match_count
 from .http import ResilientClient
 
 
+def _resolve_since(args) -> datetime | None:
+    """--since(YYYY-MM-DD) 우선, 없으면 --days N. naive UTC 반환."""
+    if getattr(args, "since", None):
+        return datetime.fromisoformat(args.since)
+    if getattr(args, "days", None):
+        return (datetime.now(timezone.utc) - timedelta(days=args.days)).replace(tzinfo=None)
+    return None
+
+
 def _cmd_spike(_args) -> None:
     print(spike.run(DEFAULT))
 
 
 def _cmd_collect(args) -> None:
     nicks = [n.strip() for n in (args.seed_nicknames or "").split(",") if n.strip()]
-    collect.run(DEFAULT, seed_nicknames=nicks, max_new_matches=args.max_matches)
+    collect.run(
+        DEFAULT,
+        seed_nicknames=nicks,
+        max_new_matches=args.max_matches,
+        since=_resolve_since(args),
+        refresh=args.refresh,
+    )
 
 
 def _cmd_build(_args) -> None:
@@ -55,8 +71,10 @@ def _cmd_meta(_args) -> None:
 def _cmd_export(args) -> None:
     con = connect(DEFAULT, read_only=True)
     try:
-        payload = export_mod.export(con, Path(args.out), gate=args.gate)
-        print(f"리더보드 {payload['leaderboard_count']}장 → {args.out}/leaderboard.{{json,csv}}")
+        payload = export_mod.export(con, Path(args.out), gate=args.gate, since=_resolve_since(args))
+        span = f" (since {payload['since']})" if payload.get("since") else ""
+        print(f"리더보드 {payload['leaderboard_count']}장{span} → "
+              f"{args.out}/leaderboard.{{json,csv}} + index.html")
         ge = payload["grade_effect"]
         print(
             f"강화효과(유저 내): 페어유저 {ge['paired_users']}, "
@@ -69,7 +87,7 @@ def _cmd_export(args) -> None:
 def _cmd_leaderboard(args) -> None:
     con = connect(DEFAULT, read_only=True)
     try:
-        lb = agg.card_leaderboard(con, gate=args.gate)
+        lb = agg.card_leaderboard(con, gate=args.gate, since=_resolve_since(args))
         if meta.has_meta(con):
             meta.enrich(con, lb)
         print(f"# 카드 리더보드 (게이트 {args.gate}경기, 상위 {args.top})")
@@ -94,20 +112,28 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--seed-nicknames", default="",
                    help="쉼표로 구분한 시드 닉네임 (예: '아이콘,랭커2'). 재개 시 생략 가능")
     c.add_argument("--max-matches", type=int, default=5000)
+    c.add_argument("--refresh", action="store_true",
+                   help="처리 끝난 유저를 다시 열어 새 경기 보충 (중복은 자동 차단)")
+    c.add_argument("--since", help="이 날짜(YYYY-MM-DD) 이후 매치만 수집")
+    c.add_argument("--days", type=int, help="최근 N일 매치만 수집")
     c.set_defaults(func=_cmd_collect)
 
     sub.add_parser("build", help="재파싱(gk_match/shot 재생성)").set_defaults(func=_cmd_build)
 
     sub.add_parser("meta", help="선수명·시즌 메타 캐시 갱신").set_defaults(func=_cmd_meta)
 
-    e = sub.add_parser("export", help="JSON/CSV 산출")
+    e = sub.add_parser("export", help="JSON/CSV/HTML 산출")
     e.add_argument("--gate", type=int, default=MIN_MATCHES_GATE)
     e.add_argument("--out", default="out")
+    e.add_argument("--since", help="이 날짜(YYYY-MM-DD) 이후 경기만 집계")
+    e.add_argument("--days", type=int, help="최근 N일 경기만 집계")
     e.set_defaults(func=_cmd_export)
 
     lb = sub.add_parser("leaderboard", help="리더보드 콘솔 출력")
     lb.add_argument("--gate", type=int, default=MIN_MATCHES_GATE)
     lb.add_argument("--top", type=int, default=20)
+    lb.add_argument("--since", help="이 날짜(YYYY-MM-DD) 이후 경기만 집계")
+    lb.add_argument("--days", type=int, help="최근 N일 경기만 집계")
     lb.set_defaults(func=_cmd_leaderboard)
 
     return p

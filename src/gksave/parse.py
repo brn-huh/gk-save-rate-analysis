@@ -16,6 +16,7 @@ parse_match 는 GK 출전(appearances)과 슛(shots)을 함께 낸다. 출전을
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from .config import (
@@ -27,9 +28,21 @@ from .config import (
 )
 
 
+def parse_match_date(detail: dict[str, Any]) -> datetime | None:
+    """payload.matchDate('2026-06-29T14:06:15', UTC) → datetime. 실패 시 None."""
+    raw = detail.get("matchDate")
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw)
+    except (ValueError, TypeError):
+        return None
+
+
 @dataclass(frozen=True)
 class Appearance:
     match_id: str
+    match_date: datetime | None
     gk_ouid: str
     gk_sp_id: int
     gk_sp_grade: int
@@ -38,6 +51,7 @@ class Appearance:
 @dataclass(frozen=True)
 class ShotRow:
     match_id: str
+    match_date: datetime | None
     gk_ouid: str
     gk_sp_id: int
     gk_sp_grade: int
@@ -79,6 +93,7 @@ def parse_match(
 
     infos = detail.get("matchInfo", [])
     match_id = detail.get("matchId", "")
+    match_date = parse_match_date(detail)
     if len(infos) != 2:
         st.skipped_not_two_teams += 1
         return appearances, shots
@@ -96,7 +111,7 @@ def parse_match(
 
         gk_ouid = me.get("ouid", "")
         gk_sp_id = gk.get("spId")
-        appearances.append(Appearance(match_id, gk_ouid, gk_sp_id, grade))
+        appearances.append(Appearance(match_id, match_date, gk_ouid, gk_sp_id, grade))
         st.appearances += 1
 
         for s in opp.get("shootDetail", []):
@@ -108,6 +123,7 @@ def parse_match(
             shots.append(
                 ShotRow(
                     match_id=match_id,
+                    match_date=match_date,
                     gk_ouid=gk_ouid,
                     gk_sp_id=gk_sp_id,
                     gk_sp_grade=grade,

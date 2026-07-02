@@ -20,6 +20,7 @@ from .config import DEFAULT, Settings
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS raw_match (
     match_id   VARCHAR PRIMARY KEY,
+    match_date TIMESTAMP,          -- payload.matchDate (UTC)
     payload    JSON     NOT NULL,
     fetched_at TIMESTAMP DEFAULT now()
 );
@@ -44,6 +45,7 @@ CREATE TABLE IF NOT EXISTS meta_season (
 -- GK 출전: 카드가 GK로 뛴 경기 1건 = 1행 (슛 0개 경기도 표본 게이트에 반영)
 CREATE TABLE IF NOT EXISTS gk_match (
     match_id     VARCHAR,
+    match_date   TIMESTAMP,
     gk_ouid      VARCHAR,
     gk_sp_id     BIGINT,
     gk_sp_grade  INTEGER
@@ -52,6 +54,7 @@ CREATE TABLE IF NOT EXISTS gk_match (
 -- 파싱 결과: 우리 GK가 마주한 상대 유효슛 1개 = 1행
 CREATE TABLE IF NOT EXISTS shot (
     match_id     VARCHAR,
+    match_date   TIMESTAMP,
     gk_ouid      VARCHAR,
     gk_sp_id     BIGINT,
     gk_sp_grade  INTEGER,
@@ -67,12 +70,29 @@ CREATE TABLE IF NOT EXISTS shot (
 """
 
 
+# 구버전 DB 파일에 없을 수 있는 컬럼 (있으면 무시). 이름 지정 INSERT라 위치는 무관.
+_MIGRATIONS = (
+    "ALTER TABLE raw_match ADD COLUMN IF NOT EXISTS match_date TIMESTAMP",
+    "ALTER TABLE gk_match  ADD COLUMN IF NOT EXISTS match_date TIMESTAMP",
+    "ALTER TABLE shot      ADD COLUMN IF NOT EXISTS match_date TIMESTAMP",
+)
+
+
+def _migrate(con: duckdb.DuckDBPyConnection) -> None:
+    for stmt in _MIGRATIONS:
+        try:
+            con.execute(stmt)
+        except Exception:  # noqa: BLE001 - 이미 있거나 지원 안 하면 무시
+            pass
+
+
 def connect(settings: Settings = DEFAULT, *, read_only: bool = False) -> duckdb.DuckDBPyConnection:
     path: Path = settings.db_path
     path.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(path), read_only=read_only)
     if not read_only:
         con.execute(SCHEMA)
+        _migrate(con)
     return con
 
 

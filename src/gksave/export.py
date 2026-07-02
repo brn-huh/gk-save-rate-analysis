@@ -25,18 +25,24 @@ WARNING = (
 )
 
 
-def build_payload(con: duckdb.DuckDBPyConnection, *, gate: int = MIN_MATCHES_GATE) -> dict:
-    leaderboard = agg.card_leaderboard(con, gate=gate)
+def build_payload(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    gate: int = MIN_MATCHES_GATE,
+    since: datetime | None = None,
+) -> dict:
+    leaderboard = agg.card_leaderboard(con, gate=gate, since=since)
     for card in leaderboard:
-        card["grade_breakdown"] = agg.grade_breakdown(con, card["gk_sp_id"])
+        card["grade_breakdown"] = agg.grade_breakdown(con, card["gk_sp_id"], since=since)
 
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "gate_min_matches": gate,
+        "since": since.isoformat() if since else None,
         "warning": WARNING,
         "leaderboard_count": len(leaderboard),
         "leaderboard": leaderboard,
-        "grade_effect": agg.within_ouid_grade_effect(con),
+        "grade_effect": agg.within_ouid_grade_effect(con, since=since),
     }
     # 메타 캐시가 있으면 선수명·시즌 붙이고 동일선수 시즌 비교표 추가
     if meta.has_meta(con):
@@ -45,9 +51,15 @@ def build_payload(con: duckdb.DuckDBPyConnection, *, gate: int = MIN_MATCHES_GAT
     return payload
 
 
-def export(con: duckdb.DuckDBPyConnection, out_dir: Path, *, gate: int = MIN_MATCHES_GATE) -> dict:
+def export(
+    con: duckdb.DuckDBPyConnection,
+    out_dir: Path,
+    *,
+    gate: int = MIN_MATCHES_GATE,
+    since: datetime | None = None,
+) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
-    payload = build_payload(con, gate=gate)
+    payload = build_payload(con, gate=gate, since=since)
 
     (out_dir / "leaderboard.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
