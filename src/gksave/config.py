@@ -46,8 +46,12 @@ class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.environ.get("GKSAVE_DATA_DIR", "data")))
     db_name: str = "gksave.duckdb"
 
-    # 레이트리밋 (보수적 기본값 — T0에서 429 실측 후 조정)
-    max_requests_per_sec: float = 5.0
+    # 레이트리밋 (기본 5, 환경변수 GKSAVE_RATE 로 조정. 429는 백오프가 흡수)
+    # 넥슨 한도: 초당 50 / 분당 1,000(병목=평균 16.7/s) / 일일 2천만.
+    # 지속 안전 최대 ≈ 15/s(900/min). 그 이상은 분당 한도로 429 유발.
+    max_requests_per_sec: float = field(
+        default_factory=lambda: float(os.environ.get("GKSAVE_RATE", "5"))
+    )
     # 429/5xx 재시도
     max_retries: int = 6
     backoff_base_sec: float = 1.0
