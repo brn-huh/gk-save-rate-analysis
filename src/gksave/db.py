@@ -67,6 +67,45 @@ CREATE TABLE IF NOT EXISTS shot (
     x            DOUBLE,
     y            DOUBLE
 );
+
+-- ── 조회 편의 뷰 (이름·시즌·강화 조인) ──────────────────────────
+-- 시즌은 gk_sp_id 앞자리와 meta_season.season_id 의 longest-prefix 매칭.
+
+CREATE VIEW IF NOT EXISTS shot_readable AS
+SELECT s.match_id, s.match_date,
+       sp.name AS player_name,
+       (SELECT m.class_name FROM meta_season m
+         WHERE CAST(s.gk_sp_id AS VARCHAR) LIKE CAST(m.season_id AS VARCHAR) || '%'
+         ORDER BY length(CAST(m.season_id AS VARCHAR)) DESC LIMIT 1) AS season,
+       s.gk_sp_id, s.gk_sp_grade AS grade,
+       s.result, s.is_pk, s.shot_type, s.in_penalty, s.assist, s.hit_post,
+       s.x, s.y, s.gk_ouid
+FROM shot s
+LEFT JOIN meta_spid sp ON sp.sp_id = s.gk_sp_id;
+
+CREATE VIEW IF NOT EXISTS card_stats AS
+WITH mm AS (
+    SELECT gk_sp_id, gk_sp_grade, count(DISTINCT match_id) AS matches
+    FROM gk_match GROUP BY 1, 2
+),
+ss AS (
+    SELECT gk_sp_id, gk_sp_grade,
+           sum(CASE WHEN result = 1 THEN 1 ELSE 0 END) AS saves,
+           sum(CASE WHEN result = 3 THEN 1 ELSE 0 END) AS goals
+    FROM shot WHERE NOT is_pk GROUP BY 1, 2
+)
+SELECT sp.name AS player_name,
+       (SELECT m.class_name FROM meta_season m
+         WHERE CAST(mm.gk_sp_id AS VARCHAR) LIKE CAST(m.season_id AS VARCHAR) || '%'
+         ORDER BY length(CAST(m.season_id AS VARCHAR)) DESC LIMIT 1) AS season,
+       mm.gk_sp_id, mm.gk_sp_grade AS grade, mm.matches,
+       COALESCE(ss.saves, 0) AS saves, COALESCE(ss.goals, 0) AS goals,
+       CASE WHEN COALESCE(ss.saves, 0) + COALESCE(ss.goals, 0) > 0
+            THEN round(100.0 * ss.saves / (ss.saves + ss.goals), 1) END AS save_pct
+FROM mm
+LEFT JOIN ss USING (gk_sp_id, gk_sp_grade)
+LEFT JOIN meta_spid sp ON sp.sp_id = mm.gk_sp_id
+ORDER BY mm.matches DESC;
 """
 
 
