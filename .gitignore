@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# 데이터 산출물 (수집 결과는 커밋하지 않음)
+data/
+*.duckdb
+*.duckdb.wal
+out/
+
+# macOS
+.DS_Store

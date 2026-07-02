@@ -1,0 +1,35 @@
+{
+  "matchId": "M1",
+  "matchType": 50,
+  "matchInfo": [
+    {
+      "ouid": "A",
+      "player": [
+        {"spId": 300000001, "spPosition": 0, "spGrade": 10},
+        {"spId": 300000050, "spPosition": 5, "spGrade": 11}
+      ],
+      "shoot": {"effectiveShootTotal": 4, "goalTotal": 1},
+      "shootDetail": [
+        {"result": 1, "type": 2, "inPenalty": true,  "assist": false, "hitPost": false, "x": 0.90, "y": 0.50, "spId": 300000050, "spGrade": 11},
+        {"result": 1, "type": 6, "inPenalty": true,  "assist": true,  "hitPost": false, "x": 0.85, "y": 0.40, "spId": 300000050, "spGrade": 11},
+        {"result": 1, "type": 1, "inPenalty": false, "assist": false, "hitPost": false, "x": 0.70, "y": 0.60, "spId": 300000050, "spGrade": 11},
+        {"result": 3, "type": 1, "inPenalty": true,  "assist": false, "hitPost": false, "x": 0.95, "y": 0.50, "spId": 300000050, "spGrade": 11}
+      ]
+    },
+    {
+      "ouid": "B",
+      "player": [
+        {"spId": 280000002, "spPosition": 0, "spGrade": 8},
+        {"spId": 280000060, "spPosition": 9, "spGrade": 9}
+      ],
+      "shoot": {"effectiveShootTotal": 5, "goalTotal": 2},
+      "shootDetail": [
+        {"result": 1, "type": 2,  "inPenalty": true,  "assist": false, "hitPost": false, "x": 0.90, "y": 0.50},
+        {"result": 1, "type": 6,  "inPenalty": true,  "assist": false, "hitPost": false, "x": 0.88, "y": 0.55},
+        {"result": 3, "type": 1,  "inPenalty": true,  "assist": true,  "hitPost": false, "x": 0.96, "y": 0.48},
+        {"result": 2, "type": 1,  "inPenalty": false, "assist": false, "hitPost": false, "x": 0.60, "y": 0.50},
+        {"result": 3, "type": 9,  "inPenalty": true,  "assist": false, "hitPost": false, "x": 0.99, "y": 0.50}
+      ]
+    }
+  ]
+}

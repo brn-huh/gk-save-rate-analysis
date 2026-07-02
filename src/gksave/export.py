@@ -1,0 +1,58 @@
+"""익스포트 (T7, T7b) — 집계 결과를 정적 JSON/CSV로.
+
+리더보드에는 교란 주의 라벨과 표본 경기수를 반드시 함께 노출한다(T7b).
+raw 종합선방률은 카드 성능이 아니라 그 카드를 쓰는 유저 실력이 섞인 값이므로
+'카드 추천'이 아님을 산출물에서 명시한다.
+"""
+
+from __future__ import annotations
+
+import csv
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+import duckdb
+
+from . import agg
+from .config import MIN_MATCHES_GATE
+
+WARNING = (
+    "이 순위는 raw 종합선방률이다. matchtype=50은 사람이 키핑하므로 이 값에는 "
+    "카드 성능뿐 아니라 그 카드를 쓴 유저의 실력·수비 라인·상대 슛 난이도가 섞여 있다. "
+    "따라서 '카드 추천'이 아니다. 강화 자체의 효과는 grade_effect(유저 내 비교)를 볼 것. "
+    "각 순위에는 표본 경기수(matches)를 함께 표기한다."
+)
+
+
+def build_payload(con: duckdb.DuckDBPyConnection, *, gate: int = MIN_MATCHES_GATE) -> dict:
+    leaderboard = agg.card_leaderboard(con, gate=gate)
+    for card in leaderboard:
+        card["grade_breakdown"] = agg.grade_breakdown(con, card["gk_sp_id"])
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "gate_min_matches": gate,
+        "warning": WARNING,
+        "leaderboard_count": len(leaderboard),
+        "leaderboard": leaderboard,
+        "grade_effect": agg.within_ouid_grade_effect(con),
+    }
+
+
+def export(con: duckdb.DuckDBPyConnection, out_dir: Path, *, gate: int = MIN_MATCHES_GATE) -> dict:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    payload = build_payload(con, gate=gate)
+
+    (out_dir / "leaderboard.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    # CSV (평면). 빈 리더보드도 헤더는 남긴다.
+    with (out_dir / "leaderboard.csv").open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["rank", "gk_sp_id", "matches", "saves", "goals", "save_pct"])
+        for c in payload["leaderboard"]:
+            pct = "" if c["save_pct"] is None else f"{c['save_pct']:.4f}"
+            w.writerow([c["rank"], c["gk_sp_id"], c["matches"], c["saves"], c["goals"], pct])
+
+    return payload
