@@ -14,7 +14,7 @@ from pathlib import Path
 
 import duckdb
 
-from . import agg
+from . import agg, meta
 from .config import MIN_MATCHES_GATE
 
 WARNING = (
@@ -29,7 +29,8 @@ def build_payload(con: duckdb.DuckDBPyConnection, *, gate: int = MIN_MATCHES_GAT
     leaderboard = agg.card_leaderboard(con, gate=gate)
     for card in leaderboard:
         card["grade_breakdown"] = agg.grade_breakdown(con, card["gk_sp_id"])
-    return {
+
+    payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "gate_min_matches": gate,
         "warning": WARNING,
@@ -37,6 +38,11 @@ def build_payload(con: duckdb.DuckDBPyConnection, *, gate: int = MIN_MATCHES_GAT
         "leaderboard": leaderboard,
         "grade_effect": agg.within_ouid_grade_effect(con),
     }
+    # 메타 캐시가 있으면 선수명·시즌 붙이고 동일선수 시즌 비교표 추가
+    if meta.has_meta(con):
+        meta.enrich(con, leaderboard)
+        payload["same_player"] = meta.same_player_view(leaderboard)
+    return payload
 
 
 def export(con: duckdb.DuckDBPyConnection, out_dir: Path, *, gate: int = MIN_MATCHES_GATE) -> dict:
@@ -50,9 +56,14 @@ def export(con: duckdb.DuckDBPyConnection, out_dir: Path, *, gate: int = MIN_MAT
     # CSV (평면). 빈 리더보드도 헤더는 남긴다.
     with (out_dir / "leaderboard.csv").open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["rank", "gk_sp_id", "matches", "saves", "goals", "save_pct"])
+        w.writerow(["rank", "gk_sp_id", "player_name", "season_id", "season_name",
+                    "matches", "saves", "goals", "save_pct"])
         for c in payload["leaderboard"]:
             pct = "" if c["save_pct"] is None else f"{c['save_pct']:.4f}"
-            w.writerow([c["rank"], c["gk_sp_id"], c["matches"], c["saves"], c["goals"], pct])
+            w.writerow([
+                c["rank"], c["gk_sp_id"], c.get("player_name", ""),
+                c.get("season_id", ""), c.get("season_name", ""),
+                c["matches"], c["saves"], c["goals"], pct,
+            ])
 
     return payload

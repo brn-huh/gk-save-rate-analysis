@@ -12,9 +12,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from . import agg, collect, export as export_mod, spike
+from . import agg, collect, export as export_mod, meta, spike
 from .config import DEFAULT, MIN_MATCHES_GATE
 from .db import connect, raw_match_count
+from .http import ResilientClient
 
 
 def _cmd_spike(_args) -> None:
@@ -41,6 +42,16 @@ def _cmd_build(_args) -> None:
         con.close()
 
 
+def _cmd_meta(_args) -> None:
+    con = connect(DEFAULT)
+    try:
+        with ResilientClient(DEFAULT) as client:
+            n_sp, n_se = meta.refresh(con, client)
+        print(f"메타 캐시 갱신: 선수 {n_sp}, 시즌 {n_se}")
+    finally:
+        con.close()
+
+
 def _cmd_export(args) -> None:
     con = connect(DEFAULT, read_only=True)
     try:
@@ -59,11 +70,15 @@ def _cmd_leaderboard(args) -> None:
     con = connect(DEFAULT, read_only=True)
     try:
         lb = agg.card_leaderboard(con, gate=args.gate)
+        if meta.has_meta(con):
+            meta.enrich(con, lb)
         print(f"# 카드 리더보드 (게이트 {args.gate}경기, 상위 {args.top})")
         print("주의: raw 선방률 — 유저 실력 교란 포함, 카드 추천 아님")
         for c in lb[: args.top]:
             pct = "  N/A" if c["save_pct"] is None else f"{c['save_pct'] * 100:5.1f}%"
-            print(f"  {c['rank']:>3}. spId={c['gk_sp_id']}  {pct}  "
+            who = c.get("player_name") or f"spId={c['gk_sp_id']}"
+            season = f" [{c['season_name']}]" if c.get("season_name") else ""
+            print(f"  {c['rank']:>3}. {who}{season}  {pct}  "
                   f"({c['saves']}/{c['saves'] + c['goals']} 세이브, {c['matches']}경기)")
     finally:
         con.close()
@@ -82,6 +97,8 @@ def build_parser() -> argparse.ArgumentParser:
     c.set_defaults(func=_cmd_collect)
 
     sub.add_parser("build", help="재파싱(gk_match/shot 재생성)").set_defaults(func=_cmd_build)
+
+    sub.add_parser("meta", help="선수명·시즌 메타 캐시 갱신").set_defaults(func=_cmd_meta)
 
     e = sub.add_parser("export", help="JSON/CSV 산출")
     e.add_argument("--gate", type=int, default=MIN_MATCHES_GATE)

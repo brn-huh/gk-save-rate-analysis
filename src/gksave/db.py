@@ -31,6 +31,16 @@ CREATE TABLE IF NOT EXISTS frontier (
     added_at TIMESTAMP DEFAULT now()
 );
 
+-- 메타데이터 캐시 (정적 파일 /static/fconline/meta/{spid,seasonid}.json)
+CREATE TABLE IF NOT EXISTS meta_spid (
+    sp_id BIGINT PRIMARY KEY,
+    name  VARCHAR
+);
+CREATE TABLE IF NOT EXISTS meta_season (
+    season_id  INTEGER PRIMARY KEY,
+    class_name VARCHAR
+);
+
 -- GK 출전: 카드가 GK로 뛴 경기 1건 = 1행 (슛 0개 경기도 표본 게이트에 반영)
 CREATE TABLE IF NOT EXISTS gk_match (
     match_id     VARCHAR,
