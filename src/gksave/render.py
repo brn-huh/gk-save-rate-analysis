@@ -71,6 +71,9 @@ _TEMPLATE = r"""<!doctype html>
   details{margin:5px 0}
   summary{cursor:pointer;font-weight:600}
   .empty{text-align:center;color:#999;padding:22px}
+  footer{margin-top:36px;padding-top:14px;border-top:1px solid var(--bd);
+         color:var(--mut);font-size:.8rem;line-height:1.6}
+  footer a{color:var(--acc);text-decoration:none}
 </style></head><body>
 <h1>FC온라인 골키퍼 선방률 리더보드</h1>
 <p class="meta" id="meta"></p>
@@ -96,6 +99,13 @@ _TEMPLATE = r"""<!doctype html>
 <h2>동일 선수 · 시즌 비교</h2>
 <p class="muted">같은 선수의 시즌·강화별 선방률(raw)과 GSAx. (여전히 raw 는 유저 교란 포함)</p>
 <div id="sp"></div>
+
+<footer>
+  데이터 출처: 본 분석의 모든 경기 데이터는 <b>NEXON Open API</b>
+  (<a href="https://open.api.nexon.com" target="_blank" rel="noopener">open.api.nexon.com</a>)
+  의 FC 온라인 매치 데이터를 수집·가공해 제공합니다.<br>
+  넥슨 및 FC 온라인과 무관한 비공식 팬 분석이며, 지표는 공개 API 데이터에 기반한 추정치입니다.
+</footer>
 
 <script id="gk-data" type="application/json">__DATA__</script>
 <script>
