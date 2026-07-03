@@ -31,9 +31,8 @@ def build_payload(
     gate: int = MIN_MATCHES_GATE,
     since: datetime | None = None,
 ) -> dict:
-    leaderboard = agg.card_leaderboard(con, gate=gate, since=since)
-    for card in leaderboard:
-        card["grade_breakdown"] = agg.grade_breakdown(con, card["gk_sp_id"], since=since)
+    # (선수×시즌×강화단계) 단위 — 강화를 퉁치지 않는다
+    leaderboard = agg.grade_leaderboard(con, gate=gate, since=since)
 
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -69,13 +68,13 @@ def export(
     with (out_dir / "leaderboard.csv").open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["rank", "gk_sp_id", "player_name", "season_id", "season_name",
-                    "matches", "saves", "goals", "save_pct"])
+                    "grade", "matches", "saves", "goals", "save_pct"])
         for c in payload["leaderboard"]:
             pct = "" if c["save_pct"] is None else f"{c['save_pct']:.4f}"
             w.writerow([
                 c["rank"], c["gk_sp_id"], c.get("player_name", ""),
                 c.get("season_id", ""), c.get("season_name", ""),
-                c["matches"], c["saves"], c["goals"], pct,
+                c.get("grade", ""), c["matches"], c["saves"], c["goals"], pct,
             ])
 
     # 공개용 정적 HTML (자기완결형, 그대로 열거나 호스팅)

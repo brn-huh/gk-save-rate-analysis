@@ -8,14 +8,14 @@ _PAYLOAD = {
     "warning": "raw 선방률 — 카드 추천 아님",
     "leaderboard_count": 1,
     "leaderboard": [
-        {"rank": 1, "gk_sp_id": 101190053, "player_name": "야신",
+        {"rank": 1, "gk_sp_id": 101190053, "player_name": "야신", "grade": 10,
          "season_name": "ICON", "save_pct": 0.75, "saves": 3, "goals": 1, "matches": 60},
     ],
     "grade_effect": {"mean_save_pct_delta_per_grade": 0.02, "paired_users": 4, "pairs": 6},
     "same_player": [
         {"player_name": "노이어", "cards": [
-            {"season_name": "CAP", "save_pct": 0.53, "matches": 80},
-            {"season_name": "BLD", "save_pct": None, "matches": 1},
+            {"season_name": "CAP", "grade": 11, "save_pct": 0.53, "matches": 80},
+            {"season_name": "BLD", "grade": 8, "save_pct": None, "matches": 1},
         ]},
     ],
 }
@@ -29,6 +29,7 @@ def test_html_contains_key_elements():
     assert "75.0%" in html                    # 선방률 포맷
     assert "60" in html                       # 표본경기
     assert "노이어" in html                   # 동일선수 비교
+    assert "10강" in html                     # 강화단계 표기
     assert "N/A" in html                      # None 선방률 안전 표기
     assert "+2.00%p" in html                  # 강화효과
 

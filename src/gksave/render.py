@@ -18,7 +18,7 @@ def _pct(v: float | None) -> str:
 
 def _leaderboard_rows(cards: list[dict[str, Any]]) -> str:
     if not cards:
-        return '<tr><td colspan="6" class="empty">게이트를 통과한 카드가 없습니다.</td></tr>'
+        return '<tr><td colspan="7" class="empty">게이트를 통과한 카드가 없습니다.</td></tr>'
     out = []
     for c in cards:
         who = escape(c.get("player_name") or f"spId {c['gk_sp_id']}")
@@ -27,6 +27,7 @@ def _leaderboard_rows(cards: list[dict[str, Any]]) -> str:
         out.append(
             f"<tr><td class='rank'>{c['rank']}</td>"
             f"<td>{who}</td><td class='season'>{season}</td>"
+            f"<td class='num'>{c.get('grade', '')}강</td>"
             f"<td class='pct'>{_pct(c['save_pct'])}</td>"
             f"<td class='num'>{c['saves']}/{total}</td>"
             f"<td class='num'>{c['matches']}</td></tr>"
@@ -41,13 +42,14 @@ def _same_player_section(groups: list[dict[str, Any]]) -> str:
     for g in groups:
         rows = "\n".join(
             f"<tr><td>{escape(c.get('season_name') or '')}</td>"
+            f"<td class='num'>{c.get('grade', '')}강</td>"
             f"<td class='pct'>{_pct(c['save_pct'])}</td>"
             f"<td class='num'>{c['matches']}</td></tr>"
             for c in g["cards"]
         )
         blocks.append(
             f"<details><summary>{escape(g['player_name'])}</summary>"
-            f"<table class='mini'><thead><tr><th>시즌</th><th>선방률</th><th>표본</th></tr></thead>"
+            f"<table class='mini'><thead><tr><th>시즌</th><th>강화</th><th>선방률</th><th>표본</th></tr></thead>"
             f"<tbody>{rows}</tbody></table></details>"
         )
     return (
@@ -92,9 +94,9 @@ def build_html(payload: dict[str, Any]) -> str:
 
 <div class="warn"><b>⚠️ 읽는 법:</b> {escape(payload.get("warning", ""))}</div>
 
-<h2>카드 리더보드</h2>
+<h2>리더보드 (선수 · 시즌 · 강화)</h2>
 <table><thead><tr>
-  <th>#</th><th>선수</th><th>시즌</th><th>선방률</th><th>세이브</th><th>표본경기</th>
+  <th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>선방률</th><th>세이브</th><th>표본경기</th>
 </tr></thead><tbody>
 {_leaderboard_rows(payload.get("leaderboard", []))}
 </tbody></table>

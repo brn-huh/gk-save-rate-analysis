@@ -50,6 +50,18 @@ def test_leaderboard_ranks_by_save_pct(con, sample_detail):
     assert lb[0]["matches"] == 1
 
 
+def test_grade_leaderboard_splits_by_grade(con):
+    # 같은 카드(sp 500)를 10강·11강으로 → 퉁치지 않고 2행
+    _insert(con, _match("a", "U", 500, 10, saves=3, goals=1))
+    _insert(con, _match("b", "W", 500, 11, saves=4, goals=0))
+    agg.rebuild(con)
+    lb = agg.grade_leaderboard(con, gate=1)
+    by_grade = {(r["gk_sp_id"], r["grade"]): r for r in lb}
+    assert (500, 10) in by_grade and (500, 11) in by_grade   # 강화별 분리
+    assert by_grade[(500, 11)]["save_pct"] == pytest.approx(1.0)
+    assert by_grade[(500, 10)]["save_pct"] == pytest.approx(0.75)
+
+
 def test_gate_excludes_thin_samples(con, sample_detail):
     _insert(con, sample_detail)
     agg.rebuild(con)

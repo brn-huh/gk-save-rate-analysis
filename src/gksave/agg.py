@@ -119,6 +119,49 @@ def card_leaderboard(
     return out
 
 
+def grade_leaderboard(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    gate: int = MIN_MATCHES_GATE,
+    since: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """(선수×시즌=sp_id) × 강화단계 단위 리더보드. 강화단계를 퉁치지 않는다.
+
+    각 (sp_id, spGrade) 조합이 한 행. gate 는 그 조합의 표본 경기수에 건다.
+    """
+    m_pred, m_params = _date_pred(since, first=True)
+    s_pred, s_params = _date_pred(since, first=False)
+    rows = con.execute(
+        f"""
+        WITH m AS (
+            SELECT gk_sp_id, gk_sp_grade, count(DISTINCT match_id) AS matches
+            FROM gk_match{m_pred} GROUP BY 1, 2
+        ),
+        s AS (
+            SELECT gk_sp_id, gk_sp_grade,
+                   sum(CASE WHEN result = 1 THEN 1 ELSE 0 END) AS saves,
+                   sum(CASE WHEN result = 3 THEN 1 ELSE 0 END) AS goals
+            FROM shot WHERE NOT is_pk{s_pred} GROUP BY 1, 2
+        )
+        SELECT m.gk_sp_id, m.gk_sp_grade, m.matches,
+               COALESCE(s.saves, 0), COALESCE(s.goals, 0)
+        FROM m LEFT JOIN s USING (gk_sp_id, gk_sp_grade)
+        WHERE m.matches >= ?
+        """,
+        m_params + s_params + [gate],
+    ).fetchall()
+
+    out = [
+        {"gk_sp_id": r[0], "grade": r[1], "matches": r[2],
+         "saves": r[3], "goals": r[4], "save_pct": _save_pct(r[3], r[4])}
+        for r in rows
+    ]
+    out.sort(key=lambda d: (d["save_pct"] is not None, d["save_pct"] or 0.0), reverse=True)
+    for i, d in enumerate(out, 1):
+        d["rank"] = i
+    return out
+
+
 def grade_breakdown(
     con: duckdb.DuckDBPyConnection, sp_id: int, *, since: datetime | None = None
 ) -> list[dict[str, Any]]:

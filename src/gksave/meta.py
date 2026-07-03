@@ -88,7 +88,7 @@ def same_player_view(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
     out: list[dict[str, Any]] = []
     for name, group in by.items():
-        if len({c["season_id"] for c in group}) < 2:
+        if len(group) < 2:  # 비교하려면 (시즌×강화) 조합이 2개 이상
             continue
         rows = sorted(
             group,
@@ -102,6 +102,7 @@ def same_player_view(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     {
                         "season_id": c["season_id"],
                         "season_name": c["season_name"],
+                        "grade": c.get("grade"),
                         "gk_sp_id": c["gk_sp_id"],
                         "save_pct": c["save_pct"],
                         "matches": c["matches"],

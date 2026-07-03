@@ -87,16 +87,16 @@ def _cmd_export(args) -> None:
 def _cmd_leaderboard(args) -> None:
     con = connect(DEFAULT, read_only=True)
     try:
-        lb = agg.card_leaderboard(con, gate=args.gate, since=_resolve_since(args))
+        lb = agg.grade_leaderboard(con, gate=args.gate, since=_resolve_since(args))
         if meta.has_meta(con):
             meta.enrich(con, lb)
-        print(f"# 카드 리더보드 (게이트 {args.gate}경기, 상위 {args.top})")
+        print(f"# 리더보드 (선수×시즌×강화, 게이트 {args.gate}경기, 상위 {args.top})")
         print("주의: raw 선방률 — 유저 실력 교란 포함, 카드 추천 아님")
         for c in lb[: args.top]:
             pct = "  N/A" if c["save_pct"] is None else f"{c['save_pct'] * 100:5.1f}%"
             who = c.get("player_name") or f"spId={c['gk_sp_id']}"
             season = f" [{c['season_name']}]" if c.get("season_name") else ""
-            print(f"  {c['rank']:>3}. {who}{season}  {pct}  "
+            print(f"  {c['rank']:>3}. {who}{season} {c['grade']}강  {pct}  "
                   f"({c['saves']}/{c['saves'] + c['goals']} 세이브, {c['matches']}경기)")
     finally:
         con.close()
