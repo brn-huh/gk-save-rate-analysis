@@ -21,6 +21,11 @@ SPGRADE_MIN = 8                  # 측정 강화단계 하한
 SPGRADE_MAX = 13                 # 측정 강화단계 상한
 MIN_MATCHES_GATE = 50            # 카드(시즌×선수) 리더보드 최소 표본 경기수
 
+# 수집 하한 날짜(기본): 이 날짜 이전 매치는 수집에서 제외한다.
+# (게임 시즌/업데이트 경계 — 그 이전 데이터는 메타가 달라 분석에서 뺀다)
+# collect 시 --since 로 덮어쓸 수 있다.
+COLLECT_MIN_DATE = "2026-03-26"
+
 # ── shootDetail 코드 (nexon open api 명세) ───────────────────────
 RESULT_SAVE = 1                  # ontarget = 선방(실점 아님)  ※ T0에서 '수비수 블록 포함 여부' 검증 필요
 RESULT_OFFTARGET = 2             # 유효슛 아님 → 분모 제외

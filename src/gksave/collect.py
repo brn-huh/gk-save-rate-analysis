@@ -17,7 +17,7 @@ from typing import Any, Callable
 import duckdb
 
 from . import api
-from .config import DEFAULT, Settings
+from .config import COLLECT_MIN_DATE, DEFAULT, Settings
 from .db import have_match
 from .http import ApiError, ResilientClient
 from .parse import parse_match_date
@@ -180,6 +180,11 @@ def run(
     since 를 주면 그 날짜 이후 매치만 수집한다.
     """
     from .db import connect, raw_match_count
+
+    # 수집 하한 날짜: --since 미지정이면 기본 COLLECT_MIN_DATE 적용
+    if since is None:
+        since = datetime.fromisoformat(COLLECT_MIN_DATE)
+    log(f"수집 하한 날짜: {since.date()} 이전 매치 제외")
 
     con = connect(settings)
     try:

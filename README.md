@@ -32,6 +32,8 @@ gksave spike
 gksave collect --seed-nicknames "닉1,닉2" --max-matches 30000
 gksave collect --refresh                 # 처리한 유저 다시 열어 새 경기 보충
 gksave collect --since 2026-07-01        # 특정 날짜 이후 매치만
+# 기본 수집 하한: config.COLLECT_MIN_DATE (2026-03-26) 이전 매치는 자동 제외.
+#   시즌/업데이트 경계 이전 데이터는 메타가 달라 분석에서 뺀다. --since 로 덮어쓰기 가능.
 
 # 3) 집계·표출
 gksave build                             # raw_match 재파싱 → gk_match/shot (30k ≈ 19초)
