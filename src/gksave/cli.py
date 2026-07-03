@@ -121,6 +121,36 @@ def _cmd_gsax(args) -> None:
         con.close()
 
 
+def _cmd_card(args) -> None:
+    con = connect(DEFAULT, read_only=True)
+    try:
+        since = _resolve_since(args)
+        who = {"gk_sp_id": args.sp_id}
+        if meta.has_meta(con):
+            meta.enrich(con, [who])
+        title = who.get("player_name") or f"spId {args.sp_id}"
+        season = f" [{who['season_name']}]" if who.get("season_name") else ""
+        grade = f" {args.grade}강" if args.grade else " (전체 강화)"
+        print(f"# {title}{season}{grade}")
+
+        print("\n[거리 구간별 선방률] (근사 미터)")
+        for z in agg.zone_breakdown(con, args.sp_id, grade=args.grade, since=since):
+            pct = "N/A" if z["save_pct"] is None else f"{z['save_pct'] * 100:5.1f}%"
+            print(f"  {z['zone']:16} {pct}  ({z['saves']}/{z['shots']}슛)")
+
+        print("\n[슛 타입별 선방률]")
+        tb = agg.type_breakdown(con, args.sp_id, grade=args.grade, since=since)
+        for t in tb["by_type"]:
+            pct = "N/A" if t["save_pct"] is None else f"{t['save_pct'] * 100:5.1f}%"
+            print(f"  {t['name']:10} {pct}  ({t['saves']}/{t['shots']}슛)")
+        h, f = tb["header"], tb["foot"]
+        hp = "N/A" if h["save_pct"] is None else f"{h['save_pct'] * 100:.1f}%"
+        fp = "N/A" if f["save_pct"] is None else f"{f['save_pct'] * 100:.1f}%"
+        print(f"  ── 헤더 {hp} ({h['saves']}/{h['shots']}) | 발 {fp} ({f['saves']}/{f['shots']})")
+    finally:
+        con.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="gksave", description="FC온라인 GK 선방률 분석")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -161,6 +191,13 @@ def build_parser() -> argparse.ArgumentParser:
     gx.add_argument("--since", help="이 날짜(YYYY-MM-DD) 이후 경기만 집계")
     gx.add_argument("--days", type=int, help="최근 N일 경기만 집계")
     gx.set_defaults(func=_cmd_gsax)
+
+    cd = sub.add_parser("card", help="카드 상세 (거리 존별·타입별 선방률)")
+    cd.add_argument("sp_id", type=int, help="선수 spId (리더보드/CSV에서 확인)")
+    cd.add_argument("--grade", type=int, help="특정 강화단계만 (미지정=전체)")
+    cd.add_argument("--since", help="이 날짜(YYYY-MM-DD) 이후 경기만")
+    cd.add_argument("--days", type=int, help="최근 N일만")
+    cd.set_defaults(func=_cmd_card)
 
     return p
 

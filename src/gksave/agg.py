@@ -18,7 +18,16 @@ from typing import Any
 
 import duckdb
 
-from .config import DEFAULT, MIN_MATCHES_GATE, Settings
+from .config import (
+    DEFAULT,
+    MIN_MATCHES_GATE,
+    PITCH_SCALE_M,
+    SHOT_TYPE_HEADER,
+    SHOT_TYPE_NAMES,
+    ZONE_CUTS_M,
+    ZONE_NAMES,
+    Settings,
+)
 from .parse import ParseStats, parse_match
 
 _GK_MATCH_COLS = ["match_id", "match_date", "gk_ouid", "gk_sp_id", "gk_sp_grade"]
@@ -287,6 +296,87 @@ def grade_breakdown(
          "save_pct": _save_pct(r[2], r[3])}
         for r in rows
     ]
+
+
+def _card_pred(sp_id: int, grade: int | None, since: datetime | None) -> tuple[str, list]:
+    clauses = ["gk_sp_id = ?"]
+    params: list = [sp_id]
+    if grade is not None:
+        clauses.append("gk_sp_grade = ?")
+        params.append(grade)
+    if since is not None:
+        clauses.append("match_date >= ?")
+        params.append(since)
+    return " AND ".join(clauses), params
+
+
+def zone_breakdown(
+    con: duckdb.DuckDBPyConnection, sp_id: int, *,
+    grade: int | None = None, since: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """거리 구간(초근/근/중/원)별 선방률 (명세서 §2②). 거리 = 정규화×PITCH_SCALE_M(근사)."""
+    pred, params = _card_pred(sp_id, grade, since)
+    c = PITCH_SCALE_M
+    lo, mid, hi = ZONE_CUTS_M
+    rows = con.execute(
+        f"""
+        WITH s AS (
+            SELECT result, sqrt((1-x)*(1-x)+(0.5-y)*(0.5-y)) * {c} AS dm
+            FROM shot WHERE NOT is_pk AND x IS NOT NULL AND {pred}
+        )
+        SELECT CASE WHEN dm < {lo} THEN 0 WHEN dm < {mid} THEN 1
+                    WHEN dm < {hi} THEN 2 ELSE 3 END AS zone,
+               count(*), sum(CASE WHEN result = 1 THEN 1 ELSE 0 END), avg(dm)
+        FROM s GROUP BY zone
+        """,
+        params,
+    ).fetchall()
+    got = {r[0]: r for r in rows}
+    out = []
+    for z in range(4):
+        r = got.get(z)
+        n = r[1] if r else 0
+        saves = r[2] if r else 0
+        out.append({
+            "zone": ZONE_NAMES[z], "shots": n, "saves": saves, "goals": n - saves,
+            "save_pct": _save_pct(saves, n - saves),
+            "avg_dist_m": round(r[3], 1) if r else None,
+        })
+    return out
+
+
+def type_breakdown(
+    con: duckdb.DuckDBPyConnection, sp_id: int, *,
+    grade: int | None = None, since: datetime | None = None,
+) -> dict[str, Any]:
+    """슛 타입별 선방률 (명세서 §3) + 헤더/발 슈팅 집계."""
+    pred, params = _card_pred(sp_id, grade, since)
+    rows = con.execute(
+        f"""
+        SELECT shot_type, count(*), sum(CASE WHEN result = 1 THEN 1 ELSE 0 END)
+        FROM shot WHERE NOT is_pk AND {pred} GROUP BY shot_type ORDER BY count(*) DESC
+        """,
+        params,
+    ).fetchall()
+    by_type = [
+        {"type": t, "name": SHOT_TYPE_NAMES.get(t, str(t)), "shots": n, "saves": sv,
+         "save_pct": _save_pct(sv, n - sv)}
+        for t, n, sv in rows
+    ]
+    # 헤더(type==3) vs 발(그 외)
+    hd = con.execute(
+        f"""
+        SELECT (shot_type = {SHOT_TYPE_HEADER}) AS is_header,
+               count(*), sum(CASE WHEN result = 1 THEN 1 ELSE 0 END)
+        FROM shot WHERE NOT is_pk AND {pred} GROUP BY 1
+        """,
+        params,
+    ).fetchall()
+    agg_hf = {bool(r[0]): (r[1], r[2]) for r in hd}
+    def _pack(key):
+        n, sv = agg_hf.get(key, (0, 0))
+        return {"shots": n, "saves": sv, "save_pct": _save_pct(sv, n - sv)}
+    return {"by_type": by_type, "header": _pack(True), "foot": _pack(False)}
 
 
 def within_ouid_grade_effect(

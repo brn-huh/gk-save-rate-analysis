@@ -118,6 +118,31 @@ def test_gsax_league_sum_is_zero(con):
     assert lb[0]["rank"] == 1 and lb[0]["gsax_per_shot"] >= lb[1]["gsax_per_shot"]
 
 
+def test_zone_and_type_breakdown(con):
+    # 거리·타입 다른 슛들: (result,type,x,y)
+    _insert(con, _match_faced("z1", "A", 500, 10, [
+        (1, 1, 0.97, 0.5),   # 초근(2.75m) 노멀 선방
+        (3, 1, 0.90, 0.5),   # 근(9.2m)   노멀 실점
+        (1, 1, 0.83, 0.5),   # 중(15.6m)  노멀 선방
+        (1, 2, 0.70, 0.5),   # 원(27.5m)  감아차기 선방
+        (1, 3, 0.90, 0.4),   # 중(13m)    헤더 선방
+    ]))
+    agg.rebuild(con)
+
+    zones = {z["zone"]: z for z in agg.zone_breakdown(con, 500)}
+    assert zones["초근거리(0-5m)"]["shots"] == 1
+    assert zones["근거리(5-11m)"]["shots"] == 1 and zones["근거리(5-11m)"]["saves"] == 0
+    assert zones["중거리(11-16.5m)"]["shots"] == 2   # 노멀 + 헤더
+    assert zones["원거리(16.5m+)"]["shots"] == 1
+
+    tb = agg.type_breakdown(con, 500)
+    by = {t["name"]: t for t in tb["by_type"]}
+    assert by["노멀"]["shots"] == 3 and by["노멀"]["saves"] == 2
+    assert by["감아차기"]["shots"] == 1
+    assert tb["header"] == {"shots": 1, "saves": 1, "save_pct": 1.0}
+    assert tb["foot"]["shots"] == 4 and tb["foot"]["saves"] == 3
+
+
 def test_within_ouid_grade_effect(con):
     # 같은 유저 U · 같은 카드 500: 10강 선방률 0.75, 11강 1.0 → 단계당 Δ +0.25
     _insert(con, _match("g10a", "U", 500, 10, saves=3, goals=1))
