@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import agg, collect, export as export_mod, meta, spike
-from .config import DEFAULT, MIN_MATCHES_GATE
+from .config import DEFAULT, MIN_MATCHES_GATE, ZONE_CUTS_M
 from .db import connect, raw_match_count
 from .http import ResilientClient
 
@@ -105,10 +105,12 @@ def _cmd_leaderboard(args) -> None:
 def _cmd_gsax(args) -> None:
     con = connect(DEFAULT, read_only=True)
     try:
-        lb = agg.gsax_leaderboard(con, gate=args.gate, since=_resolve_since(args))
+        min_d = ZONE_CUTS_M[0] if args.exclude_shortest else 0.0
+        lb = agg.gsax_leaderboard(con, gate=args.gate, since=_resolve_since(args), min_dist_m=min_d)
         if meta.has_meta(con):
             meta.enrich(con, lb)
-        print(f"# GSAx 리더보드 (난이도 보정, 게이트 {args.gate}경기, 상위 {args.top})")
+        tag = " · 초근거리(<5m) 제외" if args.exclude_shortest else ""
+        print(f"# GSAx 리더보드 (난이도 보정{tag}, 게이트 {args.gate}경기, 상위 {args.top})")
         print("GSAx = 실제선방 − 기대선방. 슛 난이도 교란 제거(양수=기대보다 잘 막음).")
         for c in lb[: args.top]:
             who = c.get("player_name") or f"spId={c['gk_sp_id']}"
@@ -188,6 +190,8 @@ def build_parser() -> argparse.ArgumentParser:
     gx = sub.add_parser("gsax", help="GSAx(난이도 보정) 리더보드")
     gx.add_argument("--gate", type=int, default=MIN_MATCHES_GATE)
     gx.add_argument("--top", type=int, default=20)
+    gx.add_argument("--exclude-shortest", action="store_true",
+                    help="초근거리(<5m) 뽀록성 슛 제외")
     gx.add_argument("--since", help="이 날짜(YYYY-MM-DD) 이후 경기만 집계")
     gx.add_argument("--days", type=int, help="최근 N일 경기만 집계")
     gx.set_defaults(func=_cmd_gsax)

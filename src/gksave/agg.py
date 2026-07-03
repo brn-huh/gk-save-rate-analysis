@@ -206,6 +206,7 @@ def gsax_leaderboard(
     gate: int = MIN_MATCHES_GATE,
     since: datetime | None = None,
     dist_bins: int = 5,
+    min_dist_m: float = 0.0,
 ) -> list[dict[str, Any]]:
     """GSAx(난이도 보정) 리더보드.
 
@@ -215,16 +216,23 @@ def gsax_leaderboard(
     (유저 실력 교란은 within_ouid 가 담당 — 상호보완)
 
     순위는 GSAx/슛(난이도보정 선방 레이트) 기준. 리그 전체 Σ GSAx = 0.
+
+    min_dist_m > 0 이면 그 거리(m) 미만 슛을 제외한다(예: 5 = 초근거리 제외).
+    거의 못 막는 뽀록성 초근 슛의 노이즈를 빼 실력 신호를 안정화.
     """
     s_pred, s_params = _date_pred(since, first=False)
     m_pred, m_params = _date_pred(since, first=True)
+    dist_filter = (
+        f" AND sqrt((1 - x) * (1 - x) + (0.5 - y) * (0.5 - y)) * {PITCH_SCALE_M} >= {min_dist_m}"
+        if min_dist_m > 0 else ""
+    )
     rows = con.execute(
         f"""
         WITH s AS (
             SELECT gk_sp_id, gk_sp_grade, result, shot_type,
                    sqrt((1 - x) * (1 - x) + (0.5 - y) * (0.5 - y)) AS dist
             FROM shot
-            WHERE NOT is_pk AND x IS NOT NULL AND y IS NOT NULL{s_pred}
+            WHERE NOT is_pk AND x IS NOT NULL AND y IS NOT NULL{s_pred}{dist_filter}
         ),
         b AS (SELECT *, ntile({int(dist_bins)}) OVER (ORDER BY dist) AS dbin FROM s),
         bin_rate AS (

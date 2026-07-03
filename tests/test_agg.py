@@ -143,6 +143,21 @@ def test_zone_and_type_breakdown(con):
     assert tb["foot"]["shots"] == 4 and tb["foot"]["saves"] == 3
 
 
+def test_gsax_exclude_shortest(con):
+    # 초근(<5m: x≈0.98) + 원거리 섞기 → min_dist_m=5 면 초근 제외로 슛 수 감소, Σ=0 유지
+    _insert(con, _match_faced("s1", "A", 500, 10, [
+        (1, 1, 0.98, 0.5), (3, 1, 0.985, 0.5),   # 초근(~1.5m)
+        (1, 2, 0.80, 0.5), (1, 6, 0.75, 0.55)]))  # 원거리
+    _insert(con, _match_faced("s2", "B", 700, 9, [
+        (3, 1, 0.98, 0.5),                          # 초근
+        (1, 2, 0.82, 0.5), (3, 1, 0.70, 0.5), (1, 6, 0.78, 0.6)]))
+    agg.rebuild(con)
+    full = agg.gsax_leaderboard(con, gate=1, dist_bins=2)
+    ex = agg.gsax_leaderboard(con, gate=1, dist_bins=2, min_dist_m=5.0)
+    assert sum(r["shots"] for r in ex) < sum(r["shots"] for r in full)  # 초근 빠짐
+    assert abs(sum(r["gsax"] for r in ex)) < 1e-6                        # 필터셋에서도 Σ=0
+
+
 def test_within_ouid_grade_effect(con):
     # 같은 유저 U · 같은 카드 500: 10강 선방률 0.75, 11강 1.0 → 단계당 Δ +0.25
     _insert(con, _match("g10a", "U", 500, 10, saves=3, goals=1))

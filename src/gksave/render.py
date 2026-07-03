@@ -81,11 +81,12 @@ _TEMPLATE = r"""<!doctype html>
   <span class="lab">정렬</span>
   <button class="sort active" data-sort="save_pct">선방률</button>
   <button class="sort" data-sort="gsax_per_shot">GSAx</button>
+  <button class="sort" data-sort="gsax_ex_short_per_shot">GSAx(초근제외)</button>
   <button class="sort" data-sort="matches">표본</button>
 </div>
 <p class="muted">행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다.</p>
 <table id="lb">
-  <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>선방률</th><th>GSAx/100</th><th>표본</th></tr></thead>
+  <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>선방률</th><th id="gsaxHdr">GSAx/100</th><th>표본</th></tr></thead>
   <tbody></tbody>
 </table>
 
@@ -134,11 +135,14 @@ function render(){
     if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1; return bv-av;
   });
   if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">해당하는 카드가 없습니다.</td></tr>';return;}
+  const gf = sortKey.indexOf('gsax')===0 ? sortKey : 'gsax_per_shot';  // GSAx 컬럼은 활성 모드 값
+  document.getElementById('gsaxHdr').textContent =
+    gf==='gsax_ex_short_per_shot' ? 'GSAx/100(초근×)' : 'GSAx/100';
   rows.forEach((c,i)=>{
     const tr=document.createElement('tr'); tr.className='row';
     tr.innerHTML=`<td class="rank">${i+1}</td><td>${esc(c.player_name||('spId '+c.gk_sp_id))}</td>`+
       `<td class="season">${esc(c.season_name||'')}</td><td class="num">${c.grade}강</td>`+
-      `<td class="pct">${pct(c.save_pct)}</td><td class="num">${gps(c.gsax_per_shot)}</td>`+
+      `<td class="pct">${pct(c.save_pct)}</td><td class="num">${gps(c[gf])}</td>`+
       `<td class="num">${c.matches}</td>`;
     tr.onclick=()=>toggle(tr,c); tb.appendChild(tr);
   });

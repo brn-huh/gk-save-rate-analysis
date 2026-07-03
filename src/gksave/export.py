@@ -15,7 +15,7 @@ from pathlib import Path
 import duckdb
 
 from . import agg, meta, render
-from .config import MIN_MATCHES_GATE
+from .config import MIN_MATCHES_GATE, ZONE_CUTS_M
 
 WARNING = (
     "이 순위는 raw 종합선방률이다. matchtype=50은 사람이 키핑하므로 이 값에는 "
@@ -43,16 +43,21 @@ def build_payload(
         "leaderboard": leaderboard,
         "grade_effect": agg.within_ouid_grade_effect(con, since=since),
     }
-    # GSAx(난이도 보정) 순위
+    # GSAx(난이도 보정): 전체 + 초근거리(<5m) 제외 두 버전
     gsax = agg.gsax_leaderboard(con, gate=gate, since=since)
+    gsax_ex = agg.gsax_leaderboard(con, gate=gate, since=since, min_dist_m=ZONE_CUTS_M[0])
     payload["gsax"] = gsax
 
-    # 리더보드 카드에 GSAx 붙이기 (같은 (sp_id, 강화) 키로) → 동일선수 비교에도 반영
-    gsax_by_key = {(g["gk_sp_id"], g["grade"]): g for g in gsax}
+    # 리더보드 카드에 두 GSAx 붙이기 (같은 (sp_id, 강화) 키로) → 동일선수·페이지에서도 반영
+    gsax_by = {(g["gk_sp_id"], g["grade"]): g for g in gsax}
+    gsax_ex_by = {(g["gk_sp_id"], g["grade"]): g for g in gsax_ex}
     for c in leaderboard:
-        gk = gsax_by_key.get((c["gk_sp_id"], c["grade"]))
+        gk = gsax_by.get((c["gk_sp_id"], c["grade"]))
         c["gsax"] = gk["gsax"] if gk else None
         c["gsax_per_shot"] = gk["gsax_per_shot"] if gk else None
+        ge = gsax_ex_by.get((c["gk_sp_id"], c["grade"]))
+        c["gsax_ex_short"] = ge["gsax"] if ge else None
+        c["gsax_ex_short_per_shot"] = ge["gsax_per_shot"] if ge else None
 
     # 카드별 거리 존별·타입별 (대량 집계 2쿼리) → 각 카드에 첨부(페이지 드릴다운용)
     zones_all = agg.zone_breakdown_all(con, since=since)
