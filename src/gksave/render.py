@@ -18,6 +18,7 @@ def build_html(payload: dict[str, Any]) -> str:
         "generated_at": str(payload.get("generated_at", "")),
         "gate": payload.get("gate_min_matches"),
         "since": payload.get("since"),
+        "date_range": payload.get("date_range", {}),
         "warning": payload.get("warning", ""),
         "grade_effect": payload.get("grade_effect", {}),
         "leaderboard": payload.get("leaderboard", []),
@@ -115,8 +116,10 @@ const pct=v=>v==null?'N/A':(v*100).toFixed(1)+'%';
 const gps=v=>v==null?'':(v*100>=0?'+':'')+(v*100).toFixed(1);
 const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;};
 
+const dr=D.date_range||{};
+const period=(dr.min&&dr.max)?`데이터 기간 ${dr.min} ~ ${dr.max} · `:'';
 document.getElementById('meta').textContent =
-  `생성 ${D.generated_at} · 게이트 ${D.gate}경기↑ · ${D.leaderboard.length}장`
+  `${period}게이트 ${D.gate}경기↑ · ${D.leaderboard.length}장`
   + (D.since?` · ${D.since} 이후`:'');
 document.getElementById('warn').innerHTML = '<b>⚠️ 읽는 법:</b> ' + esc(D.warning);
 

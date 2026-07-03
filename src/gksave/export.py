@@ -34,10 +34,19 @@ def build_payload(
     # (선수×시즌×강화단계) 단위 — 강화를 퉁치지 않는다
     leaderboard = agg.grade_leaderboard(con, gate=gate, since=since)
 
+    dr = con.execute(
+        "SELECT min(match_date), max(match_date) FROM gk_match WHERE match_date IS NOT NULL"
+    ).fetchone()
+    date_range = {
+        "min": dr[0].date().isoformat() if dr and dr[0] else None,
+        "max": dr[1].date().isoformat() if dr and dr[1] else None,
+    }
+
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "gate_min_matches": gate,
         "since": since.isoformat() if since else None,
+        "date_range": date_range,
         "warning": WARNING,
         "leaderboard_count": len(leaderboard),
         "leaderboard": leaderboard,
