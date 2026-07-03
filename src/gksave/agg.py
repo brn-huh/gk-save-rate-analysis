@@ -379,6 +379,71 @@ def type_breakdown(
     return {"by_type": by_type, "header": _pack(True), "foot": _pack(False)}
 
 
+def zone_breakdown_all(
+    con: duckdb.DuckDBPyConnection, *, since: datetime | None = None,
+) -> dict[tuple[int, int], list[dict[str, Any]]]:
+    """모든 (sp_id, 강화)의 거리 존별 선방률을 한 번에. 키=(gk_sp_id, grade)."""
+    dp, params = _date_pred(since, first=False)
+    c = PITCH_SCALE_M
+    lo, mid, hi = ZONE_CUTS_M
+    rows = con.execute(
+        f"""
+        WITH s AS (
+            SELECT gk_sp_id, gk_sp_grade, result,
+                   CASE WHEN d < {lo} THEN 0 WHEN d < {mid} THEN 1
+                        WHEN d < {hi} THEN 2 ELSE 3 END AS zone
+            FROM (SELECT gk_sp_id, gk_sp_grade, result,
+                         sqrt((1-x)*(1-x)+(0.5-y)*(0.5-y)) * {c} AS d
+                  FROM shot WHERE NOT is_pk AND x IS NOT NULL{dp})
+        )
+        SELECT gk_sp_id, gk_sp_grade, zone, count(*),
+               sum(CASE WHEN result = 1 THEN 1 ELSE 0 END)
+        FROM s GROUP BY 1, 2, 3
+        """,
+        params,
+    ).fetchall()
+    acc: dict[tuple[int, int], dict[int, tuple[int, int]]] = {}
+    for sp, gr, zone, n, sv in rows:
+        acc.setdefault((sp, gr), {})[zone] = (n, sv)
+    out: dict[tuple[int, int], list[dict[str, Any]]] = {}
+    for key, zmap in acc.items():
+        out[key] = [
+            {"zone": ZONE_NAMES[z], "shots": zmap.get(z, (0, 0))[0],
+             "saves": zmap.get(z, (0, 0))[1],
+             "save_pct": _save_pct(zmap.get(z, (0, 0))[1],
+                                   zmap.get(z, (0, 0))[0] - zmap.get(z, (0, 0))[1])}
+            for z in range(4)
+        ]
+    return out
+
+
+def type_breakdown_all(
+    con: duckdb.DuckDBPyConnection, *, since: datetime | None = None,
+) -> dict[tuple[int, int], list[dict[str, Any]]]:
+    """모든 (sp_id, 강화)의 타입별 선방률을 한 번에. 키=(gk_sp_id, grade)."""
+    dp, params = _date_pred(since, first=False)
+    rows = con.execute(
+        f"""
+        SELECT gk_sp_id, gk_sp_grade, shot_type, count(*),
+               sum(CASE WHEN result = 1 THEN 1 ELSE 0 END)
+        FROM shot WHERE NOT is_pk{dp} GROUP BY 1, 2, 3
+        """,
+        params,
+    ).fetchall()
+    acc: dict[tuple[int, int], list[tuple]] = {}
+    for sp, gr, t, n, sv in rows:
+        acc.setdefault((sp, gr), []).append((t, n, sv))
+    out: dict[tuple[int, int], list[dict[str, Any]]] = {}
+    for key, lst in acc.items():
+        lst.sort(key=lambda r: r[1], reverse=True)
+        out[key] = [
+            {"type": t, "name": SHOT_TYPE_NAMES.get(t, str(t)), "shots": n, "saves": sv,
+             "save_pct": _save_pct(sv, n - sv)}
+            for t, n, sv in lst
+        ]
+    return out
+
+
 def within_ouid_grade_effect(
     con: duckdb.DuckDBPyConnection,
     *,

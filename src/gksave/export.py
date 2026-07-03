@@ -54,6 +54,14 @@ def build_payload(
         c["gsax"] = gk["gsax"] if gk else None
         c["gsax_per_shot"] = gk["gsax_per_shot"] if gk else None
 
+    # 카드별 거리 존별·타입별 (대량 집계 2쿼리) → 각 카드에 첨부(페이지 드릴다운용)
+    zones_all = agg.zone_breakdown_all(con, since=since)
+    types_all = agg.type_breakdown_all(con, since=since)
+    for c in leaderboard:
+        key = (c["gk_sp_id"], c["grade"])
+        c["zones"] = zones_all.get(key, [])
+        c["types"] = types_all.get(key, [])
+
     # 메타 캐시가 있으면 선수명·시즌 붙이고 동일선수 시즌 비교표 추가
     if meta.has_meta(con):
         meta.enrich(con, leaderboard)
