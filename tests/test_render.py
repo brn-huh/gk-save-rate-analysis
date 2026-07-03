@@ -12,6 +12,10 @@ _PAYLOAD = {
          "season_name": "ICON", "save_pct": 0.75, "saves": 3, "goals": 1, "matches": 60},
     ],
     "grade_effect": {"mean_save_pct_delta_per_grade": 0.02, "paired_users": 4, "pairs": 6},
+    "gsax": [
+        {"rank": 1, "gk_sp_id": 101190053, "player_name": "야신", "grade": 10,
+         "season_name": "ICON", "gsax": 12.3, "gsax_per_shot": 0.05, "shots": 240},
+    ],
     "same_player": [
         {"player_name": "노이어", "cards": [
             {"season_name": "CAP", "grade": 11, "save_pct": 0.53, "matches": 80},
@@ -30,6 +34,7 @@ def test_html_contains_key_elements():
     assert "60" in html                       # 표본경기
     assert "노이어" in html                   # 동일선수 비교
     assert "10강" in html                     # 강화단계 표기
+    assert "GSAx" in html and "+12.3" in html # GSAx 섹션
     assert "N/A" in html                      # None 선방률 안전 표기
     assert "+2.00%p" in html                  # 강화효과
 

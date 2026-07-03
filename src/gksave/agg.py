@@ -191,6 +191,73 @@ def grade_leaderboard(
     return out
 
 
+def gsax_leaderboard(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    gate: int = MIN_MATCHES_GATE,
+    since: datetime | None = None,
+    dist_bins: int = 5,
+) -> list[dict[str, Any]]:
+    """GSAx(난이도 보정) 리더보드.
+
+    각 슛을 (타입 × 정규화거리 구간)으로 묶어 리그 전체의 그 구간 선방률 =
+    기대선방확률로 본다. 카드별 기대선방 = 자기가 마주한 슛들의 기대확률 합,
+    GSAx = 실제선방 − 기대선방. 슛 난이도 교란(쉬운 슛 많이 마주한 이점)을 제거한다.
+    (유저 실력 교란은 within_ouid 가 담당 — 상호보완)
+
+    순위는 GSAx/슛(난이도보정 선방 레이트) 기준. 리그 전체 Σ GSAx = 0.
+    """
+    s_pred, s_params = _date_pred(since, first=False)
+    m_pred, m_params = _date_pred(since, first=True)
+    rows = con.execute(
+        f"""
+        WITH s AS (
+            SELECT gk_sp_id, gk_sp_grade, result, shot_type,
+                   sqrt((1 - x) * (1 - x) + (0.5 - y) * (0.5 - y)) AS dist
+            FROM shot
+            WHERE NOT is_pk AND x IS NOT NULL AND y IS NOT NULL{s_pred}
+        ),
+        b AS (SELECT *, ntile({int(dist_bins)}) OVER (ORDER BY dist) AS dbin FROM s),
+        bin_rate AS (
+            SELECT shot_type, dbin, avg(CASE WHEN result = 1 THEN 1.0 ELSE 0 END) AS p_save
+            FROM b GROUP BY shot_type, dbin
+        ),
+        ps AS (
+            SELECT b.gk_sp_id, b.gk_sp_grade, b.result, br.p_save
+            FROM b JOIN bin_rate br USING (shot_type, dbin)
+        ),
+        a AS (
+            SELECT gk_sp_id, gk_sp_grade, count(*) AS shots,
+                   sum(CASE WHEN result = 1 THEN 1 ELSE 0 END) AS saves,
+                   sum(p_save) AS exp_saves
+            FROM ps GROUP BY 1, 2
+        ),
+        m AS (
+            SELECT gk_sp_id, gk_sp_grade, count(DISTINCT match_id) AS matches
+            FROM gk_match{m_pred} GROUP BY 1, 2
+        )
+        SELECT a.gk_sp_id, a.gk_sp_grade, m.matches, a.shots, a.saves, a.exp_saves
+        FROM a JOIN m USING (gk_sp_id, gk_sp_grade)
+        WHERE m.matches >= ?
+        """,
+        s_params + m_params + [gate],
+    ).fetchall()
+
+    out = []
+    for sp_id, grade, matches, shots, saves, exp in rows:
+        gsax = saves - exp
+        out.append({
+            "gk_sp_id": sp_id, "grade": grade, "matches": matches, "shots": shots,
+            "saves": saves, "exp_saves": round(exp, 2), "gsax": round(gsax, 2),
+            "gsax_per_shot": gsax / shots if shots else None,
+            "save_pct": saves / shots if shots else None,
+        })
+    out.sort(key=lambda d: (d["gsax_per_shot"] is not None, d["gsax_per_shot"] or 0.0), reverse=True)
+    for i, d in enumerate(out, 1):
+        d["rank"] = i
+    return out
+
+
 def grade_breakdown(
     con: duckdb.DuckDBPyConnection, sp_id: int, *, since: datetime | None = None
 ) -> list[dict[str, Any]]:

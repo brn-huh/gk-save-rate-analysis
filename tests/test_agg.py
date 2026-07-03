@@ -91,6 +91,33 @@ def test_zero_division_guarded(con):
     assert all(r["save_pct"] is None for r in lb[first_none:])
 
 
+def _match_faced(mid, ouid, sp_id, grade, faced):
+    """우리 카드(GK sp_id/grade)가 상대의 슛 faced=[(result,type,x,y)]를 마주하는 매치."""
+    return {
+        "matchId": mid, "matchType": 50, "matchDate": "2026-06-20T00:00:00",
+        "matchInfo": [
+            {"ouid": ouid, "player": [{"spId": sp_id, "spPosition": 0, "spGrade": grade}],
+             "shootDetail": []},
+            {"ouid": "O" + ouid, "player": [{"spId": 600, "spPosition": 0, "spGrade": 10}],
+             "shootDetail": [{"result": r, "type": t, "x": x, "y": y} for (r, t, x, y) in faced]},
+        ],
+    }
+
+
+def test_gsax_league_sum_is_zero(con):
+    # 서로 다른 난이도(타입·거리)의 슛을 두 카드가 마주 → GSAx 리그 합은 0
+    _insert(con, _match_faced("g1", "A", 500, 10, [
+        (1, 2, 0.9, 0.5), (3, 2, 0.95, 0.5), (1, 6, 0.85, 0.4), (1, 1, 0.6, 0.5)]))
+    _insert(con, _match_faced("g2", "B", 700, 9, [
+        (3, 2, 0.92, 0.5), (1, 6, 0.88, 0.55), (3, 1, 0.7, 0.5), (1, 1, 0.65, 0.6)]))
+    agg.rebuild(con)
+    lb = agg.gsax_leaderboard(con, gate=1, dist_bins=3)
+    assert len(lb) == 2
+    assert abs(sum(r["gsax"] for r in lb)) < 1e-6          # 리그 Σ GSAx = 0
+    assert all(r["gsax_per_shot"] is not None for r in lb)
+    assert lb[0]["rank"] == 1 and lb[0]["gsax_per_shot"] >= lb[1]["gsax_per_shot"]
+
+
 def test_within_ouid_grade_effect(con):
     # 같은 유저 U · 같은 카드 500: 10강 선방률 0.75, 11강 1.0 → 단계당 Δ +0.25
     _insert(con, _match("g10a", "U", 500, 10, saves=3, goals=1))

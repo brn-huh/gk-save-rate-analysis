@@ -43,9 +43,14 @@ def build_payload(
         "leaderboard": leaderboard,
         "grade_effect": agg.within_ouid_grade_effect(con, since=since),
     }
+    # GSAx(난이도 보정) 순위
+    gsax = agg.gsax_leaderboard(con, gate=gate, since=since)
+    payload["gsax"] = gsax
+
     # 메타 캐시가 있으면 선수명·시즌 붙이고 동일선수 시즌 비교표 추가
     if meta.has_meta(con):
         meta.enrich(con, leaderboard)
+        meta.enrich(con, gsax)
         payload["same_player"] = meta.same_player_view(leaderboard)
     return payload
 

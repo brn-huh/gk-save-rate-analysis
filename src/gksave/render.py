@@ -35,6 +35,41 @@ def _leaderboard_rows(cards: list[dict[str, Any]]) -> str:
     return "\n".join(out)
 
 
+def _gsax_rows(cards: list[dict[str, Any]]) -> str:
+    if not cards:
+        return '<tr><td colspan="7" class="empty">데이터 없음</td></tr>'
+    out = []
+    for c in cards:
+        who = escape(c.get("player_name") or f"spId {c['gk_sp_id']}")
+        season = escape(c.get("season_name") or "")
+        gps = c["gsax_per_shot"]
+        gps_txt = "" if gps is None else f"{gps * 100:+.1f}"
+        out.append(
+            f"<tr><td class='rank'>{c['rank']}</td>"
+            f"<td>{who}</td><td class='season'>{season}</td>"
+            f"<td class='num'>{c.get('grade', '')}강</td>"
+            f"<td class='pct'>{c['gsax']:+.1f}</td>"
+            f"<td class='num'>{gps_txt}</td>"
+            f"<td class='num'>{c['shots']}</td></tr>"
+        )
+    return "\n".join(out)
+
+
+def _gsax_section(cards: list[dict[str, Any]]) -> str:
+    if not cards:
+        return ""
+    return (
+        "<h2>GSAx 리더보드 (난이도 보정)</h2>"
+        "<p class='muted'>GSAx = 실제선방 − 기대선방(슛 타입·거리로 계산). "
+        "슛 난이도 교란을 제거한 값. 양수 = 평균 키퍼보다 잘 막음. 순위는 GSAx/100슛.</p>"
+        "<table><thead><tr>"
+        "<th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>GSAx</th><th>/100슛</th><th>슛</th>"
+        "</tr></thead><tbody>"
+        + _gsax_rows(sorted(cards, key=lambda c: c['rank'])[:50])
+        + "</tbody></table>"
+    )
+
+
 def _same_player_section(groups: list[dict[str, Any]]) -> str:
     if not groups:
         return ""
@@ -64,6 +99,7 @@ def build_html(payload: dict[str, Any]) -> str:
     delta = ge.get("mean_save_pct_delta_per_grade")
     delta_txt = "표본 부족" if delta is None else f"{delta * 100:+.2f}%p / 강화단계"
     same_player = _same_player_section(payload.get("same_player", []))
+    gsax_section = _gsax_section(payload.get("gsax", []))
 
     return f"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
@@ -100,6 +136,8 @@ def build_html(payload: dict[str, Any]) -> str:
 </tr></thead><tbody>
 {_leaderboard_rows(payload.get("leaderboard", []))}
 </tbody></table>
+
+{gsax_section}
 
 <h2>강화 효과 (유저 내 비교)</h2>
 <p class="muted">같은 유저·같은 카드에서 강화단계 1 상승당 평균 선방률 변화 —
