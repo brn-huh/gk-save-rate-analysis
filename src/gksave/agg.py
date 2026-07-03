@@ -9,7 +9,10 @@ within-ouid 강화효과: 같은 유저(ouid)가 같은 카드(sp_id)를 서로 
 
 from __future__ import annotations
 
+import csv
 import json
+import os
+import tempfile
 from datetime import datetime
 from typing import Any
 
@@ -18,42 +21,68 @@ import duckdb
 from .config import DEFAULT, MIN_MATCHES_GATE, Settings
 from .parse import ParseStats, parse_match
 
-# shot 테이블 컬럼 순서 (INSERT 바인딩용)
-_SHOT_COLS = (
-    "match_id, match_date, gk_ouid, gk_sp_id, gk_sp_grade, shot_type, result, "
-    "is_pk, in_penalty, assist, hit_post, x, y"
-)
-_N_SHOT_COLS = 13
+_GK_MATCH_COLS = ["match_id", "match_date", "gk_ouid", "gk_sp_id", "gk_sp_grade"]
+_SHOT_COL_LIST = [
+    "match_id", "match_date", "gk_ouid", "gk_sp_id", "gk_sp_grade", "shot_type",
+    "result", "is_pk", "in_penalty", "assist", "hit_post", "x", "y",
+]
+_SHOT_COLS = ", ".join(_SHOT_COL_LIST)
+
+
+def _new_csv():
+    f = tempfile.NamedTemporaryFile(
+        mode="w", newline="", encoding="utf-8", suffix=".csv", delete=False
+    )
+    return f, csv.writer(f)
 
 
 def rebuild(con: duckdb.DuckDBPyConnection) -> ParseStats:
-    """raw_match 전체를 다시 파싱해 gk_match·shot 테이블을 재생성."""
+    """raw_match 전체를 재파싱해 gk_match·shot 을 재생성.
+
+    원본을 스트리밍(fetchmany)으로 읽어 임시 CSV에 쓰고 DuckDB COPY 로 벌크 적재.
+    행별 executemany(28만행 = ~14분) 대신이라 수십 초로 줄고, 1.5GB를 한 번에
+    메모리로 올리지도 않는다. None→'' (NULL), datetime/bool 은 CSV 문자열로 자동 파싱.
+    """
     con.execute("DELETE FROM gk_match")
     con.execute("DELETE FROM shot")
     stats = ParseStats()
-    apps: list[tuple] = []
-    shots: list[tuple] = []
-    for mid, payload in con.execute("SELECT match_id, payload FROM raw_match").fetchall():
-        detail = json.loads(payload) if isinstance(payload, str) else payload
-        a, s = parse_match(detail, stats)
-        apps.extend((x.match_id, x.match_date, x.gk_ouid, x.gk_sp_id, x.gk_sp_grade) for x in a)
-        shots.extend(
-            (
-                x.match_id, x.match_date, x.gk_ouid, x.gk_sp_id, x.gk_sp_grade,
-                x.shot_type, x.result, x.is_pk, x.in_penalty, x.assist, x.hit_post, x.x, x.y,
-            )
-            for x in s
+
+    af, aw = _new_csv()
+    sf, sw = _new_csv()
+    try:
+        aw.writerow(_GK_MATCH_COLS)
+        sw.writerow(_SHOT_COL_LIST)
+        cur = con.execute("SELECT match_id, payload FROM raw_match")
+        while True:
+            batch = cur.fetchmany(1000)
+            if not batch:
+                break
+            for _mid, payload in batch:
+                detail = json.loads(payload) if isinstance(payload, str) else payload
+                apps, shots = parse_match(detail, stats)
+                for x in apps:
+                    aw.writerow([x.match_id, x.match_date, x.gk_ouid, x.gk_sp_id, x.gk_sp_grade])
+                for x in shots:
+                    sw.writerow([
+                        x.match_id, x.match_date, x.gk_ouid, x.gk_sp_id, x.gk_sp_grade,
+                        x.shot_type, x.result, x.is_pk, x.in_penalty, x.assist, x.hit_post,
+                        x.x, x.y,
+                    ])
+        af.close()
+        sf.close()
+        con.execute(
+            f"COPY gk_match ({', '.join(_GK_MATCH_COLS)}) FROM '{af.name}' "
+            "(HEADER true, NULLSTR '')"
         )
-    if apps:
-        con.executemany(
-            "INSERT INTO gk_match (match_id, match_date, gk_ouid, gk_sp_id, gk_sp_grade) "
-            "VALUES (?, ?, ?, ?, ?)",
-            apps,
-        )
-    if shots:
-        con.executemany(
-            f"INSERT INTO shot ({_SHOT_COLS}) VALUES ({', '.join(['?'] * _N_SHOT_COLS)})", shots
-        )
+        con.execute(f"COPY shot ({_SHOT_COLS}) FROM '{sf.name}' (HEADER true, NULLSTR '')")
+    finally:
+        for f in (af, sf):
+            if not f.closed:
+                f.close()
+            try:
+                os.unlink(f.name)
+            except OSError:
+                pass
     return stats
 
 
