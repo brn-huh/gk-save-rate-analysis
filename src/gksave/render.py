@@ -75,16 +75,22 @@ def _same_player_section(groups: list[dict[str, Any]]) -> str:
         return ""
     blocks = []
     for g in groups:
+        def _gps(c):
+            v = c.get("gsax_per_shot")
+            return "" if v is None else f"{v * 100:+.1f}"
+
         rows = "\n".join(
             f"<tr><td>{escape(c.get('season_name') or '')}</td>"
             f"<td class='num'>{c.get('grade', '')}강</td>"
             f"<td class='pct'>{_pct(c['save_pct'])}</td>"
+            f"<td class='num'>{_gps(c)}</td>"
             f"<td class='num'>{c['matches']}</td></tr>"
             for c in g["cards"]
         )
         blocks.append(
             f"<details><summary>{escape(g['player_name'])}</summary>"
-            f"<table class='mini'><thead><tr><th>시즌</th><th>강화</th><th>선방률</th><th>표본</th></tr></thead>"
+            f"<table class='mini'><thead><tr><th>시즌</th><th>강화</th><th>선방률</th>"
+            f"<th>GSAx/100</th><th>표본</th></tr></thead>"
             f"<tbody>{rows}</tbody></table></details>"
         )
     return (

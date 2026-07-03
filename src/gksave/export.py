@@ -47,6 +47,13 @@ def build_payload(
     gsax = agg.gsax_leaderboard(con, gate=gate, since=since)
     payload["gsax"] = gsax
 
+    # 리더보드 카드에 GSAx 붙이기 (같은 (sp_id, 강화) 키로) → 동일선수 비교에도 반영
+    gsax_by_key = {(g["gk_sp_id"], g["grade"]): g for g in gsax}
+    for c in leaderboard:
+        gk = gsax_by_key.get((c["gk_sp_id"], c["grade"]))
+        c["gsax"] = gk["gsax"] if gk else None
+        c["gsax_per_shot"] = gk["gsax_per_shot"] if gk else None
+
     # 메타 캐시가 있으면 선수명·시즌 붙이고 동일선수 시즌 비교표 추가
     if meta.has_meta(con):
         meta.enrich(con, leaderboard)

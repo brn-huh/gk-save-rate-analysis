@@ -105,6 +105,7 @@ def same_player_view(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
                         "grade": c.get("grade"),
                         "gk_sp_id": c["gk_sp_id"],
                         "save_pct": c["save_pct"],
+                        "gsax_per_shot": c.get("gsax_per_shot"),
                         "matches": c["matches"],
                     }
                     for c in rows
