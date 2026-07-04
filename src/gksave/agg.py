@@ -522,6 +522,8 @@ def card_extras_all(
         d["gk_rating"] = round(rating, 2) if rating is not None else None
         d["pass_pct"] = _ratio(ps, pt)
         d["aerial_pct"] = _ratio(asuc, atr)
+        d["aerial_try"] = atr
+        d["aerial_success"] = asuc
     return out
 
 
