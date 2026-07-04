@@ -44,11 +44,16 @@ CREATE TABLE IF NOT EXISTS meta_season (
 
 -- GK 출전: 카드가 GK로 뛴 경기 1건 = 1행 (슛 0개 경기도 표본 게이트에 반영)
 CREATE TABLE IF NOT EXISTS gk_match (
-    match_id     VARCHAR,
-    match_date   TIMESTAMP,
-    gk_ouid      VARCHAR,
-    gk_sp_id     BIGINT,
-    gk_sp_grade  INTEGER
+    match_id       VARCHAR,
+    match_date     TIMESTAMP,
+    gk_ouid        VARCHAR,
+    gk_sp_id       BIGINT,
+    gk_sp_grade    INTEGER,
+    sp_rating      DOUBLE,      -- GK 엔진 평점 (player.status.spRating)
+    pass_try       INTEGER,
+    pass_success   INTEGER,
+    aerial_try     INTEGER,
+    aerial_success INTEGER
 );
 
 -- 파싱 결과: 우리 GK가 마주한 상대 유효슛 1개 = 1행
@@ -114,6 +119,11 @@ _MIGRATIONS = (
     "ALTER TABLE raw_match ADD COLUMN IF NOT EXISTS match_date TIMESTAMP",
     "ALTER TABLE gk_match  ADD COLUMN IF NOT EXISTS match_date TIMESTAMP",
     "ALTER TABLE shot      ADD COLUMN IF NOT EXISTS match_date TIMESTAMP",
+    "ALTER TABLE gk_match  ADD COLUMN IF NOT EXISTS sp_rating DOUBLE",
+    "ALTER TABLE gk_match  ADD COLUMN IF NOT EXISTS pass_try INTEGER",
+    "ALTER TABLE gk_match  ADD COLUMN IF NOT EXISTS pass_success INTEGER",
+    "ALTER TABLE gk_match  ADD COLUMN IF NOT EXISTS aerial_try INTEGER",
+    "ALTER TABLE gk_match  ADD COLUMN IF NOT EXISTS aerial_success INTEGER",
 )
 
 

@@ -30,7 +30,8 @@ from .config import (
 )
 from .parse import ParseStats, parse_match
 
-_GK_MATCH_COLS = ["match_id", "match_date", "gk_ouid", "gk_sp_id", "gk_sp_grade"]
+_GK_MATCH_COLS = ["match_id", "match_date", "gk_ouid", "gk_sp_id", "gk_sp_grade",
+                  "sp_rating", "pass_try", "pass_success", "aerial_try", "aerial_success"]
 _SHOT_COL_LIST = [
     "match_id", "match_date", "gk_ouid", "gk_sp_id", "gk_sp_grade", "shot_type",
     "result", "is_pk", "in_penalty", "assist", "hit_post", "x", "y",
@@ -70,7 +71,9 @@ def rebuild(con: duckdb.DuckDBPyConnection) -> ParseStats:
                 detail = json.loads(payload) if isinstance(payload, str) else payload
                 apps, shots = parse_match(detail, stats)
                 for x in apps:
-                    aw.writerow([x.match_id, x.match_date, x.gk_ouid, x.gk_sp_id, x.gk_sp_grade])
+                    aw.writerow([x.match_id, x.match_date, x.gk_ouid, x.gk_sp_id, x.gk_sp_grade,
+                                 x.sp_rating, x.pass_try, x.pass_success,
+                                 x.aerial_try, x.aerial_success])
                 for x in shots:
                     sw.writerow([
                         x.match_id, x.match_date, x.gk_ouid, x.gk_sp_id, x.gk_sp_grade,
@@ -449,6 +452,76 @@ def type_breakdown_all(
              "save_pct": _save_pct(sv, n - sv)}
             for t, n, sv in lst
         ]
+    return out
+
+
+def _ratio(a, b):
+    return a / b if b else None
+
+
+def card_extras_all(
+    con: duckdb.DuckDBPyConnection, *, since: datetime | None = None,
+) -> dict[tuple[int, int], dict[str, Any]]:
+    """모든 (sp_id, 강화)의 상황별·수비맥락·GK 본인 스탯을 한 번에. 키=(gk_sp_id, grade).
+
+    상황별(명세서 §1·§5): 박스 안/밖·1대1(독대)·연계/컷백 선방률.
+    수비맥락(§2·§4): 경기당 마주한 유효슛(노출도), 마주한 평균 거리, 실점 평균 거리.
+    GK 본인(§6): 엔진 평점·패스 성공률·공중볼 성공률.
+    """
+    dp_shot, p_shot = _date_pred(since, first=False)
+    dp_gk, p_gk = _date_pred(since, first=True)
+    c = PITCH_SCALE_M
+
+    shot_rows = con.execute(
+        f"""
+        WITH s AS (
+            SELECT gk_sp_id, gk_sp_grade, result, in_penalty, assist,
+                   sqrt((1-x)*(1-x)+(0.5-y)*(0.5-y)) * {c} AS dm
+            FROM shot WHERE NOT is_pk AND x IS NOT NULL{dp_shot}
+        )
+        SELECT gk_sp_id, gk_sp_grade, count(*),
+               sum(CASE WHEN in_penalty THEN 1 ELSE 0 END),
+               sum(CASE WHEN in_penalty AND result=1 THEN 1 ELSE 0 END),
+               sum(CASE WHEN NOT in_penalty THEN 1 ELSE 0 END),
+               sum(CASE WHEN NOT in_penalty AND result=1 THEN 1 ELSE 0 END),
+               sum(CASE WHEN in_penalty AND NOT assist THEN 1 ELSE 0 END),
+               sum(CASE WHEN in_penalty AND NOT assist AND result=1 THEN 1 ELSE 0 END),
+               sum(CASE WHEN assist THEN 1 ELSE 0 END),
+               sum(CASE WHEN assist AND result=1 THEN 1 ELSE 0 END),
+               avg(dm), avg(CASE WHEN result=3 THEN dm END)
+        FROM s GROUP BY 1, 2
+        """,
+        p_shot,
+    ).fetchall()
+
+    gk_rows = con.execute(
+        f"""
+        SELECT gk_sp_id, gk_sp_grade, count(DISTINCT match_id),
+               avg(sp_rating), sum(pass_success), sum(pass_try),
+               sum(aerial_success), sum(aerial_try)
+        FROM gk_match{dp_gk} GROUP BY 1, 2
+        """,
+        p_gk,
+    ).fetchall()
+
+    out: dict[tuple[int, int], dict[str, Any]] = {}
+    for r in shot_rows:
+        (sp, gr, shots, in_n, in_sv, out_n, out_sv, u_n, u_sv, a_n, a_sv,
+         faced, conceded) = r
+        out[(sp, gr)] = {
+            "shots": shots,
+            "in_pen_save": _ratio(in_sv, in_n), "out_pen_save": _ratio(out_sv, out_n),
+            "unassisted_save": _ratio(u_sv, u_n), "assisted_save": _ratio(a_sv, a_n),
+            "faced_dist_m": round(faced, 1) if faced is not None else None,
+            "conceded_dist_m": round(conceded, 1) if conceded is not None else None,
+        }
+    for sp, gr, matches, rating, ps, pt, asuc, atr in gk_rows:
+        d = out.setdefault((sp, gr), {"shots": 0})
+        d["matches"] = matches
+        d["exposure"] = _ratio(d.get("shots", 0), matches)   # 경기당 유효슛
+        d["gk_rating"] = round(rating, 2) if rating is not None else None
+        d["pass_pct"] = _ratio(ps, pt)
+        d["aerial_pct"] = _ratio(asuc, atr)
     return out
 
 

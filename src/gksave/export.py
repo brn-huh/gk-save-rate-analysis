@@ -71,10 +71,12 @@ def build_payload(
     # 카드별 거리 존별·타입별 (대량 집계 2쿼리) → 각 카드에 첨부(페이지 드릴다운용)
     zones_all = agg.zone_breakdown_all(con, since=since)
     types_all = agg.type_breakdown_all(con, since=since)
+    extras_all = agg.card_extras_all(con, since=since)
     for c in leaderboard:
         key = (c["gk_sp_id"], c["grade"])
         c["zones"] = zones_all.get(key, [])
         c["types"] = types_all.get(key, [])
+        c["extras"] = extras_all.get(key, {})
 
     # 메타 캐시가 있으면 선수명·시즌 붙이고 동일선수 시즌 비교표 추가
     if meta.has_meta(con):

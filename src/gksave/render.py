@@ -68,6 +68,10 @@ _TEMPLATE = r"""<!doctype html>
   .zbar .zn{color:var(--mut);text-align:right;font-variant-numeric:tabular-nums}
   table.mini{font-size:.84rem}
   table.mini td{padding:4px 8px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 16px;font-size:.84rem}
+  .stat{display:flex;justify-content:space-between;border-bottom:1px dotted #e3e3e3;padding:3px 0}
+  .stat span{color:var(--mut)}
+  .stat b{font-variant-numeric:tabular-nums}
   .muted{color:var(--mut);font-size:.85rem}
   details{margin:5px 0}
   summary{cursor:pointer;font-weight:600}
@@ -131,8 +135,23 @@ function detailHtml(c){
     `<span class="zn">${z.saves}/${z.shots}</span></div>`).join('') || '<span class="muted">좌표 없음</span>';
   const types=(c.types||[]).filter(t=>t.shots>=3).map(t=>
     `<tr><td>${esc(t.name)}</td><td class="pct">${pct(t.save_pct)}</td><td class="num">${t.saves}/${t.shots}</td></tr>`).join('');
+  const e=c.extras||{};
+  const stat=(label,val)=>`<div class="stat"><span>${label}</span><b>${val}</b></div>`;
+  const m=v=>v==null?'-':v+'m';
+  const statsHtml=
+    stat('노출도(경기당 유효슛)', e.exposure==null?'-':e.exposure.toFixed(1))+
+    stat('마주한 평균 거리', m(e.faced_dist_m))+
+    stat('실점 평균 거리', m(e.conceded_dist_m))+
+    stat('박스 안 선방률', pct(e.in_pen_save))+
+    stat('박스 밖 선방률', pct(e.out_pen_save))+
+    stat('1대1(독대) 선방률', pct(e.unassisted_save))+
+    stat('연계·컷백 선방률', pct(e.assisted_save))+
+    stat('GK 엔진 평점', e.gk_rating==null?'-':e.gk_rating)+
+    stat('패스 성공률', pct(e.pass_pct))+
+    stat('공중볼 성공률', pct(e.aerial_pct));
   return `<div class="detail-grid"><div><h4>거리 구간별 (근사 미터)</h4>${zones}</div>`+
-         `<div><h4>슛 타입별</h4><table class="mini"><tbody>${types}</tbody></table></div></div>`;
+         `<div><h4>슛 타입별</h4><table class="mini"><tbody>${types}</tbody></table></div></div>`+
+         `<h4 style="margin-top:14px">상황 · 수비 맥락 · GK 스탯</h4><div class="stats">${statsHtml}</div>`;
 }
 function toggle(tr,c){
   const nx=tr.nextElementSibling;

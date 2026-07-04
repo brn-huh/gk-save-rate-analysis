@@ -46,6 +46,11 @@ class Appearance:
     gk_ouid: str
     gk_sp_id: int
     gk_sp_grade: int
+    sp_rating: float | None = None       # GK 엔진 평점 (player.status)
+    pass_try: int | None = None
+    pass_success: int | None = None
+    aerial_try: int | None = None
+    aerial_success: int | None = None
 
 
 @dataclass(frozen=True)
@@ -111,7 +116,13 @@ def parse_match(
 
         gk_ouid = me.get("ouid", "")
         gk_sp_id = gk.get("spId")
-        appearances.append(Appearance(match_id, match_date, gk_ouid, gk_sp_id, grade))
+        stt = gk.get("status") or {}
+        appearances.append(Appearance(
+            match_id, match_date, gk_ouid, gk_sp_id, grade,
+            sp_rating=stt.get("spRating"),
+            pass_try=stt.get("passTry"), pass_success=stt.get("passSuccess"),
+            aerial_try=stt.get("aerialTry"), aerial_success=stt.get("aerialSuccess"),
+        ))
         st.appearances += 1
 
         for s in opp.get("shootDetail", []):

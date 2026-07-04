@@ -118,6 +118,37 @@ def test_gsax_league_sum_is_zero(con):
     assert lb[0]["rank"] == 1 and lb[0]["gsax_per_shot"] >= lb[1]["gsax_per_shot"]
 
 
+def test_card_extras(con):
+    # GK 본인 스탯 + 상황별(박스 안/밖·1대1·연계) 검증
+    gk_status = {"spRating": 7.5, "passTry": 20, "passSuccess": 18,
+                 "aerialTry": 4, "aerialSuccess": 3}
+    detail = {
+        "matchId": "e1", "matchType": 50, "matchDate": "2026-06-20T00:00:00",
+        "matchInfo": [
+            {"ouid": "U", "player": [{"spId": 500, "spPosition": 0, "spGrade": 10,
+                                      "status": gk_status}], "shootDetail": []},
+            {"ouid": "O", "player": [{"spId": 600, "spPosition": 0, "spGrade": 10}],
+             "shootDetail": [
+                 {"result": 1, "type": 1, "inPenalty": True, "assist": False, "x": 0.9, "y": 0.5},
+                 {"result": 3, "type": 1, "inPenalty": True, "assist": False, "x": 0.95, "y": 0.5},
+                 {"result": 1, "type": 1, "inPenalty": True, "assist": True, "x": 0.88, "y": 0.5},
+                 {"result": 1, "type": 1, "inPenalty": False, "assist": False, "x": 0.7, "y": 0.5},
+             ]},
+        ],
+    }
+    _insert(con, detail)
+    agg.rebuild(con)
+    e = agg.card_extras_all(con)[(500, 10)]
+    assert e["shots"] == 4 and e["matches"] == 1 and e["exposure"] == pytest.approx(4.0)
+    assert e["in_pen_save"] == pytest.approx(2 / 3)      # 박스 안 3중 2막
+    assert e["out_pen_save"] == pytest.approx(1.0)
+    assert e["unassisted_save"] == pytest.approx(0.5)    # 1대1: 2중 1
+    assert e["assisted_save"] == pytest.approx(1.0)      # 연계: 1중 1
+    assert e["gk_rating"] == pytest.approx(7.5)
+    assert e["pass_pct"] == pytest.approx(0.9)           # 18/20
+    assert e["aerial_pct"] == pytest.approx(0.75)        # 3/4
+
+
 def test_zone_and_type_breakdown(con):
     # 거리·타입 다른 슛들: (result,type,x,y)
     _insert(con, _match_faced("z1", "A", 500, 10, [
