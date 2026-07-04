@@ -33,54 +33,67 @@ _TEMPLATE = r"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FC온라인 GK 선방률 리더보드</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
-  :root{ --bd:#eee; --mut:#888; --acc:#2b6cb0; }
+  :root{ --bg:#04060f; --panel:#0b1024; --panel2:#0e1533; --line:#1c2444;
+         --gold:#f0d17a; --gold2:#caa966; --text:#eaeefb; --mut:#8792ac; }
   *{box-sizing:border-box}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-       max-width:960px;margin:0 auto;padding:20px 14px;color:#1a1a1a}
-  h1{font-size:1.5rem;margin:0 0 2px}
-  h2{font-size:1.15rem;margin:28px 0 8px}
-  h4{margin:0 0 6px;font-size:.9rem;color:#444}
+  body{font-family:'Pretendard',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+       max-width:1080px;margin:0 auto;padding:26px 16px 60px;color:var(--text);
+       background:radial-gradient(1100px 460px at 50% -8%,rgba(240,209,122,.10),transparent 62%),var(--bg)}
+  h1{font-size:1.7rem;font-weight:800;margin:0 0 4px;letter-spacing:-.01em}
+  h1 .star{color:var(--gold);margin-right:8px}
+  h1 .t{background:linear-gradient(90deg,#fff,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  h2{font-size:1.15rem;font-weight:700;margin:30px 0 8px;padding-left:10px;border-left:3px solid var(--gold)}
+  h4{margin:0 0 8px;font-size:.9rem;color:var(--gold2);font-weight:700}
   .meta{color:var(--mut);font-size:.85rem}
-  .warn{background:#fff4e5;border:1px solid #ffb84d;border-radius:8px;
-        padding:11px 13px;font-size:.88rem;line-height:1.5;margin:14px 0}
-  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
-  .controls input{padding:7px 10px;border:1px solid #ccc;border-radius:7px;font-size:.9rem;flex:1;min-width:160px}
+  .warn{background:rgba(240,209,122,.07);border:1px solid rgba(240,209,122,.28);border-radius:10px;
+        padding:12px 14px;font-size:.88rem;line-height:1.55;margin:16px 0;color:#e7d5a8}
+  .warn b{color:var(--gold)}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:14px 0 6px}
+  .controls input{padding:9px 12px;border:1px solid var(--line);border-radius:9px;font-size:.9rem;
+        flex:1;min-width:170px;background:var(--panel);color:var(--text);font-family:inherit}
+  .controls input::placeholder{color:#5a6483}
   .controls .lab{color:var(--mut);font-size:.82rem}
-  button.sort{padding:6px 11px;border:1px solid #ccc;background:#fff;border-radius:7px;
-              cursor:pointer;font-size:.85rem}
-  button.sort.active{background:var(--acc);color:#fff;border-color:var(--acc)}
+  button.sort{padding:7px 13px;border:1px solid var(--line);background:var(--panel);color:var(--mut);
+        border-radius:9px;cursor:pointer;font-size:.85rem;font-family:inherit;transition:.15s}
+  button.sort:hover{border-color:var(--gold2);color:var(--text)}
+  button.sort.active{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#1a1405;
+        border-color:var(--gold);font-weight:700}
   table{width:100%;border-collapse:collapse;font-size:.92rem}
-  th,td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left}
-  thead th{position:sticky;top:0;background:#fafafa;color:#555;font-size:.8rem;font-weight:600}
-  td.rank{color:#aaa;width:2.3rem}
-  td.pct{font-variant-numeric:tabular-nums;font-weight:600}
-  td.num,td.season{color:#555;font-variant-numeric:tabular-nums}
-  tr.row{cursor:pointer}
-  tr.row:hover{background:#f6f9ff}
-  tr.detail>td{background:#fafcff;padding:12px 16px}
-  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  th,td{padding:10px 11px;border-bottom:1px solid var(--line);text-align:left}
+  thead th{position:sticky;top:0;background:#070b1c;color:var(--gold2);font-size:.78rem;
+        font-weight:700;letter-spacing:.02em;z-index:2}
+  td.rank{color:var(--gold2);width:2.4rem;font-weight:700;font-variant-numeric:tabular-nums}
+  td.pct{font-variant-numeric:tabular-nums;font-weight:700;color:var(--gold)}
+  td.num,td.season{color:var(--mut);font-variant-numeric:tabular-nums}
+  tr.row{cursor:pointer;transition:background .12s}
+  tr.row:hover{background:var(--panel2)}
+  tr.detail>td{background:#070c1e;padding:14px 18px}
+  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
   @media(max-width:640px){.detail-grid{grid-template-columns:1fr}}
-  .zbar{display:grid;grid-template-columns:120px 52px 1fr 62px;align-items:center;gap:8px;margin:3px 0;font-size:.82rem}
-  .zbar .zt{font-weight:600;font-variant-numeric:tabular-nums}
-  .zbar .zbg{background:#e8e8e8;border-radius:4px;height:9px;overflow:hidden}
-  .zbar .zf{display:block;height:100%;background:var(--acc)}
+  .zbar{display:grid;grid-template-columns:130px 54px 1fr 64px;align-items:center;gap:9px;margin:4px 0;font-size:.82rem}
+  .zbar .zt{font-weight:700;font-variant-numeric:tabular-nums;color:var(--gold)}
+  .zbar .zbg{background:rgba(255,255,255,.08);border-radius:5px;height:9px;overflow:hidden}
+  .zbar .zf{display:block;height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold))}
   .zbar .zn{color:var(--mut);text-align:right;font-variant-numeric:tabular-nums}
   table.mini{font-size:.84rem}
-  table.mini td{padding:4px 8px}
-  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 16px;font-size:.84rem}
-  .stat{display:flex;justify-content:space-between;border-bottom:1px dotted #e3e3e3;padding:3px 0}
+  table.mini td,table.mini th{padding:5px 9px;border-bottom:1px solid var(--line)}
+  table.mini th{color:var(--gold2);font-weight:700}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:5px 18px;font-size:.84rem}
+  .stat{display:flex;justify-content:space-between;border-bottom:1px dotted var(--line);padding:4px 0}
   .stat span{color:var(--mut)}
-  .stat b{font-variant-numeric:tabular-nums}
+  .stat b{font-variant-numeric:tabular-nums;color:var(--text)}
   .muted{color:var(--mut);font-size:.85rem}
-  details{margin:5px 0}
-  summary{cursor:pointer;font-weight:600}
-  .empty{text-align:center;color:#999;padding:22px}
-  footer{margin-top:36px;padding-top:14px;border-top:1px solid var(--bd);
-         color:var(--mut);font-size:.8rem;line-height:1.6}
-  footer a{color:var(--acc);text-decoration:none}
+  details{margin:5px 0;border-bottom:1px solid var(--line)}
+  summary{cursor:pointer;font-weight:700;padding:7px 0;color:var(--text)}
+  summary:hover{color:var(--gold)}
+  .empty{text-align:center;color:var(--mut);padding:24px}
+  footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);
+         color:var(--mut);font-size:.8rem;line-height:1.7}
+  footer a{color:var(--gold2);text-decoration:none}
 </style></head><body>
-<h1>FC온라인 골키퍼 선방률 리더보드</h1>
+<h1><span class="star">★</span><span class="t">FC온라인 골키퍼 선방률 리더보드</span></h1>
 <p class="meta" id="meta"></p>
 <div class="warn" id="warn"></div>
 
