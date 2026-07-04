@@ -38,9 +38,29 @@ _TEMPLATE = r"""<!doctype html>
   :root{ --bg:#04060f; --panel:#0b1024; --panel2:#0e1533; --line:#1c2444;
          --gold:#f0d17a; --gold2:#caa966; --text:#eaeefb; --mut:#8792ac; }
   *{box-sizing:border-box}
+  html{background:var(--bg)}
   body{font-family:'Pretendard',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
-       max-width:1080px;margin:0 auto;padding:26px 16px 60px;color:var(--text);
-       background:radial-gradient(1100px 460px at 50% -8%,rgba(240,209,122,.10),transparent 62%),var(--bg)}
+       max-width:1080px;margin:0 auto;padding:26px 16px 60px;color:var(--text);position:relative;
+       background:
+         radial-gradient(1200px 520px at 50% -10%,rgba(240,209,122,.14),transparent 60%),
+         radial-gradient(900px 480px at 12% 4%,rgba(70,110,230,.10),transparent 58%),
+         radial-gradient(900px 480px at 88% 4%,rgba(240,209,122,.06),transparent 58%),
+         var(--bg)}
+  /* 별(starfield) — 화면 고정, 콘텐츠 뒤 */
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-repeat:no-repeat;
+    background:
+      radial-gradient(1.6px 1.6px at 18% 24%,rgba(240,209,122,.55),transparent),
+      radial-gradient(1.4px 1.4px at 68% 16%,rgba(234,238,251,.5),transparent),
+      radial-gradient(1.2px 1.2px at 42% 62%,rgba(240,209,122,.4),transparent),
+      radial-gradient(1.6px 1.6px at 84% 54%,rgba(234,238,251,.42),transparent),
+      radial-gradient(1.1px 1.1px at 9% 72%,rgba(240,209,122,.36),transparent),
+      radial-gradient(1.3px 1.3px at 55% 40%,rgba(234,238,251,.34),transparent),
+      radial-gradient(1.5px 1.5px at 92% 20%,rgba(240,209,122,.46),transparent),
+      radial-gradient(1.1px 1.1px at 30% 88%,rgba(234,238,251,.3),transparent),
+      radial-gradient(1.3px 1.3px at 76% 82%,rgba(240,209,122,.32),transparent),
+      radial-gradient(1.2px 1.2px at 6% 40%,rgba(234,238,251,.3),transparent),
+      radial-gradient(1.4px 1.4px at 48% 10%,rgba(240,209,122,.4),transparent),
+      radial-gradient(1.1px 1.1px at 62% 92%,rgba(234,238,251,.28),transparent)}
   h1{font-size:1.7rem;font-weight:800;margin:0 0 4px;letter-spacing:-.01em}
   h1 .star{color:var(--gold);margin-right:8px}
   h1 .t{background:linear-gradient(90deg,#fff,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
