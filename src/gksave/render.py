@@ -146,7 +146,7 @@ function detailHtml(c){
     stat('박스 밖 선방률', pct(e.out_pen_save))+
     stat('1대1(독대) 선방률', pct(e.unassisted_save))+
     stat('연계·컷백 선방률', pct(e.assisted_save))+
-    stat('GK 엔진 평점', e.gk_rating==null?'-':e.gk_rating)+
+    stat('경기당 평균 평점', e.gk_rating==null?'-':e.gk_rating)+
     stat('패스 성공률', pct(e.pass_pct));
     // 공중볼(aerial)은 게임상 GK에 거의 안 잡혀(중앙값 1) 노이즈 → 화면 미표시. 데이터는 DB 유지.
   return `<div class="detail-grid"><div><h4>거리 구간별 (근사 미터)</h4>${zones}</div>`+
