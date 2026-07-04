@@ -144,7 +144,7 @@ function detailHtml(c){
     stat('실점 평균 거리', m(e.conceded_dist_m))+
     stat('박스 안 선방률', pct(e.in_pen_save))+
     stat('박스 밖 선방률', pct(e.out_pen_save))+
-    stat('1대1(독대) 선방률', pct(e.unassisted_save))+
+    stat('1대1 선방률', pct(e.unassisted_save))+
     stat('연계·컷백 선방률', pct(e.assisted_save))+
     stat('경기당 평균 평점', e.gk_rating==null?'-':e.gk_rating)+
     stat('패스 성공률', pct(e.pass_pct));
