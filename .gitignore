@@ -6,7 +6,13 @@ __pycache__/
 venv/
 .pytest_cache/
 
-# 데이터 산출물 (수집 결과는 커밋하지 않음)
+# 비밀/환경변수 (API 키 등 — 절대 커밋 금지)
+.env
+.env.local
+.env.*.local
+!.env.local.example
+
+# 데이터 산출물 (수집 결과는 커밋하지 않음 — ouid 등 계정정보 포함)
 data/
 *.duckdb
 *.duckdb.wal

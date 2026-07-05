@@ -10,6 +10,31 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+
+def load_env_files(names: tuple[str, ...] = (".env.local", ".env")) -> None:
+    """.env.local / .env 의 KEY=VALUE 를 os.environ 에 주입(외부 의존성 없음).
+
+    이미 설정된 환경변수는 덮어쓰지 않는다(export 가 파일보다 우선).
+    민감정보(API 키 등)는 이 파일에만 두고 커밋하지 않는다(.gitignore).
+    """
+    for name in names:
+        p = Path.cwd() / name
+        if not p.is_file():
+            continue
+        for line in p.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = val
+
+
+# 모듈 로드 시 1회 — 어떤 진입점(gksave CLI 등)에서도 .env.local 이 적용되게
+load_env_files()
+
 # ── 넥슨 Open API ────────────────────────────────────────────────
 BASE_URL = "https://open.api.nexon.com"
 API_KEY_ENV = "NEXON_API_KEY"
