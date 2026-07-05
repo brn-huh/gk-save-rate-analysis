@@ -12,11 +12,12 @@ venv/
 .env.*.local
 !.env.local.example
 
-# 데이터 산출물 (수집 결과는 커밋하지 않음 — ouid 등 계정정보 포함)
+# 데이터 원본 (ouid 등 계정정보 포함 — 절대 커밋/배포 금지)
 data/
 *.duckdb
 *.duckdb.wal
-out/
+
+# out/ 은 공개 배포물(민감정보 0)이라 커밋한다 → Vercel 정적 배포.
 
 # macOS
 .DS_Store

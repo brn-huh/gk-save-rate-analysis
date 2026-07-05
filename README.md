@@ -133,8 +133,20 @@ duckdb -readonly data/gksave.duckdb
   `/static/fconline/meta/{spid,seasonid}.json`(메타)
 - 호출 한도: **초당 50 / 분당 1,000(병목) / 일 2,000만** → 지속 안전 레이트 ~15/s
 
+## 배포 (Vercel 정적)
+
+공개 페이지는 자기완결 `out/index.html`(데이터 embed)이라 그대로 정적 배포된다.
+
+```bash
+gksave export --gate 50 --out out     # out/ 갱신
+git add out && git commit -m "chore: 리더보드 갱신" && git push   # → Vercel 자동 재배포
+```
+- `vercel.json` 이 `outputDirectory: out` 으로 잡혀 있어, 레포를 Vercel에 연결하면
+  `out/` 를 정적으로 서빙한다(빌드 불필요).
+- `out/` 에는 키·ouid 등 민감정보가 없다(위 보안 참고). `data/`(원본, ouid 포함)는 커밋 안 됨.
+
 ## 테스트
 
 ```bash
-pytest -q          # 32 tests
+pytest -q          # 34 tests
 ```
