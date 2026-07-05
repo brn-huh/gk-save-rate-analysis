@@ -10,6 +10,7 @@ dedup: matchId는 raw_match PK, ouid는 frontier PK로 자동 중복 제거.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -17,9 +18,9 @@ from typing import Any, Callable
 import duckdb
 
 from . import api
-from .config import COLLECT_MIN_DATE, DEFAULT, Settings
+from .config import COLLECT_MIN_DATE, DEFAULT, MATCHTYPE_OFFICIAL, Settings
 from .db import have_match
-from .http import ApiError, ResilientClient
+from .http import ApiError, AsyncResilientClient, ResilientClient
 from .parse import parse_match_date
 
 Logger = Callable[[str], None]
@@ -163,6 +164,138 @@ def snowball(
         ).fetchone()[0]
         log(f"[snowball] ouid 완료. 신규매치 누적 {stored} | pending {pending}")
     return stored
+
+
+# ── 동시 요청(async) 수집 ──────────────────────────────────────
+
+async def _a_user_matches(client: AsyncResilientClient, ouid: str, offset: int, limit: int):
+    return await client.get(
+        "/fconline/v1/user/match",
+        {"ouid": ouid, "matchtype": MATCHTYPE_OFFICIAL, "offset": offset, "limit": limit},
+    )
+
+
+async def _a_detail(client: AsyncResilientClient, mid: str):
+    try:
+        return await client.get("/fconline/v1/match-detail", {"matchid": mid})
+    except ApiError:
+        return None
+
+
+async def snowball_async(
+    con: duckdb.DuckDBPyConnection,
+    client: AsyncResilientClient,
+    *,
+    max_new_matches: int = 5000,
+    user_pages: int = 3,
+    limit: int = 100,
+    since: datetime | None = None,
+    log: Logger = _log,
+) -> int:
+    """스노우볼 — 한 ouid의 신규 match-detail 을 동시에 가져와 지연을 겹친다.
+
+    user/match 리스트는 순차(콜 적음), match-detail(대다수)은 동시 fetch 로
+    레이트 예산을 꽉 채운다. dedup·frontier·재개는 동기 버전과 동일.
+    """
+    stored = 0
+    while stored < max_new_matches:
+        row = con.execute(
+            "SELECT ouid FROM frontier WHERE state = 'pending' LIMIT 1"
+        ).fetchone()
+        if row is None:
+            log("[snowball] pending ouid 소진 — 완료")
+            break
+        ouid = row[0]
+
+        new_ids: list[str] = []
+        reached_old = False
+        for p in range(user_pages):
+            try:
+                ids = await _a_user_matches(client, ouid, p * limit, limit)
+            except ApiError as e:
+                log(f"[snowball] user/match 오류(ouid={ouid[:8]}…): {e}")
+                break
+            if not ids:
+                break
+            for mid in ids:
+                if since is not None:
+                    t = match_id_time(mid)
+                    if t is not None and t < since:
+                        reached_old = True
+                        break
+                if not have_match(con, mid):
+                    new_ids.append(mid)
+            if reached_old:
+                break
+
+        # 신규 매치 상세를 동시에 가져오기
+        results = await asyncio.gather(*(_a_detail(client, m) for m in new_ids)) if new_ids else []
+        for mid, detail in zip(new_ids, results):
+            if detail is None or have_match(con, mid):
+                continue
+            con.execute(
+                "INSERT INTO raw_match (match_id, match_date, payload) VALUES (?, ?, ?) "
+                "ON CONFLICT DO NOTHING",
+                [mid, parse_match_date(detail), json.dumps(detail, ensure_ascii=False)],
+            )
+            _harvest_ouids(con, detail)
+            stored += 1
+            if stored >= max_new_matches:
+                break
+
+        con.execute("UPDATE frontier SET state = 'done' WHERE ouid = ?", [ouid])
+        pending = con.execute(
+            "SELECT count(*) FROM frontier WHERE state = 'pending'"
+        ).fetchone()[0]
+        log(f"[snowball] ouid 완료. 신규매치 누적 {stored} | pending {pending}")
+    return stored
+
+
+async def run_async(
+    settings: Settings = DEFAULT,
+    *,
+    seed_nicknames: list[str] | None = None,
+    max_new_matches: int = 5000,
+    since: datetime | None = None,
+    refresh: bool = False,
+    concurrency: int = 10,
+    log: Logger = _log,
+) -> None:
+    """동시 요청 수집. 동기 run 과 동작 동일하되 match-detail 을 병렬 fetch."""
+    from .db import connect, raw_match_count
+
+    if since is None:
+        since = datetime.fromisoformat(COLLECT_MIN_DATE)
+    log(f"수집 하한 날짜: {since.date()} 이전 제외 · 동시성 {concurrency}")
+
+    con = connect(settings)
+    try:
+        async with AsyncResilientClient(settings, concurrency=concurrency) as client:
+            for nick in seed_nicknames or []:
+                try:
+                    ouid = (await client.get("/fconline/v1/id", {"nickname": nick}))["ouid"]
+                except ApiError as e:
+                    log(f"[seed] 닉네임 '{nick}' → ouid 실패: {e}")
+                    continue
+                con.execute(
+                    "INSERT INTO frontier (ouid, state) VALUES (?, 'pending') ON CONFLICT DO NOTHING",
+                    [ouid],
+                )
+                log(f"[seed] '{nick}' → ouid {ouid[:8]}… 큐 추가")
+            if refresh:
+                n = reset_done(con)
+                log(f"=== 갱신 모드: done ouid {n}개를 pending 으로 ===")
+            pending = con.execute(
+                "SELECT count(*) FROM frontier WHERE state = 'pending'"
+            ).fetchone()[0]
+            if pending == 0:
+                log("시드도 없고 pending ouid도 없음 — 닉네임을 넘겨 시드하세요.")
+                return
+            log("=== 스노우볼 확장 (동시) ===")
+            await snowball_async(con, client, max_new_matches=max_new_matches, since=since, log=log)
+        log(f"총 raw_match: {raw_match_count(con)}건")
+    finally:
+        con.close()
 
 
 def run(

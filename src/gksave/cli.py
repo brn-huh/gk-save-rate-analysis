@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -34,13 +36,17 @@ def _cmd_spike(_args) -> None:
 
 def _cmd_collect(args) -> None:
     nicks = [n.strip() for n in (args.seed_nicknames or "").split(",") if n.strip()]
-    collect.run(
-        DEFAULT,
-        seed_nicknames=nicks,
-        max_new_matches=args.max_matches,
-        since=_resolve_since(args),
-        refresh=args.refresh,
-    )
+    since = _resolve_since(args)
+    if args.concurrency and args.concurrency > 1:
+        asyncio.run(collect.run_async(
+            DEFAULT, seed_nicknames=nicks, max_new_matches=args.max_matches,
+            since=since, refresh=args.refresh, concurrency=args.concurrency,
+        ))
+    else:
+        collect.run(
+            DEFAULT, seed_nicknames=nicks, max_new_matches=args.max_matches,
+            since=since, refresh=args.refresh,
+        )
 
 
 def _cmd_build(_args) -> None:
@@ -163,6 +169,9 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--seed-nicknames", default="",
                    help="쉼표로 구분한 시드 닉네임 (예: '아이콘,랭커2'). 재개 시 생략 가능")
     c.add_argument("--max-matches", type=int, default=5000)
+    c.add_argument("--concurrency", type=int,
+                   default=int(os.environ.get("GKSAVE_CONCURRENCY", "10")),
+                   help="동시 요청 수 (기본 10, 1 이하=순차). 레이트리밋은 그대로 지켜짐")
     c.add_argument("--refresh", action="store_true",
                    help="처리 끝난 유저를 다시 열어 새 경기 보충 (중복은 자동 차단)")
     c.add_argument("--since", help="이 날짜(YYYY-MM-DD) 이후 매치만 수집 "

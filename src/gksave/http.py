@@ -11,6 +11,7 @@ config.Settings에서 조정한다.
 
 from __future__ import annotations
 
+import asyncio
 import random
 import time
 from typing import Any, Callable
@@ -111,4 +112,95 @@ class ResilientClient:
                 attempt += 1
                 continue
 
+            raise ApiError(resp.status_code, resp.text)
+
+
+class AsyncRateLimiter:
+    """비동기 토큰버킷: 여러 코루틴이 공유해 전체 요청률을 rate 이하로 유지.
+
+    스케줄링만 짧게 직렬화하고 요청 자체는 동시에 in-flight → 네트워크 지연을
+    겹쳐 레이트 예산을 꽉 채운다(순차 대기 병목 제거).
+    """
+
+    def __init__(self, rate_per_sec: float) -> None:
+        self.min_interval = 1.0 / rate_per_sec if rate_per_sec > 0 else 0.0
+        self._next = 0.0
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        if self.min_interval <= 0:
+            return
+        async with self._lock:
+            now = asyncio.get_event_loop().time()
+            wait = self._next - now
+            if wait > 0:
+                await asyncio.sleep(wait)
+                now = asyncio.get_event_loop().time()
+            self._next = max(self._next, now) + self.min_interval
+
+
+class AsyncResilientClient:
+    """동시 요청 버전. get()은 파싱된 JSON을 돌려준다.
+
+    concurrency 개까지 동시에 in-flight, 전체 요청률은 rate 로 제한. 429/5xx는
+    지수 백오프 재시도. 레이트리밋이 한도를 지키므로 동시성을 올려도 안전.
+    """
+
+    def __init__(
+        self,
+        settings: Settings = DEFAULT,
+        *,
+        transport: httpx.AsyncBaseTransport | None = None,
+        concurrency: int = 10,
+    ) -> None:
+        self.s = settings
+        self._limiter = AsyncRateLimiter(settings.max_requests_per_sec)
+        self._sem = asyncio.Semaphore(concurrency)
+        self._client = httpx.AsyncClient(
+            base_url=BASE_URL,
+            timeout=settings.request_timeout_sec,
+            headers={"x-nxopen-api-key": api_key()},
+            transport=transport,
+        )
+
+    async def __aenter__(self) -> "AsyncResilientClient":
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+    def _backoff_delay(self, attempt: int, retry_after: str | None) -> float:
+        if retry_after:
+            try:
+                return min(float(retry_after), self.s.backoff_max_sec)
+            except ValueError:
+                pass
+        base = self.s.backoff_base_sec * (2 ** attempt)
+        return min(base, self.s.backoff_max_sec) * (0.5 + random.random() / 2)
+
+    async def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        attempt = 0
+        while True:
+            await self._limiter.acquire()
+            try:
+                async with self._sem:
+                    resp = await self._client.get(path, params=params)
+            except httpx.TransportError as exc:
+                if attempt >= self.s.max_retries:
+                    raise ApiError(-1, f"transport error: {exc}") from exc
+                await asyncio.sleep(self._backoff_delay(attempt, None))
+                attempt += 1
+                continue
+
+            if resp.status_code == 200:
+                return resp.json()
+            if resp.status_code == 429 or 500 <= resp.status_code < 600:
+                if attempt >= self.s.max_retries:
+                    raise ApiError(resp.status_code, resp.text)
+                await asyncio.sleep(self._backoff_delay(attempt, resp.headers.get("Retry-After")))
+                attempt += 1
+                continue
             raise ApiError(resp.status_code, resp.text)
