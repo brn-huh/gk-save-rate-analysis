@@ -1,39 +1,14 @@
 # 운영 가이드 (수집 → 빌드 → 배포)
 
-## 사전 준비 (최초 1회)
-
-```bash
-. .venv/bin/activate          # 가상환경 활성화
-cp .env.local.example .env.local
-# .env.local 열어서 NEXON_API_KEY=발급키 채우기
-```
-
-> ⚠️ **터미널을 새로 열 때마다** 아래 명령어를 먼저 실행해야 함.
-> 안 하면 `ModuleNotFoundError: No module named 'duckdb'` 같은 오류 남.
-> ```bash
-> cd /Users/jwkim/workspace/gk-save-rate-analysis
-> . .venv/bin/activate
-> ```
+> 모든 명령어는 프로젝트 폴더(`gk-save-rate-analysis`)에서 실행.
 
 ---
 
 ## Step 0. 현재 상태 확인
 
 ```bash
-python3 -c "
-import duckdb
-c = duckdb.connect('data/gksave.duckdb', read_only=True)
-matches = c.execute('SELECT count(*) FROM raw_match').fetchone()[0]
-done    = c.execute(\"SELECT count(*) FROM frontier WHERE state='done'\").fetchone()[0]
-pending = c.execute(\"SELECT count(*) FROM frontier WHERE state='pending'\").fetchone()[0]
-print(f'저장된 매치: {matches:,}개')
-print(f'완료 유저:   {done:,}명')
-print(f'대기 유저:   {pending:,}명  ← 아직 안 긁은 유저')
-"
-```
-
-**pending 확인 명령어:**
-```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+. .venv/bin/activate
 python3 -c "
 import duckdb
 c = duckdb.connect('data/gksave.duckdb', read_only=True)
@@ -56,6 +31,8 @@ print(f'대기 유저:   {pending:,}명  ← 이게 0이면 --refresh 사용')
 
 ### 상황 A — pending이 남아있을 때 (일반 추가 수집)
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+. .venv/bin/activate
 gksave collect --concurrency 12 --max-matches 30000
 ```
 - `--max-matches 30000` : 이번에 새로 받을 매치 수 (3만 ≈ 1시간)
@@ -64,6 +41,8 @@ gksave collect --concurrency 12 --max-matches 30000
 
 ### 상황 B — pending이 0일 때 (새 경기 보충)
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+. .venv/bin/activate
 gksave collect --refresh --concurrency 12 --max-matches 30000
 ```
 - `--refresh` : 이미 완료된 유저를 다시 열어 **새로 생긴 경기만** 추가 수집
@@ -71,10 +50,12 @@ gksave collect --refresh --concurrency 12 --max-matches 30000
 
 ### 상황 C — 백그라운드로 돌리기 (터미널 닫아도 계속)
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+. .venv/bin/activate
 nohup gksave collect --concurrency 12 --max-matches 50000 > collect.log 2>&1 &
-echo "PID: $!"              # PID 메모해두기
+echo "PID: $!"
 
-tail -f collect.log         # 진행 확인 (Ctrl+C 로 tail만 빠져나와도 수집은 계속)
+tail -f collect.log     # 진행 확인 (Ctrl+C 로 tail만 빠져나와도 수집은 계속)
 ```
 
 진행 출력 예시:
@@ -99,15 +80,17 @@ pkill -f "gksave collect"
 ```
 
 → 두 경우 모두 **그 시점까지 저장된 데이터는 모두 보존**됨.
-→ 다시 `gksave collect`를 실행하면 **중단된 위치부터 자동으로 이어서** 재개.
+→ 다시 Step 1 명령어를 실행하면 **중단된 위치부터 자동으로 이어서** 재개.
 
 ---
 
 ## Step 3. 빌드
 
-수집한 raw JSON을 분석 테이블(gk_match, shot)로 파싱. **수집 후 반드시 실행.**
+수집한 raw JSON을 분석 테이블로 파싱. **수집 후 반드시 실행.**
 
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+. .venv/bin/activate
 gksave build
 ```
 - 168,000 매치 기준 약 2분
@@ -117,16 +100,18 @@ gksave build
 ## Step 4. Export (페이지·JSON 갱신)
 
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+. .venv/bin/activate
 gksave export --gate 50 --out out
 ```
 - `out/index.html`, `out/leaderboard.json`, `out/leaderboard.csv` 갱신
-- `--gate 50` : 최소 50경기 이상인 카드만 포함
 
 ---
 
 ## Step 5. 배포 (Vercel 반영)
 
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
 git add out
 git commit -m "chore: 리더보드 갱신"
 git push
@@ -138,6 +123,8 @@ git push
 ## 한 번에 실행 (빌드→export→배포 한방에)
 
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+. .venv/bin/activate
 gksave build && \
 gksave export --gate 50 --out out && \
 git add out && \
@@ -150,6 +137,8 @@ git push
 ## 자주 쓰는 조회 명령어
 
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+. .venv/bin/activate
 gksave leaderboard --gate 50 --top 20        # 선방률 순위
 gksave gsax --gate 50 --top 20               # GSAx(난이도 보정) 순위
 gksave card <spId> --grade 10                # 카드 상세 (거리존·타입별)
@@ -164,13 +153,11 @@ open out/index.html                          # 공개 페이지 로컬에서 열
 [ Step 0 ] 현재 상태 확인 (매치 수, pending 수)
     ↓
 [ Step 1 ] 수집
-    - pending 있으면 → gksave collect
-    - pending 없으면 → gksave collect --refresh
-    - 백그라운드 원하면 → nohup ... &
+    - pending > 0  → gksave collect
+    - pending = 0  → gksave collect --refresh
+    - 백그라운드   → nohup ... &
     ↓  Ctrl+C 또는 pkill 로 언제든 중단 가능 (데이터 보존, 재개 가능)
-[ Step 2 ] 중단 (선택)
-    ↓
-[ Step 3 ] gksave build         ← raw → gk_match/shot 파싱
+[ Step 3 ] gksave build         ← raw → 분석 테이블 파싱
     ↓
 [ Step 4 ] gksave export        ← 리더보드 HTML/JSON/CSV 생성
     ↓
