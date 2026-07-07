@@ -46,28 +46,40 @@ def _new_csv():
     return f, csv.writer(f)
 
 
-def rebuild(con: duckdb.DuckDBPyConnection) -> ParseStats:
-    """raw_match 전체를 재파싱해 gk_match·shot 을 재생성.
+def rebuild(con: duckdb.DuckDBPyConnection, *, full: bool = False) -> ParseStats:
+    """raw_match 를 파싱해 gk_match·shot 에 적재.
 
-    원본을 스트리밍(fetchmany)으로 읽어 임시 CSV에 쓰고 DuckDB COPY 로 벌크 적재.
-    행별 executemany(28만행 = ~14분) 대신이라 수십 초로 줄고, 1.5GB를 한 번에
-    메모리로 올리지도 않는다. None→'' (NULL), datetime/bool 은 CSV 문자열로 자동 파싱.
+    full=False (기본, 증분): parsed_at IS NULL 인 미파싱 매치만 처리 → 수집한 만큼만.
+    full=True             : 전체 재파싱. gk_match/shot 를 날리고 parsed_at 초기화 후 재생성.
+
+    스트리밍(fetchmany) + 임시 CSV + DuckDB COPY 벌크 적재로 속도를 유지.
     """
-    con.execute("DELETE FROM gk_match")
-    con.execute("DELETE FROM shot")
-    stats = ParseStats()
+    if full:
+        con.execute("DELETE FROM gk_match")
+        con.execute("DELETE FROM shot")
+        con.execute("UPDATE raw_match SET parsed_at = NULL")
 
+    unparsed = con.execute(
+        "SELECT count(*) FROM raw_match WHERE parsed_at IS NULL"
+    ).fetchone()[0]
+    if unparsed == 0:
+        return ParseStats()
+
+    stats = ParseStats()
     af, aw = _new_csv()
     sf, sw = _new_csv()
+    parsed_ids: list[str] = []
     try:
         aw.writerow(_GK_MATCH_COLS)
         sw.writerow(_SHOT_COL_LIST)
-        cur = con.execute("SELECT match_id, payload FROM raw_match")
+        cur = con.execute(
+            "SELECT match_id, payload FROM raw_match WHERE parsed_at IS NULL"
+        )
         while True:
             batch = cur.fetchmany(1000)
             if not batch:
                 break
-            for _mid, payload in batch:
+            for mid, payload in batch:
                 detail = json.loads(payload) if isinstance(payload, str) else payload
                 apps, shots = parse_match(detail, stats)
                 for x in apps:
@@ -80,6 +92,7 @@ def rebuild(con: duckdb.DuckDBPyConnection) -> ParseStats:
                         x.shot_type, x.result, x.is_pk, x.in_penalty, x.assist, x.hit_post,
                         x.x, x.y,
                     ])
+                parsed_ids.append(mid)
         af.close()
         sf.close()
         con.execute(
@@ -87,6 +100,13 @@ def rebuild(con: duckdb.DuckDBPyConnection) -> ParseStats:
             "(HEADER true, NULLSTR '')"
         )
         con.execute(f"COPY shot ({_SHOT_COLS}) FROM '{sf.name}' (HEADER true, NULLSTR '')")
+        # 파싱 완료 표시 — 다음 증분 빌드에서 스킵
+        if parsed_ids:
+            placeholders = ", ".join("?" * len(parsed_ids))
+            con.execute(
+                f"UPDATE raw_match SET parsed_at = now() WHERE match_id IN ({placeholders})",
+                parsed_ids,
+            )
     finally:
         for f in (af, sf):
             if not f.closed:

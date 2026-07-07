@@ -69,6 +69,19 @@ Ctrl + C
 
 ---
 
+## build (단독 실행이 필요할 때)
+
+**보통은 `update.sh`로 충분.** 파싱 로직이 바뀌었을 때만 `--full` 사용.
+
+```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+. .venv/bin/activate
+gksave build          # 증분 (새로 수집한 것만 파싱 — 빠름)
+gksave build --full   # 전체 재파싱 (파싱 로직이 바뀌었을 때만)
+```
+
+---
+
 ## update.sh — 빌드 + 배포 한방에
 
 수집이 끝난 후 실행. build → export → git push → Vercel 재배포까지 자동.

@@ -124,6 +124,8 @@ _MIGRATIONS = (
     "ALTER TABLE gk_match  ADD COLUMN IF NOT EXISTS pass_success INTEGER",
     "ALTER TABLE gk_match  ADD COLUMN IF NOT EXISTS aerial_try INTEGER",
     "ALTER TABLE gk_match  ADD COLUMN IF NOT EXISTS aerial_success INTEGER",
+    # 증분 빌드: 파싱 완료된 매치 추적 (NULL = 미파싱)
+    "ALTER TABLE raw_match ADD COLUMN IF NOT EXISTS parsed_at TIMESTAMP",
 )
 
 
@@ -146,9 +148,10 @@ def connect(settings: Settings = DEFAULT, *, read_only: bool = False) -> duckdb.
 
 
 def connect_memory() -> duckdb.DuckDBPyConnection:
-    """테스트용 인메모리 연결 (스키마 적용)."""
+    """테스트용 인메모리 연결 (스키마 + 마이그레이션 적용)."""
     con = duckdb.connect(":memory:")
     con.execute(SCHEMA)
+    _migrate(con)
     return con
 
 

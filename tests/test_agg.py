@@ -38,6 +38,31 @@ def con():
     c.close()
 
 
+def test_incremental_build(con):
+    detail = {
+        "matchId": "inc1", "matchType": 50, "matchDate": "2026-06-10T00:00:00",
+        "matchInfo": [
+            {"ouid": "U1", "player": [{"spId": 100, "spPosition": 0, "spGrade": 10}], "shootDetail": []},
+            {"ouid": "U2", "player": [{"spId": 200, "spPosition": 0, "spGrade": 10}],
+             "shootDetail": [{"result": 1, "type": 1, "inPenalty": False, "assist": False, "x": 0.8, "y": 0.5}]},
+        ],
+    }
+    _insert(con, detail)
+    stats = agg.rebuild(con)           # 증분: inc1 파싱
+    assert stats.matches == 1
+
+    stats2 = agg.rebuild(con)          # 이미 파싱됨 → 0건
+    assert stats2.matches == 0
+
+    detail2 = {**detail, "matchId": "inc2"}
+    _insert(con, detail2)
+    stats3 = agg.rebuild(con)          # inc2만 증분 파싱
+    assert stats3.matches == 1
+
+    stats4 = agg.rebuild(con, full=True)  # --full 이면 전체 재파싱
+    assert stats4.matches == 2
+
+
 def test_leaderboard_ranks_by_save_pct(con, sample_detail):
     _insert(con, sample_detail)
     agg.rebuild(con)

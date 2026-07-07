@@ -3,7 +3,7 @@
 cd "$(dirname "$0")/.."
 . .venv/bin/activate
 
-echo "=== build ===" && gksave build && \
+echo "=== build (증분) ===" && gksave build && \
 echo "=== export ===" && gksave export --gate 50 --out out && \
 echo "=== deploy ===" && \
 git add out && \

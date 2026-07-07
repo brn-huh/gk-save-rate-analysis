@@ -49,12 +49,13 @@ def _cmd_collect(args) -> None:
         )
 
 
-def _cmd_build(_args) -> None:
+def _cmd_build(args) -> None:
     con = connect(DEFAULT)
     try:
-        stats = agg.rebuild(con)
+        stats = agg.rebuild(con, full=getattr(args, "full", False))
+        mode = "전체 재빌드" if getattr(args, "full", False) else "증분 빌드"
         print(
-            f"raw_match {raw_match_count(con)}건 → 파싱: 매치 {stats.matches}, "
+            f"[{mode}] raw_match {raw_match_count(con)}건 → 파싱: 매치 {stats.matches}, "
             f"GK출전 {stats.appearances}, 슛 {stats.shots} | "
             f"스킵(2팀아님 {stats.skipped_not_two_teams}, "
             f"GK≠1 {stats.skipped_no_single_gk}, "
@@ -179,7 +180,9 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--days", type=int, help="최근 N일 매치만 수집")
     c.set_defaults(func=_cmd_collect)
 
-    sub.add_parser("build", help="재파싱(gk_match/shot 재생성)").set_defaults(func=_cmd_build)
+    b = sub.add_parser("build", help="재파싱(gk_match/shot 재생성). 기본=증분(새것만), --full=전체")
+    b.add_argument("--full", action="store_true", help="전체 재파싱 (파싱 로직 바꿨을 때)")
+    b.set_defaults(func=_cmd_build)
 
     sub.add_parser("meta", help="선수명·시즌 메타 캐시 갱신").set_defaults(func=_cmd_meta)
 
