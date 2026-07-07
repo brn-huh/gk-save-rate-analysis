@@ -1,10 +1,8 @@
 # 운영 가이드 (수집 → 빌드 → 배포)
 
-> 모든 스크립트는 프로젝트 어디서든 실행 가능 (경로 자동 인식).
-
 ---
 
-## 스크립트 목록
+## 스크립트 한눈에 보기
 
 | 스크립트 | 하는 일 |
 |---|---|
@@ -16,12 +14,15 @@
 
 ---
 
-## 상황별 사용법
+## status.sh — 현재 상태 확인
 
-### 1. 현재 상태 확인 (pending 남아있나?)
+수집 전에 먼저 pending이 얼마나 남아있는지 확인.
+
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
 ./scripts/status.sh
 ```
+
 출력 예시:
 ```
 저장된 매치: 168,643개
@@ -29,44 +30,74 @@
 대기 유저:   110,224명  ← 0이면 collect --refresh 사용
 ```
 
-### 2. 수집
+- **대기 유저 > 0** → `collect.sh` 사용 (상황 A)
+- **대기 유저 = 0** → `collect.sh --refresh` 사용 (상황 B)
 
-**pending > 0 일 때 (일반)**
+---
+
+## collect.sh — 수집
+
+### 상황 A — 대기 유저(pending)가 남아있을 때
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
 ./scripts/collect.sh
 ```
 
-**pending = 0 일 때 (새 경기 보충)**
+### 상황 B — 대기 유저가 0일 때 (새 경기 보충)
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
 ./scripts/collect.sh --refresh
 ```
 
-**수집량 직접 지정**
+### 수집량 직접 지정 (기본 3만)
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
 ./scripts/collect.sh --max 50000
 ```
 
-**수집 중단**
+### 옵션 조합 예시
+```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+./scripts/collect.sh --refresh --max 50000
+```
+
+### 수집 중단
 ```
 Ctrl + C
 ```
-→ 그 시점까지 저장된 데이터 보존. 다시 실행하면 이어서 재개.
+→ 그 시점까지 저장된 데이터 보존됨. 다시 실행하면 중단된 위치부터 이어서 재개.
 
-### 3. 수집 끝난 후 — 빌드·배포 한방에
+---
+
+## update.sh — 빌드 + 배포 한방에
+
+수집이 끝난 후 실행. build → export → git push → Vercel 재배포까지 자동.
+
 ```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
 ./scripts/update.sh
 ```
-→ build → export → git push → Vercel 자동 재배포
+
+출력 예시:
+```
+=== build ===
+raw_match 168643건 → 파싱: 매치 168388, GK출전 307950, 슛 1583198 ...
+=== export ===
+=== deploy ===
+✓ Vercel 재배포 시작됨
+```
 
 ---
 
 ## 전체 흐름
 
 ```
-./scripts/status.sh         ← pending 확인
-    ↓
-./scripts/collect.sh        ← pending > 0
-./scripts/collect.sh --refresh  ← pending = 0
-    ↓  (Ctrl+C 로 언제든 중단 가능, 데이터 보존)
-./scripts/update.sh         ← build + export + push + Vercel 재배포
+1. ./scripts/status.sh
+       대기 유저 > 0 ?
+       ├── YES → ./scripts/collect.sh
+       └── NO  → ./scripts/collect.sh --refresh
+           ↓
+       (Ctrl+C 로 언제든 중단 가능, 데이터 보존·재개 가능)
+           ↓
+2. ./scripts/update.sh   ← build + export + push + Vercel 재배포
 ```
