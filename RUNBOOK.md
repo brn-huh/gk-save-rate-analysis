@@ -25,6 +25,20 @@ print(f'대기 유저:   {pending:,}명  ← 아직 안 긁은 유저')
 "
 ```
 
+**pending 확인 명령어:**
+```bash
+python3 -c "
+import duckdb
+c = duckdb.connect('data/gksave.duckdb', read_only=True)
+matches = c.execute('SELECT count(*) FROM raw_match').fetchone()[0]
+done    = c.execute(\"SELECT count(*) FROM frontier WHERE state='done'\").fetchone()[0]
+pending = c.execute(\"SELECT count(*) FROM frontier WHERE state='pending'\").fetchone()[0]
+print(f'저장된 매치: {matches:,}개')
+print(f'완료 유저:   {done:,}명')
+print(f'대기 유저:   {pending:,}명  ← 이게 0이면 --refresh 사용')
+"
+```
+
 **`pending`(대기 유저)이란?**
 수집 중 상대 유저 ID를 발견하면 큐에 쌓음. "나중에 이 유저 매치도 긁어야 함" 대기 목록.
 `gksave collect`를 실행하면 pending에서 꺼내 긁고, 그 매치에서 또 새 유저를 발견해 큐에 추가 → 스노우볼처럼 불어남.
