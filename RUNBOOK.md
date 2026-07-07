@@ -1,5 +1,27 @@
 # 운영 가이드 (수집 → 빌드 → 배포)
 
+## 컴퓨터 껐다가 다시 시작할 때
+
+터미널 새로 열고 아래만 실행하면 됩니다. 데이터는 그대로 보존돼 있음.
+
+```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+./scripts/status.sh
+```
+
+→ 매치 수·pending 확인 후 이어서 수집하려면:
+
+```bash
+./scripts/collect.sh           # pending 있으면
+./scripts/collect.sh --refresh # pending 0이면
+```
+
+→ 배포만 갱신하려면 (수집 없이 현재 데이터로):
+
+```bash
+./scripts/update.sh
+```
+
 ---
 
 ## 스크립트 한눈에 보기
