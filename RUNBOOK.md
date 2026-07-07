@@ -10,7 +10,9 @@
 | `./scripts/collect.sh` | 수집 (pending 있을 때) |
 | `./scripts/collect.sh --refresh` | 수집 (pending 없을 때, 새 경기 보충) |
 | `./scripts/collect.sh --max 50000` | 수집량 직접 지정 |
-| `./scripts/update.sh` | build → export → git push 한방에 |
+| `./scripts/build.sh` | 증분 빌드 (수집한 것만 파싱 — 빠름) |
+| `./scripts/build.sh --full` | 전체 재파싱 (파싱 로직 바뀌었을 때만) |
+| `./scripts/update.sh` | 증분 빌드 + export + git push 한방에 |
 
 ---
 
@@ -69,22 +71,31 @@ Ctrl + C
 
 ---
 
-## build (단독 실행이 필요할 때)
+## build.sh — 빌드
 
-**보통은 `update.sh`로 충분.** 파싱 로직이 바뀌었을 때만 `--full` 사용.
-
+### 증분 빌드 (평소, 수집 후)
 ```bash
 cd /Users/jwkim/workspace/gk-save-rate-analysis
-. .venv/bin/activate
-gksave build          # 증분 (새로 수집한 것만 파싱 — 빠름)
-gksave build --full   # 전체 재파싱 (파싱 로직이 바뀌었을 때만)
+./scripts/build.sh
 ```
+- 수집한 새 매치만 파싱 → 3만 수집이면 ~30초
+- 매치 총량이 늘어나도 빌드 시간은 수집량에만 비례
+
+### 전체 재파싱 (파싱 로직이 바뀌었을 때만)
+```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+./scripts/build.sh --full
+```
+- 전체를 처음부터 다시 파싱 — 18.9만 기준 약 3분 40초
+- 코드 업데이트 후 결과가 이상할 때 사용
+
+> 보통은 `update.sh`로 충분. `build.sh`를 단독으로 쓸 일은 거의 없음.
 
 ---
 
 ## update.sh — 빌드 + 배포 한방에
 
-수집이 끝난 후 실행. build → export → git push → Vercel 재배포까지 자동.
+수집이 끝난 후 실행. 증분 빌드 → export → git push → Vercel 재배포까지 자동.
 
 ```bash
 cd /Users/jwkim/workspace/gk-save-rate-analysis
@@ -93,8 +104,8 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 
 출력 예시:
 ```
-=== build ===
-raw_match 168643건 → 파싱: 매치 168388, GK출전 307950, 슛 1583198 ...
+=== build (증분) ===
+[증분 빌드] raw_match 189663건 → 파싱: 매치 21020, GK출전 38450, 슛 201124 ...
 === export ===
 === deploy ===
 ✓ Vercel 재배포 시작됨
@@ -112,5 +123,8 @@ raw_match 168643건 → 파싱: 매치 168388, GK출전 307950, 슛 1583198 ...
            ↓
        (Ctrl+C 로 언제든 중단 가능, 데이터 보존·재개 가능)
            ↓
-2. ./scripts/update.sh   ← build + export + push + Vercel 재배포
+2. ./scripts/update.sh        ← 증분 빌드 + export + push + Vercel 재배포
+
+※ 파싱 로직이 바뀐 경우에만:
+   ./scripts/build.sh --full  ← 전체 재파싱 후 update.sh
 ```
