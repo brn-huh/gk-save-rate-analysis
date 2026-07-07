@@ -8,6 +8,13 @@ cp .env.local.example .env.local
 # .env.local 열어서 NEXON_API_KEY=발급키 채우기
 ```
 
+> ⚠️ **터미널을 새로 열 때마다** 아래 명령어를 먼저 실행해야 함.
+> 안 하면 `ModuleNotFoundError: No module named 'duckdb'` 같은 오류 남.
+> ```bash
+> cd /Users/jwkim/workspace/gk-save-rate-analysis
+> . .venv/bin/activate
+> ```
+
 ---
 
 ## Step 0. 현재 상태 확인
