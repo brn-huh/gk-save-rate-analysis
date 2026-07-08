@@ -339,12 +339,29 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.getElementById('panel-'+t.dataset.tab).classList.add('active');
 });
 
-const ge=D.grade_effect||{}, de=ge.mean_save_pct_delta_per_grade;
-const deTxt = de==null?'표본 부족':(de*100>=0?'+':'')+(de*100).toFixed(2)+'%p';
+const ge=D.grade_effect||{}, de=ge.mean_save_pct_delta_per_grade, se=ge.se_per_grade;
+const pp=v=>(v*100>=0?'+':'')+(v*100).toFixed(2)+'%p';
+// 95% 신뢰구간이 0을 포함하면 방향을 단정할 수 없음 → '사실상 차이 없음'으로 표기해 오해 차단
+let geShort, geLong;
+if(de==null){
+  geShort='표본 부족'; geLong='표본이 부족해 강화 효과를 추정할 수 없습니다.';
+}else{
+  const lo=se==null?null:de-1.96*se, hi=se==null?null:de+1.96*se;
+  const ciTxt=(lo!=null)?`[${pp(lo)}, ${pp(hi)}]`:'';
+  const ci=ciTxt?` (95% 신뢰구간 ${ciTxt})`:'';
+  const split=`올라간 페어 ${ge.up_pairs||0} : 내려간 페어 ${ge.down_pairs||0}`;
+  const nulEffect = (lo!=null && lo<=0 && hi>=0);
+  if(nulEffect){
+    geShort=`<b>사실상 차이 없음(≈0)</b> <span class="muted">— 단계당 ${pp(de)}, 신뢰구간이 0 포함</span>`;
+    geLong=`강화단계 1 상승당 평균 선방률 변화는 <b>${pp(de)}</b>지만, 95% 신뢰구간이 ${ciTxt} 로 <b>0을 포함</b>합니다. 즉 이 표본에서 강화단계는 선방률에 <b>유의미한 차이를 만들지 못했습니다</b>(${split} 로 거의 반반). 표본이 쌓이면 값이 달라질 수 있습니다.`;
+  }else{
+    geShort=`강화단계 1 상승당 평균 선방률 <b>${pp(de)}</b>${ci}`;
+    geLong=`강화단계 1 상승당 평균 선방률 변화: <b>${pp(de)}</b>${ci} (${split}).`;
+  }
+}
 document.getElementById('ge').innerHTML =
-  `<b>⚡ 강화 효과:</b> 강화단계 1 상승당 평균 선방률 <b>${deTxt}</b> <span class="muted">(유저 실력 교란 제거)</span>`;
-document.getElementById('geDetail').innerHTML =
-  `강화단계 1 상승당 평균 선방률 변화: <b>${deTxt}</b> (페어유저 ${ge.paired_users||0}, 페어 ${ge.pairs||0})`;
+  `<b>⚡ 강화 효과:</b> ${geShort} <span class="muted">(유저 실력 교란 제거, 페어 ${ge.pairs||0})</span>`;
+document.getElementById('geDetail').innerHTML = geLong;
 
 document.getElementById('sp').innerHTML=(D.same_player||[]).map(g=>{
   const rows=g.cards.map(c=>

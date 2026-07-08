@@ -601,12 +601,24 @@ def within_ouid_grade_effect(
             pairs += 1
 
     mean_delta = sum(deltas) / len(deltas) if deltas else None
+    # 평균의 표준오차(SE) — 95% 신뢰구간이 0을 포함하면 '유의미한 차이 없음'.
+    # 강화 효과는 페어 표본이 얇아 노이즈가 커서, 맨숫자만 보면 방향을 오해하기 쉽다.
+    se = None
+    if mean_delta is not None and len(deltas) >= 2:
+        var = sum((d - mean_delta) ** 2 for d in deltas) / len(deltas)  # 모분산
+        se = (var / len(deltas)) ** 0.5
+    up = sum(1 for d in deltas if d > 1e-9)
+    down = sum(1 for d in deltas if d < -1e-9)
     return {
         "paired_users": len([c for c in cells.values() if len(c) >= 2]),
         "pairs": pairs,
         "mean_save_pct_delta_per_grade": mean_delta,
+        "se_per_grade": se,
+        "up_pairs": up,
+        "down_pairs": down,
         "note": (
             "같은 유저·같은 카드에서 강화단계가 1 오를 때 평균 선방률 변화. "
-            "유저 실력 교란이 페어 안에서 상쇄됨. 표본 적으면 신뢰 낮음."
+            "유저 실력 교란이 페어 안에서 상쇄됨. 표본 적으면 신뢰 낮음. "
+            "95% 신뢰구간(평균±1.96·SE)이 0을 포함하면 유의미한 차이 없음."
         ),
     }
