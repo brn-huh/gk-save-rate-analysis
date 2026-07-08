@@ -30,6 +30,30 @@ def _log(msg: str) -> None:
     print(msg, flush=True)
 
 
+def _pct(n: int, total: int) -> str:
+    if total <= 0:
+        return "—"
+    return f"{n / total * 100:.1f}%"
+
+
+def _log_progress(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    stored: int,
+    max_new_matches: int,
+    log: Logger,
+) -> None:
+    done = con.execute(
+        "SELECT count(*) FROM frontier WHERE state = 'done'"
+    ).fetchone()[0]
+    total = con.execute("SELECT count(*) FROM frontier").fetchone()[0]
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log(
+        f"{ts} | 매치 {stored:,}/{max_new_matches:,} ({_pct(stored, max_new_matches)}) "
+        f"· 유저 {done:,}/{total:,} ({_pct(done, total)})"
+    )
+
+
 def match_id_time(match_id: str) -> datetime | None:
     """matchId(ObjectId) 앞 4바이트 = 생성 unix초 → naive UTC datetime.
 
@@ -134,7 +158,8 @@ def snowball(
             "SELECT ouid FROM frontier WHERE state = 'pending' LIMIT 1"
         ).fetchone()
         if row is None:
-            log("[snowball] pending ouid 소진 — 완료")
+            _log_progress(con, stored=stored, max_new_matches=max_new_matches, log=log)
+            log(f"{datetime.now():%Y-%m-%d %H:%M:%S} | 유저 큐 소진")
             break
         ouid = row[0]
         reached_old = False
@@ -142,7 +167,7 @@ def snowball(
             try:
                 ids = api.list_user_matches(client, ouid, offset=p * limit, limit=limit)
             except ApiError as e:
-                log(f"[snowball] user/match 오류(ouid={ouid[:8]}…): {e}")
+                log(f"{datetime.now():%Y-%m-%d %H:%M:%S} | user/match 오류(ouid={ouid[:8]}…): {e}")
                 break
             if not ids:
                 break
@@ -159,10 +184,7 @@ def snowball(
             if reached_old or stored >= max_new_matches:
                 break
         con.execute("UPDATE frontier SET state = 'done' WHERE ouid = ?", [ouid])
-        pending = con.execute(
-            "SELECT count(*) FROM frontier WHERE state = 'pending'"
-        ).fetchone()[0]
-        log(f"[snowball] ouid 완료. 신규매치 누적 {stored} | pending {pending}")
+        _log_progress(con, stored=stored, max_new_matches=max_new_matches, log=log)
     return stored
 
 
@@ -203,7 +225,8 @@ async def snowball_async(
             "SELECT ouid FROM frontier WHERE state = 'pending' LIMIT 1"
         ).fetchone()
         if row is None:
-            log("[snowball] pending ouid 소진 — 완료")
+            _log_progress(con, stored=stored, max_new_matches=max_new_matches, log=log)
+            log(f"{datetime.now():%Y-%m-%d %H:%M:%S} | 유저 큐 소진")
             break
         ouid = row[0]
 
@@ -213,7 +236,7 @@ async def snowball_async(
             try:
                 ids = await _a_user_matches(client, ouid, p * limit, limit)
             except ApiError as e:
-                log(f"[snowball] user/match 오류(ouid={ouid[:8]}…): {e}")
+                log(f"{datetime.now():%Y-%m-%d %H:%M:%S} | user/match 오류(ouid={ouid[:8]}…): {e}")
                 break
             if not ids:
                 break
@@ -244,10 +267,7 @@ async def snowball_async(
                 break
 
         con.execute("UPDATE frontier SET state = 'done' WHERE ouid = ?", [ouid])
-        pending = con.execute(
-            "SELECT count(*) FROM frontier WHERE state = 'pending'"
-        ).fetchone()[0]
-        log(f"[snowball] ouid 완료. 신규매치 누적 {stored} | pending {pending}")
+        _log_progress(con, stored=stored, max_new_matches=max_new_matches, log=log)
     return stored
 
 

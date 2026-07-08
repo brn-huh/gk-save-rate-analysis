@@ -47,6 +47,7 @@ def build_payload(
         "gate_min_matches": gate,
         "since": since.isoformat() if since else None,
         "date_range": date_range,
+        "total_collected_matches": con.execute("SELECT count(*) FROM raw_match").fetchone()[0],
         "warning": WARNING,
         "leaderboard_count": len(leaderboard),
         "leaderboard": leaderboard,

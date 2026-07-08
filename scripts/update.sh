@@ -1,12 +1,8 @@
 #!/bin/bash
-# 수집 끝난 후 build → export → git push 한방에
+# 수집 끝난 후 build → export 까지 실행
 cd "$(dirname "$0")/.."
 . .venv/bin/activate
 
 echo "=== build (증분) ===" && gksave build && \
 echo "=== export ===" && gksave export --gate 50 --out out && \
-echo "=== deploy ===" && \
-git add out && \
-git commit -m "chore: 리더보드 갱신" && \
-git push && \
-echo "✓ Vercel 재배포 시작됨"
+echo "✓ build/export 완료 (git commit/push는 수동 진행)"

@@ -19,6 +19,7 @@ def build_html(payload: dict[str, Any]) -> str:
         "gate": payload.get("gate_min_matches"),
         "since": payload.get("since"),
         "date_range": payload.get("date_range", {}),
+        "total_collected_matches": payload.get("total_collected_matches", 0),
         "warning": payload.get("warning", ""),
         "grade_effect": payload.get("grade_effect", {}),
         "leaderboard": payload.get("leaderboard", []),
@@ -155,8 +156,9 @@ const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':s;r
 
 const dr=D.date_range||{};
 const period=(dr.min&&dr.max)?`데이터 기간 ${dr.min} ~ ${dr.max} · `:'';
+const totalMatches = Number(D.total_collected_matches || 0).toLocaleString('ko-KR');
 document.getElementById('meta').textContent =
-  `${period}게이트 ${D.gate}경기↑ · ${D.leaderboard.length}장`
+  `${period}총 수집 경기 ${totalMatches}건 · 게이트 ${D.gate}경기↑ · ${D.leaderboard.length}장`
   + (D.since?` · ${D.since} 이후`:'');
 document.getElementById('warn').innerHTML = '<b>⚠️ 읽는 법:</b> ' + esc(D.warning);
 

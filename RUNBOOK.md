@@ -1,5 +1,23 @@
 # 운영 가이드 (수집 → 빌드 → 배포)
 
+## 딱 이것만 하면 된다!
+
+```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+./scripts/collect.sh
+```
+
+- 수집이 끝나면 프롬프트가 뜸:
+  - `수집 완료. update.sh를 지금 실행할까요? [y/N]`
+- `y` 입력: `update.sh` 실행 (증분 빌드 + export)
+- 완료 후 결과 화면 확인:
+
+```bash
+open out/index.html
+```
+
+---
+
 ## 컴퓨터 껐다가 다시 시작할 때
 
 터미널 새로 열고 아래만 실행하면 됩니다. 데이터는 그대로 보존돼 있음.
@@ -34,7 +52,7 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 | `./scripts/collect.sh --max 50000` | 수집량 직접 지정 |
 | `./scripts/build.sh` | 증분 빌드 (수집한 것만 파싱 — 빠름) |
 | `./scripts/build.sh --full` | 전체 재파싱 (파싱 로직 바뀌었을 때만) |
-| `./scripts/update.sh` | 증분 빌드 + export + git push 한방에 |
+| `./scripts/update.sh` | 증분 빌드 + export 실행 |
 
 ---
 
@@ -115,9 +133,9 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 
 ---
 
-## update.sh — 빌드 + 배포 한방에
+## update.sh — 빌드 + export
 
-수집이 끝난 후 실행. 증분 빌드 → export → git push → Vercel 재배포까지 자동.
+수집이 끝난 후 실행. 증분 빌드 → export 까지 자동 실행한다.
 
 ```bash
 cd /Users/jwkim/workspace/gk-save-rate-analysis
@@ -129,8 +147,7 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 === build (증분) ===
 [증분 빌드] raw_match 189663건 → 파싱: 매치 21020, GK출전 38450, 슛 201124 ...
 === export ===
-=== deploy ===
-✓ Vercel 재배포 시작됨
+✓ build/export 완료 (git commit/push는 수동 진행)
 ```
 
 ---
@@ -145,7 +162,8 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
            ↓
        (Ctrl+C 로 언제든 중단 가능, 데이터 보존·재개 가능)
            ↓
-2. ./scripts/update.sh        ← 증분 빌드 + export + push + Vercel 재배포
+2. collect 종료 후 프롬프트에서 y 입력(또는 ./scripts/update.sh 직접 실행)
+   ← 증분 빌드 + export
 
 ※ 파싱 로직이 바뀐 경우에만:
    ./scripts/build.sh --full  ← 전체 재파싱 후 update.sh

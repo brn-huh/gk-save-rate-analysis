@@ -19,4 +19,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "=== 수집 시작 (최대 ${MAX}매치 $EXTRA_ARGS) ==="
-gksave collect --concurrency 12 --max-matches "$MAX" $EXTRA_ARGS
+if gksave collect --concurrency 12 --max-matches "$MAX" $EXTRA_ARGS; then
+  echo
+  read -r -p "수집 완료. update.sh를 지금 실행할까요? [y/N] " answer
+  if [[ "$answer" =~ ^[Yy]$ ]]; then
+    ./scripts/update.sh
+  else
+    echo "update.sh는 건너뜁니다."
+  fi
+else
+  echo "수집 중 오류가 발생해 update.sh는 실행하지 않습니다."
+  exit 1
+fi
