@@ -34,7 +34,6 @@ _TEMPLATE = r"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FC온라인 GK 선방률 리더보드</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
   :root{ --bg:#04060f; --panel:#0b1024; --panel2:#0e1533; --line:#1c2444;
          --gold:#f0d17a; --gold2:#caa966; --text:#eaeefb; --mut:#8792ac; }
@@ -113,31 +112,122 @@ _TEMPLATE = r"""<!doctype html>
   footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);
          color:var(--mut);font-size:.8rem;line-height:1.7}
   footer a{color:var(--gold2);text-decoration:none}
+  /* 상단 상시 배너(주의 라벨 + 강화효과) */
+  .banner{background:rgba(240,209,122,.07);border:1px solid rgba(240,209,122,.28);border-radius:10px;
+        padding:11px 14px;font-size:.86rem;line-height:1.5;margin:14px 0 4px;color:#e7d5a8}
+  .banner b{color:var(--gold)}
+  .banner .ge{margin-top:7px;padding-top:7px;border-top:1px dotted rgba(240,209,122,.25);color:#e7d5a8}
+  /* 탭 */
+  .tabs{display:flex;gap:6px;margin:16px 0 4px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .tab{padding:9px 15px;border:1px solid transparent;border-bottom:none;border-radius:9px 9px 0 0;
+        background:transparent;color:var(--mut);cursor:pointer;font-size:.9rem;font-family:inherit;
+        font-weight:700;transition:.15s;margin-bottom:-1px}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:#1a1405;background:linear-gradient(180deg,var(--gold),var(--gold2));
+        border-color:var(--gold)}
+  .panel{display:none}
+  .panel.active{display:block}
+  /* 더보기 */
+  .more{display:flex;gap:8px;justify-content:center;margin:16px 0 4px}
+  .more button{padding:8px 18px;border:1px solid var(--line);background:var(--panel);color:var(--gold2);
+        border-radius:9px;cursor:pointer;font-size:.86rem;font-family:inherit;font-weight:700;transition:.15s}
+  .more button:hover{border-color:var(--gold2);color:var(--text)}
+  /* 지표 설명 */
+  .help p{font-size:.9rem;line-height:1.7;color:var(--text)}
+  .help .lead{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:10px 0}
+  .help .lead dt{color:var(--gold);font-weight:700;margin-top:10px}
+  .help .lead dt:first-child{margin-top:0}
+  .help .lead dd{margin:2px 0 0;color:var(--text);font-size:.88rem;line-height:1.6}
+  .help ol.usage{margin:8px 0 0;padding-left:1.2em;font-size:.9rem;line-height:1.7}
+  .help details{margin:6px 0}
+  .help details p{font-size:.86rem;color:var(--mut);margin:4px 0 8px}
+  .help dl.terms dt{color:var(--gold2);font-weight:700;margin-top:9px;font-size:.86rem}
+  .help dl.terms dd{margin:1px 0 0;color:var(--mut);font-size:.85rem;line-height:1.55}
 </style></head><body>
 <h1><span class="star">★</span><span class="t">FC온라인 골키퍼 선방률 리더보드</span></h1>
 <p class="meta" id="meta"></p>
-<div class="warn" id="warn"></div>
 
-<div class="controls">
-  <input id="search" placeholder="선수 이름 검색…">
-  <span class="lab">정렬</span>
-  <button class="sort active" data-sort="save_pct">선방률</button>
-  <button class="sort" data-sort="gsax_per_shot">GSAx</button>
-  <button class="sort" data-sort="gsax_ex_short_per_shot">GSAx(초근제외)</button>
-  <button class="sort" data-sort="matches">표본</button>
+<div class="banner">
+  <div id="warn"></div>
+  <div class="ge" id="ge"></div>
 </div>
-<p class="muted">행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다.</p>
-<table id="lb">
-  <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>선방률</th><th id="gsaxHdr">GSAx/100</th><th>표본</th></tr></thead>
-  <tbody></tbody>
-</table>
 
-<h2>강화 효과 (유저 내 비교)</h2>
-<p class="muted" id="ge"></p>
+<div class="tabs">
+  <button class="tab active" data-tab="lb">리더보드</button>
+  <button class="tab" data-tab="sp">동일 선수 비교</button>
+  <button class="tab" data-tab="help">지표 설명 · 사용법</button>
+</div>
 
-<h2>동일 선수 · 시즌 비교</h2>
-<p class="muted">같은 선수의 시즌·강화별 선방률(raw)과 GSAx. (여전히 raw 는 유저 교란 포함)</p>
-<div id="sp"></div>
+<!-- 탭 1: 리더보드 -->
+<div class="panel active" id="panel-lb">
+  <div class="controls">
+    <input id="search" placeholder="선수 이름 검색…">
+    <span class="lab">정렬</span>
+    <button class="sort active" data-sort="save_pct">선방률</button>
+    <button class="sort" data-sort="gsax_per_shot">GSAx</button>
+    <button class="sort" data-sort="gsax_ex_short_per_shot">GSAx(초근제외)</button>
+    <button class="sort" data-sort="matches">표본</button>
+  </div>
+  <p class="muted">행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
+  <table id="lb">
+    <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>선방률</th><th id="gsaxHdr">GSAx/100</th><th>표본</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="more" id="more"></div>
+</div>
+
+<!-- 탭 2: 동일 선수 비교 -->
+<div class="panel" id="panel-sp">
+  <p class="muted">같은 선수의 시즌·강화별 선방률(raw)과 GSAx. (여전히 raw 는 유저 교란 포함)</p>
+  <div id="sp"></div>
+</div>
+
+<!-- 탭 3: 지표 설명 · 사용법 -->
+<div class="panel help" id="panel-help">
+  <h2>이 페이지 사용법</h2>
+  <ol class="usage">
+    <li><b>리더보드 탭</b>에서 선방률·GSAx·표본으로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
+    <li>표의 <b>행을 클릭</b>하면 그 카드의 거리 구간별·슛 타입별 선방률과 세부 스탯이 펼쳐집니다.</li>
+    <li><b>동일 선수 비교 탭</b>에서 같은 선수의 시즌·강화별 성적을 나란히 봅니다.</li>
+  </ol>
+
+  <h2>핵심 지표</h2>
+  <dl class="lead">
+    <dt>선방률</dt>
+    <dd>상대의 유효슛 중 막아낸 비율. <b>선방 ÷ (선방 + 실점)</b>으로 계산합니다. 값이 높을수록 잘 막은 것. 단, 이 순위의 raw 선방률에는 카드 성능뿐 아니라 <b>그 카드를 쓴 유저의 실력·수비 라인·상대 슛 난이도</b>가 섞여 있어 '카드 추천'이 아닙니다.</dd>
+    <dt>GSAx / 100</dt>
+    <dd>Goals Saved Above Expected — <b>슛 난이도를 보정</b>한 지표입니다. 거리·각도로 계산한 '기대 실점'보다 실제로 얼마나 더(또는 덜) 막았는지를 유효슛 100개 기준으로 환산합니다. <b>+면 기대보다 선방, −면 기대보다 실점</b>. 유저 실력 교란을 줄인, 선방률보다 공정한 비교값입니다.</dd>
+    <dt>GSAx(초근제외)</dt>
+    <dd>초근거리(5m 미만) 슛을 뺀 GSAx. 골문 앞 난사처럼 GK가 어쩔 수 없는 상황을 제외해, 포지셔닝·반응 능력을 더 잘 드러냅니다.</dd>
+    <dt>표본 · 게이트</dt>
+    <dd>표본 = 그 카드가 집계된 경기 수. 표본이 적으면 우연(뽀록)일 수 있어 신뢰도가 낮습니다. 그래서 최소 <b id="gateN"></b>경기 이상(게이트)인 카드만 순위에 올립니다. 순위를 볼 때 표본 수를 꼭 함께 보세요.</dd>
+  </dl>
+
+  <h2>세부 지표 (행 클릭 시 펼쳐지는 값)</h2>
+  <details><summary>거리 구간별 · 슛 타입별</summary>
+    <dl class="terms">
+      <dt>거리 구간별</dt><dd>실점·선방을 골문과의 근사 거리(초근/근/중/원거리)로 나눈 선방률. 어느 거리에 강하고 약한지 보여줍니다.</dd>
+      <dt>슛 타입별</dt><dd>노멀·감아차기·헤더·발리 등 슛 종류별 선방률. 표본 3개 미만 타입은 노이즈라 숨깁니다.</dd>
+    </dl>
+  </details>
+  <details><summary>상황 · 수비 맥락 · GK 스탯</summary>
+    <dl class="terms">
+      <dt>노출도(경기당 유효슛)</dt><dd>한 경기에 GK가 마주한 평균 유효슛 수. 높을수록 수비 부담이 큰 환경.</dd>
+      <dt>마주한 / 실점 평균 거리</dt><dd>받은 슛과 먹힌 슛의 평균 거리(근사 미터). 둘의 차이가 클수록 먼 슛을 잘 막았다는 뜻.</dd>
+      <dt>박스 안 / 밖 선방률</dt><dd>페널티 박스 안팎으로 나눈 선방률.</dd>
+      <dt>1대1 선방률</dt><dd>도움 없이 개인 돌파로 들어온 슛(단독 찬스)에 대한 선방률.</dd>
+      <dt>연계·컷백 선방률</dt><dd>도움(어시스트)을 받은 슛에 대한 선방률.</dd>
+      <dt>경기당 평균 평점 · 패스 성공률</dt><dd>게임이 부여한 GK 평점과 패스 성공률.</dd>
+    </dl>
+  </details>
+  <details><summary>강화 효과 (유저 내 비교)</summary>
+    <p id="geDetail"></p>
+    <p>같은 유저가 같은 카드를 강화단계만 올렸을 때 선방률이 얼마나 변하는지를 짝지어 비교한 값입니다. 유저 실력 차이를 제거했기 때문에 <b>강화 그 자체의 효과</b>에 가장 가깝습니다.</p>
+  </details>
+
+  <h2>주의</h2>
+  <div class="warn" id="warnFull"></div>
+</div>
 
 <footer>
   데이터 출처: 본 분석의 모든 경기 데이터는 <b>NEXON Open API</b>
@@ -149,7 +239,8 @@ _TEMPLATE = r"""<!doctype html>
 <script id="gk-data" type="application/json">__DATA__</script>
 <script>
 const D = JSON.parse(document.getElementById('gk-data').textContent);
-let sortKey='save_pct', q='';
+const PAGE=100;
+let sortKey='save_pct', q='', limit=PAGE;
 const pct=v=>v==null?'N/A':(v*100).toFixed(1)+'%';
 const gps=v=>v==null?'':(v*100>=0?'+':'')+(v*100).toFixed(1);
 const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;};
@@ -160,7 +251,10 @@ const totalMatches = Number(D.total_collected_matches || 0).toLocaleString('ko-K
 document.getElementById('meta').textContent =
   `${period}총 수집 경기 ${totalMatches}건 · 게이트 ${D.gate}경기↑ · ${D.leaderboard.length}장`
   + (D.since?` · ${D.since} 이후`:'');
-document.getElementById('warn').innerHTML = '<b>⚠️ 읽는 법:</b> ' + esc(D.warning);
+document.getElementById('warn').innerHTML =
+  '<b>⚠️ 읽는 법:</b> 이 순위는 raw 선방률이라 카드 성능에 <b>유저 실력</b>이 섞여 있어 \'카드 추천\'이 아닙니다. 용어·자세한 설명은 <b>지표 설명</b> 탭.';
+document.getElementById('warnFull').innerHTML = esc(D.warning);
+var gEl=document.getElementById('gateN'); if(gEl) gEl.textContent=D.gate;
 
 function detailHtml(c){
   const zones=(c.zones||[]).map(z=>
@@ -196,6 +290,7 @@ function toggle(tr,c){
 }
 function render(){
   const tb=document.querySelector('#lb tbody'); tb.innerHTML='';
+  const more=document.getElementById('more'); more.innerHTML='';
   let rows=D.leaderboard.filter(c=>!q||(c.player_name||'').toLowerCase().includes(q));
   rows=rows.slice().sort((a,b)=>{
     const av=a[sortKey], bv=b[sortKey];
@@ -205,7 +300,9 @@ function render(){
   const gf = sortKey.indexOf('gsax')===0 ? sortKey : 'gsax_per_shot';  // GSAx 컬럼은 활성 모드 값
   document.getElementById('gsaxHdr').textContent =
     gf==='gsax_ex_short_per_shot' ? 'GSAx/100(초근×)' : 'GSAx/100';
-  rows.forEach((c,i)=>{
+  // 검색 중이면 전체에서 찾도록 캡 무시, 아니면 상위 limit 장만 그린다(초기 로드 경량화)
+  const vis = q ? rows : rows.slice(0, limit);
+  vis.forEach((c,i)=>{
     const tr=document.createElement('tr'); tr.className='row';
     tr.innerHTML=`<td class="rank">${i+1}</td><td>${esc(c.player_name||('spId '+c.gk_sp_id))}</td>`+
       `<td class="season">${esc(c.season_name||'')}</td><td class="num">${c.grade}강</td>`+
@@ -213,18 +310,41 @@ function render(){
       `<td class="num">${c.matches}</td>`;
     tr.onclick=()=>toggle(tr,c); tb.appendChild(tr);
   });
+  if(q) return;  // 검색 중엔 더보기/접기 없음
+  if(rows.length>limit){
+    const b1=document.createElement('button');
+    b1.textContent=`더 보기 (${vis.length}/${rows.length})`;
+    b1.onclick=()=>{limit+=PAGE; render();};
+    const b2=document.createElement('button');
+    b2.textContent='전체 보기';
+    b2.onclick=()=>{limit=rows.length; render();};
+    more.appendChild(b1); more.appendChild(b2);
+  }else if(limit>PAGE){
+    const b0=document.createElement('button');
+    b0.textContent='접기 (상위 100)';
+    b0.onclick=()=>{limit=PAGE; render(); document.getElementById('panel-lb').scrollIntoView({behavior:'smooth',block:'start'});};
+    more.appendChild(b0);
+  }
 }
-document.getElementById('search').oninput=e=>{q=e.target.value.trim().toLowerCase();render();};
+document.getElementById('search').oninput=e=>{q=e.target.value.trim().toLowerCase();limit=PAGE;render();};
 document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('[data-sort]').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active'); sortKey=b.dataset.sort; render();
+  b.classList.add('active'); sortKey=b.dataset.sort; limit=PAGE; render();
+});
+// 탭 전환
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  document.getElementById('panel-'+t.dataset.tab).classList.add('active');
 });
 
 const ge=D.grade_effect||{}, de=ge.mean_save_pct_delta_per_grade;
+const deTxt = de==null?'표본 부족':(de*100>=0?'+':'')+(de*100).toFixed(2)+'%p';
 document.getElementById('ge').innerHTML =
-  '같은 유저·같은 카드에서 강화단계 1 상승당 평균 선방률 변화(유저 실력 교란 제거): '+
-  `<b>${de==null?'표본 부족':(de*100>=0?'+':'')+(de*100).toFixed(2)+'%p'}</b> `+
-  `(페어유저 ${ge.paired_users||0}, 페어 ${ge.pairs||0})`;
+  `<b>⚡ 강화 효과:</b> 강화단계 1 상승당 평균 선방률 <b>${deTxt}</b> <span class="muted">(유저 실력 교란 제거)</span>`;
+document.getElementById('geDetail').innerHTML =
+  `강화단계 1 상승당 평균 선방률 변화: <b>${deTxt}</b> (페어유저 ${ge.paired_users||0}, 페어 ${ge.pairs||0})`;
 
 document.getElementById('sp').innerHTML=(D.same_player||[]).map(g=>{
   const rows=g.cards.map(c=>
