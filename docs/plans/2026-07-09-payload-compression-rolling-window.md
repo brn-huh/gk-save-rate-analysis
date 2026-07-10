@@ -1,0 +1,178 @@
+# payload 무손실 압축 + 롤링 30일 통계 창
+
+작성: 2026-07-09 · 등급: 중대(데이터 포맷 비가역 변경)
+
+## 배경
+
+수집 성능 조사에서 두 개의 독립적인 손실을 실측했다.
+
+- **가동률 14.5%** — 수집기가 152시간 중 22시간만 돌았다. `collect.sh`가 대화형 프롬프트에서 블로킹한다.
+- **가동 중에도 5.64매치/초** — 레이트 예산은 15/초. 유저당 17.9초 중 API가 강제하는 건 6.9초뿐이고,
+  `have_match` 0.43초, 진행률 카운트 0.008초를 빼면 **약 10.6초가 INSERT**다. 매치마다 21KB JSON을
+  autocommit 3문장(raw 1 + frontier 2)으로 11.4GB 테이블에 쓰는 동안 in-flight 요청은 0이다.
+
+이 계획은 그 전제조건인 **쓰기량 감소**만 다룬다. 인서트 배치·오프로딩·파이프라이닝·무인 루프는 후속.
+
+부수적으로, 실제 데이터가 6/1~7/8의 38일치뿐이고 `COLLECT_MIN_DATE = "2026-03-26"`이 한 번도
+작동한 적 없는 죽은 설정임이 드러났다. 지평선은 날짜가 아니라 `user_pages=3`(유저당 최근 300경기)이 정한다.
+
+## 목표
+
+1. 매치당 쓰기량 21.0KB → 2.8KB (zlib-6, 실측 13.2%)
+2. 통계를 롤링 30일 창으로 (`shot`/`gk_match` 기반이라 되돌릴 수 있는 결정)
+3. 수집 컷을 롤링 35일로 (창보다 5일 여유, `reached_old` 조기중단으로 요청 절약)
+
+## In-scope
+
+- `raw_match.payload` 를 `JSON` → `BLOB`(zlib-6)
+- 인코딩/디코딩 단일 지점 `src/gksave/codec.py`
+- 기존 11.4GB DB 마이그레이션 (새 파일 생성 후 스왑)
+- `COLLECT_MIN_DATE` → `COLLECT_WINDOW_DAYS = 35`
+- `update.sh` export 에 `--days 30`, `collect.sh` 에 `--days 35`
+
+## Out-of-scope (로드맵)
+
+인서트 배치 · 쓰기 오프로딩 · 유저 파이프라이닝 · 락 인지형 무인 루프 · frontier 우선순위 ·
+`raw_match` 프루닝(`compact --keep-days`) · payload 프루닝(원본 무손실 유지).
+
+## 핵심 결정
+
+| 결정 | 근거 |
+|---|---|
+| 무손실 압축, payload 폐기 없음 | 파싱 로직(GSAx 캘리브레이션)이 아직 바뀐다. 재파싱 능력 필수 |
+| zlib-6, 표준 라이브러리 | 2.76KB/13.2%. 의존성은 httpx·duckdb 둘뿐인 기조 유지. zstd-3과 크기 차 5%, 압축·해제가 병목인 지점 없음 |
+| in-place `ALTER` 금지, 새 파일 + 스왑 | DuckDB 1.5.4는 `DROP COLUMN`·`DELETE` 후 `CHECKPOINT` 해도 회수율 0% (실측). 부수효과로 원본 무손상 = 롤백 가능 |
+| 대량 삽입은 base64 + COPY | `executemany` 대비 8.2배 (1.5분 vs 12.2분, 실측). `agg.py`의 기존 CSV+COPY 패턴과 동일 |
+| `decode_payload`는 `bytes`와 `str` 모두 수용 | 3줄로 `.bak` 백업·롤백 경로가 계속 읽힌다 |
+| 컬럼명 `payload` 유지 | `agg.py`의 `SELECT match_id, payload` 가 그대로 산다 |
+| 통계 창은 롤링 30일 (월 1일 앵커 아님) | 월 앵커는 매달 1일 창이 61→31일로 반토막. 실측상 창 절반이면 통과 셀의 24.8%가 사라진다 |
+| 창은 export 시점 파라미터 | 집계는 `shot`/`gk_match`를 읽는다. `raw_match` 보존과 무관하며 언제든 다시 뽑을 수 있다 |
+
+## 마이그레이션 전 기준값
+
+```
+raw_match  446,802      frontier 205,455 (done 4,424 / pending 201,031)
+gk_match   820,921      shot     4,214,106
+DB 파일    11.4 GB      match_date 범위 2026-06-01 ~ 2026-07-08
+```
+
+## 수용 기준
+
+| # | 기준 |
+|---|---|
+| AC1 | 새 `data/gksave.duckdb` ≤ 2.5GB |
+| AC2 | raw_match 446,802행 |
+| AC3 | 무작위 1,000행에서 `decode_payload(신규)` == 구 payload의 `json.loads` |
+| AC4 | `parsed_at` NULL/비NULL 분포가 이전과 동일 |
+| AC5 | frontier 205,455행, state 분포 동일 |
+| AC6 | gk_match 820,921행, shot 4,214,106행 |
+| AC7 | `gksave build`(증분) 파싱 대상 0건 |
+| AC8 | `gksave build --full` 후 gk_match·shot 행수가 기준값과 동일 |
+| AC9 | `gksave collect --max 50` 후 새 행이 BLOB으로 저장·디코드됨 |
+| AC10 | `pytest` 전체 통과 |
+| AC11 | 원본이 `data/gksave.duckdb.bak` 으로 보존 (AC1~AC10 통과 전 삭제 금지) |
+| AC12 | `update.sh` 산출 `out/index.html` 의 `since` 가 30일 전 날짜 |
+
+## 작업
+
+### T1. `src/gksave/codec.py` + 테스트 (TDD)
+
+`tests/test_codec.py` 를 먼저 쓴다.
+
+```python
+def encode_payload(detail: dict) -> bytes         # json.dumps(ensure_ascii=False) → utf-8 → zlib.compress(_, 6)
+def decode_payload(v: bytes | bytearray | str | dict) -> dict   # bytes→해제, str→json.loads, dict→그대로
+```
+
+검증: `pytest tests/test_codec.py -q` · 왕복 일치 + 한글 보존 + `str`/`dict` 입력 수용
+커밋: `feat: payload 압축 코덱 추가`
+
+### T2. `src/gksave/db.py` 스키마
+
+`db.py:24` `payload JSON NOT NULL` → `payload BLOB NOT NULL`
+
+검증: `python -c "from gksave.db import connect_memory; print(connect_memory().execute(\"SELECT data_type FROM duckdb_columns() WHERE table_name='raw_match' AND column_name='payload'\").fetchone())"` → `BLOB`
+
+### T3. `src/gksave/collect.py` 쓰기 경로
+
+`_store_match`(collect.py:91) 와 `snowball_async`(collect.py:259) 의 INSERT 두 곳에서
+`json.dumps(detail, ensure_ascii=False)` → `encode_payload(detail)`
+
+### T4. `src/gksave/agg.py` 읽기 경로
+
+`agg.py:81` `detail = json.loads(payload) if isinstance(payload, str) else payload` → `decode_payload(payload)`
+
+### T5. 테스트 갱신
+
+`tests/test_agg.py:13` 의 `INSERT INTO raw_match (match_id, payload)` 가 `encode_payload(...)` 를 넣도록.
+
+검증: `pytest -q` 전체 통과 (AC10). 여기까지 실제 DB는 건드리지 않는다.
+커밋: `feat: raw_match.payload 를 zlib BLOB 으로 전환`
+
+### T6. `scripts/migrate_compress.py` 신설 — 신규 파일 생성만, 스왑 없음
+
+1. `data/gksave.duckdb` 를 `read_only=True` 로 연다 (`db.connect(read_only=True)` 는 SCHEMA를 적용하지 않음 — db.py:144 확인함)
+2. `data/gksave.new.duckdb` 를 `db.SCHEMA` 로 생성
+3. `ATTACH` 로 `frontier` / `meta_spid` / `meta_season` / `gk_match` / `shot` 를 `INSERT INTO ... SELECT *` 복사
+4. `raw_match` 는 `fetchmany(1000)` 스트리밍 → `encode_payload` → base64 임시 CSV → `from_base64()` 로 `COPY`
+   (`match_date` · `fetched_at` · `parsed_at` 전부 보존)
+5. `CHECKPOINT` 후 AC1~AC6 자체 검증 출력. 하나라도 실패하면 비영으로 종료하고 신규 파일을 남긴다
+
+검증: 스크립트 출력이 AC1~AC6 전부 PASS. 예상 소요 약 5분(압축 2분 + COPY 1.5분 + ATTACH 복사 30초)
+중단해도 안전한 체크포인트 — 원본은 무손상이므로 신규 파일만 지우고 재시도
+
+### T7. 스왑 + 실DB 검증
+
+```
+mv data/gksave.duckdb data/gksave.duckdb.bak
+mv data/gksave.new.duckdb data/gksave.duckdb
+gksave build                    # AC7: 파싱 0건
+gksave build --full             # AC8: gk_match 820,921 / shot 4,214,106
+gksave collect --max 50 --days 35   # AC9
+```
+
+커밋: `chore: DB 마이그레이션 (payload 압축)` — `data/` 는 .gitignore 대상이라 코드만
+
+### T8. `src/gksave/config.py` 롤링 수집 창
+
+`config.py:52` `COLLECT_MIN_DATE = "2026-03-26"` → `COLLECT_WINDOW_DAYS = 35`
+`collect.py:288`(run_async) 과 `collect.py:339`(run) 의 `since is None` 기본값을
+`datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=COLLECT_WINDOW_DAYS)` 로.
+
+검증: `gksave collect --max 1` 로그의 "수집 하한 날짜" 가 오늘-35일
+
+### T9. 스크립트 창 설정
+
+- `scripts/update.sh`: `gksave export --gate 50 --days 30 --out out`
+- `scripts/collect.sh`: `gksave collect --concurrency 12 --days 35 --max "$MAX" ...`
+
+검증: `./scripts/update.sh` 후 `out/index.html` 의 `since` 가 30일 전 (AC12)
+커밋: `feat: 통계 롤링 30일 창 + 수집 롤링 35일 컷`
+
+### T10. 리더보드 재생성 + 배포
+
+`./scripts/update.sh` → `git add out && git commit` → push (Vercel 자동 재배포)
+
+## 작업 순서 근거
+
+T1~T5는 실제 DB를 건드리지 않고 인메모리 테스트로만 검증된다. T4의 관대한 디코드 덕에
+**T5 시점의 코드가 구형 DB(JSON 컬럼)도 계속 읽을 수 있어**, 마이그레이션 전에 안전하게 커밋할 수 있다.
+T6은 원본을 read-only로만 열고 신규 파일을 만든다. 되돌리려면 신규 파일만 지우면 된다.
+T7의 `mv` 두 줄이 유일한 비가역 지점이고, 그 직전까지 AC1~AC6이 전부 통과한 상태다.
+T8~T9는 데이터와 무관해 언제 해도 되지만, 마이그레이션 검증 로그를 오염시키지 않도록 뒤에 둔다.
+
+병렬 가능 지점 없음(전부 직렬 의존). 중단해도 안전한 체크포인트: T5 커밋 후, T6 완료 후.
+
+## 남은 리스크
+
+- **`parsed_at` 유실이 조용한 오염을 부른다.** 증분 빌드가 `parsed_at IS NULL` 로 대상을 고르고
+  결과를 `gk_match`·`shot` 에 **append** 하므로, NULL 로 리셋되면 재파싱분이 중복 적재된다. AC4가 잡는다.
+- 신규 코드로 구형 DB에 **쓰면** `bytes` → JSON 컬럼 삽입이 실패한다. 조용한 손상이 아니라 즉시 예외라 수용.
+- 마이그레이션 중 크래시 시 신규 파일이 반쯤 찬다. 원본 무손상이므로 지우고 재시도.
+- 디스크: 원본 11.4GB + 신규 1.6GB + 임시 base64 CSV 약 1.7GB = 약 15GB. 여유 170GB.
+
+## 실행 규칙
+
+1. 검증 실패 시 다음 작업으로 넘어가지 말고 보고한다.
+2. 작업 단위로 커밋한다.
+3. 계획 밖 변경 금지. 필요가 발견되면 보고 후 계획을 갱신한다.
