@@ -46,6 +46,29 @@ def _dated_match(mid, date_str, saves, goals, sp_id=500, grade=10):
     }
 
 
+def test_date_range_respects_since():
+    """페이지 상단 '데이터 기간'은 집계에 실제로 쓰인 창을 보여줘야 한다.
+
+    롤링 30일 창을 켜기 전에는 since 가 없어 이 불일치가 드러나지 않았다.
+    since 를 무시하면 '데이터 기간 6/1~7/10' 이라 써놓고 6/10 부터만 집계하게 된다.
+    """
+    from gksave import export
+
+    con = connect_memory()
+    for d in (_dated_match("old", "2026-01-01T00:00:00", saves=0, goals=3),
+              _dated_match("new", "2026-06-20T00:00:00", saves=4, goals=0)):
+        con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)",
+                    [d["matchId"], encode_payload(d)])
+    agg.rebuild(con)
+
+    full = export.build_payload(con, gate=1)
+    assert full["date_range"]["min"] == "2026-01-01"
+
+    windowed = export.build_payload(con, gate=1, since=datetime(2026, 6, 1))
+    assert windowed["date_range"]["min"] == "2026-06-20"   # 창 밖 경기는 기간에서 빠진다
+    assert windowed["date_range"]["max"] == "2026-06-20"
+
+
 def test_since_filters_leaderboard():
     con = connect_memory()
     for d in (_dated_match("old", "2026-01-01T00:00:00", saves=0, goals=3),

@@ -113,6 +113,19 @@ def test_urls_point_at_nexon_cdn():
     )
 
 
+def test_meta_line_does_not_leak_raw_since_timestamp():
+    """롤링 창을 켜자 since 접미사가 '2026-06-10T05:52:24.383976 이후' 로 노출됐다.
+
+    date_range 가 이미 같은 창을 사람이 읽는 형식으로 보여주므로 접미사는 중복이다.
+    """
+    payload = dict(_PAYLOAD)
+    payload["since"] = "2026-06-10T05:52:24.383976"
+    payload["date_range"] = {"min": "2026-06-10", "max": "2026-07-10"}
+    html = render.build_html(payload)
+    assert "T05:52:24" not in html.split('id="gk-data"')[0]  # 템플릿(스크립트 로직)에 없어야
+    assert "${D.since}" not in html
+
+
 def test_thumbnails_are_lazy_with_intrinsic_size():
     # lazy 없으면 초기 100행이 전부 요청되고, width/height 없으면 레이아웃이 튄다.
     html = render.build_html(_PAYLOAD)

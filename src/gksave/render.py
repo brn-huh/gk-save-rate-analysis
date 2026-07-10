@@ -327,11 +327,11 @@ const heroImg=(spid,name)=>spid==null?'':
   `onerror="imgFallback(this)">`;
 
 const dr=D.date_range||{};
+// date_range 는 since 를 반영한 실제 집계 창이다. 원시 ISO since 를 덧붙이면 중복이자 노이즈.
 const period=(dr.min&&dr.max)?`데이터 기간 ${dr.min} ~ ${dr.max} · `:'';
 const totalMatches = Number(D.total_collected_matches || 0).toLocaleString('ko-KR');
 document.getElementById('meta').textContent =
-  `${period}총 수집 경기 ${totalMatches}건 · 게이트 ${D.gate}경기↑ · ${D.leaderboard.length}장`
-  + (D.since?` · ${D.since} 이후`:'');
+  `${period}총 수집 경기 ${totalMatches}건 · 게이트 ${D.gate}경기↑ · ${D.leaderboard.length}장`;
 document.getElementById('warn').innerHTML =
   '<b>⚠️ 읽는 법:</b> 이 순위는 raw 선방률이라 카드 성능에 <b>유저 실력</b>이 섞여 있어 \'카드 추천\'이 아닙니다. 용어·자세한 설명은 <b>지표 설명</b> 탭.';
 document.getElementById('warnFull').innerHTML = esc(D.warning);

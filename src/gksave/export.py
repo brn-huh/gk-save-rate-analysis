@@ -34,8 +34,12 @@ def build_payload(
     # (선수×시즌×강화단계) 단위 — 강화를 퉁치지 않는다
     leaderboard = agg.grade_leaderboard(con, gate=gate, since=since)
 
+    # 집계에 실제로 쓰인 창을 그대로 보여준다. since 를 빼먹으면 페이지가
+    # '데이터 기간 6/1~7/10' 이라 써놓고 6/10 부터만 집계하게 된다.
     dr = con.execute(
-        "SELECT min(match_date), max(match_date) FROM gk_match WHERE match_date IS NOT NULL"
+        "SELECT min(match_date), max(match_date) FROM gk_match "
+        "WHERE match_date IS NOT NULL" + (" AND match_date >= ?" if since else ""),
+        [since] if since else [],
     ).fetchone()
     date_range = {
         "min": dr[0].date().isoformat() if dr and dr[0] else None,
