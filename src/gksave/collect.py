@@ -11,14 +11,14 @@ dedup: matchId는 raw_match PK, ouid는 frontier PK로 자동 중복 제거.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 import duckdb
 
 from . import api
 from .codec import encode_payload
-from .config import COLLECT_MIN_DATE, DEFAULT, MATCHTYPE_OFFICIAL, Settings
+from .config import COLLECT_WINDOW_DAYS, DEFAULT, MATCHTYPE_OFFICIAL, Settings
 from .db import have_match
 from .http import ApiError, AsyncResilientClient, ResilientClient
 from .parse import parse_match_date
@@ -28,6 +28,12 @@ Logger = Callable[[str], None]
 
 def _log(msg: str) -> None:
     print(msg, flush=True)
+
+
+def _default_since() -> datetime:
+    """--since/--days 미지정 시 수집 하한. naive UTC (match_date 와 같은 기준)."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    return now - timedelta(days=COLLECT_WINDOW_DAYS)
 
 
 def _pct(n: int, total: int) -> str:
@@ -285,7 +291,7 @@ async def run_async(
     from .db import connect, raw_match_count
 
     if since is None:
-        since = datetime.fromisoformat(COLLECT_MIN_DATE)
+        since = _default_since()
     log(f"수집 하한 날짜: {since.date()} 이전 제외 · 동시성 {concurrency}")
 
     con = connect(settings)
@@ -334,9 +340,9 @@ def run(
     """
     from .db import connect, raw_match_count
 
-    # 수집 하한 날짜: --since 미지정이면 기본 COLLECT_MIN_DATE 적용
+    # 수집 하한 날짜: --since/--days 미지정이면 롤링 COLLECT_WINDOW_DAYS 적용
     if since is None:
-        since = datetime.fromisoformat(COLLECT_MIN_DATE)
+        since = _default_since()
     log(f"수집 하한 날짜: {since.date()} 이전 매치 제외")
 
     con = connect(settings)

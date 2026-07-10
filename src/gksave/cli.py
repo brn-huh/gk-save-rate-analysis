@@ -176,7 +176,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--refresh", action="store_true",
                    help="처리 끝난 유저를 다시 열어 새 경기 보충 (중복은 자동 차단)")
     c.add_argument("--since", help="이 날짜(YYYY-MM-DD) 이후 매치만 수집 "
-                   "(미지정 시 기본 하한 config.COLLECT_MIN_DATE 적용)")
+                   "(미지정 시 롤링 config.COLLECT_WINDOW_DAYS 일 적용)")
     c.add_argument("--days", type=int, help="최근 N일 매치만 수집")
     c.set_defaults(func=_cmd_collect)
 

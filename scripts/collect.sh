@@ -18,8 +18,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-echo "=== 수집 시작 (최대 ${MAX}매치 $EXTRA_ARGS) ==="
-if gksave collect --concurrency 12 --max-matches "$MAX" $EXTRA_ARGS; then
+# 수집 창 35일 = 통계 창 30일 + 5일 여유. reached_old 조기중단으로 요청을 아낀다.
+echo "=== 수집 시작 (최대 ${MAX}매치, 최근 35일 $EXTRA_ARGS) ==="
+if gksave collect --concurrency 12 --days 35 --max-matches "$MAX" $EXTRA_ARGS; then
   echo
   read -r -p "수집 완료. update.sh를 지금 실행할까요? [y/N] " answer
   if [[ "$answer" =~ ^[Yy]$ ]]; then
