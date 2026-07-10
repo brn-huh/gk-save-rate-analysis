@@ -137,10 +137,29 @@ def _migrate(con: duckdb.DuckDBPyConnection) -> None:
             pass
 
 
+class DbLockedError(duckdb.IOException):
+    """다른 프로세스가 DB 쓰기 락을 잡고 있다.
+
+    duckdb.IOException 을 상속해, 이 예외를 모르는 호출부도 기존대로 잡을 수 있다.
+    """
+
+
 def connect(settings: Settings = DEFAULT, *, read_only: bool = False) -> duckdb.DuckDBPyConnection:
     path: Path = settings.db_path
     path.parent.mkdir(parents=True, exist_ok=True)
-    con = duckdb.connect(str(path), read_only=read_only)
+    try:
+        con = duckdb.connect(str(path), read_only=read_only)
+    except duckdb.IOException as e:
+        # DuckDB 단일 파일이라 쓰기 프로세스는 하나뿐이고, 읽기 전용도 쓰기 락과
+        # 공존하지 못한다. 원문은 트레이스백뿐이라 무엇을 해야 할지 알려준다.
+        if "Conflicting lock" not in str(e):
+            raise
+        raise DbLockedError(
+            f"다른 프로세스가 DB 를 쓰고 있다: {path}\n"
+            f"  collect · build · export 는 동시에 못 돈다. 끝날 때까지 기다리거나\n"
+            f"  해당 프로세스를 멈춰라 (ps aux | grep gksave).\n"
+            f"  원문: {e}"
+        ) from e
     if not read_only:
         con.execute(SCHEMA)
         _migrate(con)

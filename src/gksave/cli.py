@@ -17,7 +17,7 @@ from pathlib import Path
 
 from . import agg, collect, export as export_mod, meta, spike
 from .config import DEFAULT, MIN_MATCHES_GATE, ZONE_CUTS_M
-from .db import connect, raw_match_count
+from .db import DbLockedError, connect, raw_match_count
 from .http import ResilientClient
 
 
@@ -223,6 +223,9 @@ def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     try:
         args.func(args)
+    except DbLockedError as e:
+        # 락 충돌은 사용자가 고칠 수 있는 상황이다. 트레이스백을 띄우지 않는다.
+        raise SystemExit(f"\n{e}")
     except RuntimeError as e:
         raise SystemExit(str(e))
 

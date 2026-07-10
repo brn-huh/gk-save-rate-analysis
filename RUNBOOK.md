@@ -50,6 +50,8 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 | `./scripts/collect.sh` | 수집 (pending 있을 때) |
 | `./scripts/collect.sh --refresh` | 수집 (pending 없을 때, 새 경기 보충) |
 | `./scripts/collect.sh --max 50000` | 수집량 직접 지정 |
+| `./scripts/collect.sh --yes` | 수집 후 묻지 않고 update.sh 까지 |
+| `./scripts/collect.sh --no-update` | 수집만, update.sh 건너뜀 |
 | `./scripts/build.sh` | 증분 빌드 (수집한 것만 파싱 — 빠름) |
 | `./scripts/build.sh --full` | 전체 재파싱 (파싱 로직 바뀌었을 때만) |
 | `./scripts/update.sh` | 증분 빌드 + export 실행 |
@@ -78,6 +80,13 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 ---
 
 ## collect.sh — 수집
+
+> 수동 트리거 전용이다. cron·launchd·nohup 으로 자동화하지 않는다 —
+> DuckDB 는 단일 파일이라 쓰기 프로세스가 하나뿐이고, 모듈을 고치는 중에
+> 백그라운드 수집이 돌면 `build`·`export` 와 락이 충돌한다.
+>
+> 락이 겹치면 트레이스백 대신 "다른 프로세스가 DB 를 쓰고 있다" 안내가 뜨고
+> 종료코드 1 로 끝난다. `update.sh` 는 자동으로 건너뛴다.
 
 ### 상황 A — 대기 유저(pending)가 남아있을 때
 ```bash
