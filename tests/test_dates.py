@@ -1,11 +1,11 @@
 """날짜/갱신: matchDate 파싱, matchId 시각 디코드, since 필터, refresh."""
 
-import json
 from datetime import datetime
 
 import pytest
 
 from gksave import agg
+from gksave.codec import encode_payload
 from gksave.collect import match_id_time, reset_done
 from gksave.db import connect_memory
 from gksave.parse import parse_match_date
@@ -51,7 +51,7 @@ def test_since_filters_leaderboard():
     for d in (_dated_match("old", "2026-01-01T00:00:00", saves=0, goals=3),
               _dated_match("new", "2026-06-20T00:00:00", saves=4, goals=0)):
         con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)",
-                    [d["matchId"], json.dumps(d)])
+                    [d["matchId"], encode_payload(d)])
     agg.rebuild(con)
 
     # since 없으면 두 경기 다: 4/7

@@ -21,7 +21,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS raw_match (
     match_id   VARCHAR PRIMARY KEY,
     match_date TIMESTAMP,          -- payload.matchDate (UTC)
-    payload    JSON     NOT NULL,
+    payload    BLOB     NOT NULL,  -- zlib-6 압축 JSON (codec.encode_payload). 20.8KB → 2.77KB
     fetched_at TIMESTAMP DEFAULT now()
 );
 

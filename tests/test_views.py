@@ -1,8 +1,8 @@
 """조회 편의 뷰: shot_readable, card_stats 가 이름·시즌·강화를 붙여 낸다."""
 
-import json
 
 from gksave import agg
+from gksave.codec import encode_payload
 from gksave.db import connect_memory
 
 
@@ -23,7 +23,7 @@ def _seed(con):
     con.execute("INSERT INTO meta_season VALUES (?, ?)", [101, "ICON"])
     d = _match("m1", 101190053, 9, saves=3, goals=1)
     con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)",
-                [d["matchId"], json.dumps(d)])
+                [d["matchId"], encode_payload(d)])
     agg.rebuild(con)
 
 

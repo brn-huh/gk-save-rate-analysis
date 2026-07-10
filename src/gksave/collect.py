@@ -11,13 +11,13 @@ dedup: matchId는 raw_match PK, ouid는 frontier PK로 자동 중복 제거.
 from __future__ import annotations
 
 import asyncio
-import json
 from datetime import datetime, timezone
 from typing import Any, Callable
 
 import duckdb
 
 from . import api
+from .codec import encode_payload
 from .config import COLLECT_MIN_DATE, DEFAULT, MATCHTYPE_OFFICIAL, Settings
 from .db import have_match
 from .http import ApiError, AsyncResilientClient, ResilientClient
@@ -91,7 +91,7 @@ def _store_match(
     con.execute(
         "INSERT INTO raw_match (match_id, match_date, payload) VALUES (?, ?, ?) "
         "ON CONFLICT DO NOTHING",
-        [match_id, parse_match_date(detail), json.dumps(detail, ensure_ascii=False)],
+        [match_id, parse_match_date(detail), encode_payload(detail)],
     )
     _harvest_ouids(con, detail)
     return True
@@ -259,7 +259,7 @@ async def snowball_async(
             con.execute(
                 "INSERT INTO raw_match (match_id, match_date, payload) VALUES (?, ?, ?) "
                 "ON CONFLICT DO NOTHING",
-                [mid, parse_match_date(detail), json.dumps(detail, ensure_ascii=False)],
+                [mid, parse_match_date(detail), encode_payload(detail)],
             )
             _harvest_ouids(con, detail)
             stored += 1

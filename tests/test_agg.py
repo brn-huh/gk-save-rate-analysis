@@ -1,17 +1,17 @@
 """집계 테스트: 게이트 경계, 0나눗셈, within-ouid."""
 
-import json
 
 import pytest
 
 from gksave import agg
+from gksave.codec import encode_payload
 from gksave.db import connect_memory
 
 
 def _insert(con, detail):
     con.execute(
         "INSERT INTO raw_match (match_id, payload) VALUES (?, ?)",
-        [detail["matchId"], json.dumps(detail, ensure_ascii=False)],
+        [detail["matchId"], encode_payload(detail)],
     )
 
 

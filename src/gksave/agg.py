@@ -10,7 +10,6 @@ within-ouid 강화효과: 같은 유저(ouid)가 같은 카드(sp_id)를 서로 
 from __future__ import annotations
 
 import csv
-import json
 import os
 import tempfile
 from datetime import datetime
@@ -18,6 +17,7 @@ from typing import Any
 
 import duckdb
 
+from .codec import decode_payload
 from .config import (
     DEFAULT,
     MIN_MATCHES_GATE,
@@ -80,7 +80,7 @@ def rebuild(con: duckdb.DuckDBPyConnection, *, full: bool = False) -> ParseStats
             if not batch:
                 break
             for mid, payload in batch:
-                detail = json.loads(payload) if isinstance(payload, str) else payload
+                detail = decode_payload(payload)
                 apps, shots = parse_match(detail, stats)
                 for x in apps:
                     aw.writerow([x.match_id, x.match_date, x.gk_ouid, x.gk_sp_id, x.gk_sp_grade,
