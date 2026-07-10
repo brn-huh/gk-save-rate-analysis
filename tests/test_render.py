@@ -13,9 +13,9 @@ _NODE = shutil.which("node")
 requires_node = pytest.mark.skipif(_NODE is None, reason="node 없음 — JS 동작 검증 생략")
 
 
-def _eval_js(expr: str) -> str:
-    """페이지에 실제로 실려 나가는 이미지 JS를 그대로 실행해 표현식 값을 얻는다."""
-    js = f"{render.IMAGE_JS}\nprocess.stdout.write(String({expr}));"
+def _eval_js(expr: str, src: str | None = None) -> str:
+    """페이지에 실제로 실려 나가는 JS를 그대로 실행해 표현식 값을 얻는다."""
+    js = f"{render.IMAGE_JS if src is None else src}\nprocess.stdout.write(String({expr}));"
     r = subprocess.run([_NODE, "-e", js], capture_output=True, text=True, check=True)
     return r.stdout
 
@@ -151,6 +151,55 @@ def test_thumbnail_uses_portrait_not_action():
     # 목록에 액션샷을 쓰면 커버리지 62% 라 초기 렌더에서 403 이 쏟아진다.
     assert _eval_js("thumbUrl(844224836)") == _eval_js("portraitUrl(844224836)")
     assert _eval_js("thumbUrl(844224836)") != _eval_js("actionUrl(844224836)")
+
+
+# ── 동일 선수 비교 탭 검색 ─────────────────────────────────────────────────
+
+
+@requires_node
+def test_match_name_is_case_insensitive_substring():
+    f = render.FILTER_JS
+    assert _eval_js("matchName('Petr Cech','cech')", f) == "true"
+    assert _eval_js("matchName('노이어','노이')", f) == "true"
+    assert _eval_js("matchName('노이어','칸')", f) == "false"
+
+
+@requires_node
+def test_match_name_treats_empty_query_as_match_all():
+    f = render.FILTER_JS
+    assert _eval_js("matchName('아무개','')", f) == "true"
+    assert _eval_js("matchName(null,'')", f) == "true"       # 이름 없는 그룹도 통과
+    assert _eval_js("matchName(null,'x')", f) == "false"      # 질의가 있으면 탈락
+
+
+def test_compare_tab_has_search_input():
+    html = render.build_html(_PAYLOAD)
+    assert 'id="spSearch"' in html
+    assert 'id="spCount"' in html
+
+
+def test_compare_groups_carry_name_for_filtering():
+    # display 토글로 거르므로 각 그룹이 자기 이름을 들고 있어야 한다(재렌더 시 펼침 상태가 날아간다).
+    html = render.build_html(_PAYLOAD)
+    assert "data-name=" in html
+
+
+# ── 강화 효과: 배너에서 내리고 지표 설명 탭에만 남긴다 ──────────────────────
+
+
+def test_grade_effect_not_pinned_to_top_banner():
+    # 귀무 결과를 최상단에 상시 고정하면 '카드 추천 아님' 경고의 주목도를 갉아먹는다.
+    html = render.build_html(_PAYLOAD)
+    assert 'id="ge"' not in html
+    assert "⚡ 강화 효과" not in html
+
+
+def test_grade_effect_survives_in_help_tab():
+    # 배너에서 뺐다고 계산·설명까지 잃으면 안 된다.
+    html = render.build_html(_PAYLOAD)
+    assert 'id="geDetail"' in html
+    assert "geLong" in html
+    assert "grade_effect" in html
 
 
 def test_leaderboard_table_scrolls_inside_its_own_container():

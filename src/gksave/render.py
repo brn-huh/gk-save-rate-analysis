@@ -37,6 +37,12 @@ function imgFallback(el){
 }
 """
 
+# 리더보드·비교탭이 공유하는 이름 검색 규칙. tests/test_render.py 가 node 로 직접 실행한다.
+FILTER_JS = r"""
+// 빈 질의는 전부 통과, 대소문자 무시 부분일치.
+const matchName=(name,q)=>!q||String(name==null?'':name).toLowerCase().includes(q);
+"""
+
 
 def build_html(payload: dict[str, Any]) -> str:
     page = {
@@ -52,7 +58,11 @@ def build_html(payload: dict[str, Any]) -> str:
     }
     # <script> 탈출 방지: '<' → <
     data_json = json.dumps(page, ensure_ascii=False).replace("<", "\\u003c")
-    return _TEMPLATE.replace("__IMAGE_JS__", IMAGE_JS).replace("__DATA__", data_json)
+    return (
+        _TEMPLATE.replace("__IMAGE_JS__", IMAGE_JS)
+        .replace("__FILTER_JS__", FILTER_JS)
+        .replace("__DATA__", data_json)
+    )
 
 
 _TEMPLATE = r"""<!doctype html>
@@ -141,7 +151,6 @@ _TEMPLATE = r"""<!doctype html>
   .banner{background:rgba(240,209,122,.07);border:1px solid rgba(240,209,122,.28);border-radius:10px;
         padding:11px 14px;font-size:.86rem;line-height:1.5;margin:14px 0 4px;color:#e7d5a8}
   .banner b{color:var(--gold)}
-  .banner .ge{margin-top:7px;padding-top:7px;border-top:1px dotted rgba(240,209,122,.25);color:#e7d5a8}
   /* 탭 */
   .tabs{display:flex;gap:6px;margin:16px 0 4px;border-bottom:1px solid var(--line);flex-wrap:wrap}
   .tab{padding:9px 15px;border:1px solid transparent;border-bottom:none;border-radius:9px 9px 0 0;
@@ -203,7 +212,6 @@ _TEMPLATE = r"""<!doctype html>
 
 <div class="banner">
   <div id="warn"></div>
-  <div class="ge" id="ge"></div>
 </div>
 
 <div class="tabs">
@@ -234,8 +242,13 @@ _TEMPLATE = r"""<!doctype html>
 
 <!-- 탭 2: 동일 선수 비교 -->
 <div class="panel" id="panel-sp">
+  <div class="controls">
+    <input id="spSearch" placeholder="선수 이름 검색…">
+    <span class="lab" id="spCount"></span>
+  </div>
   <p class="muted">같은 선수의 시즌·강화별 선방률(raw)과 GSAx. (여전히 raw 는 유저 교란 포함)</p>
   <div id="sp"></div>
+  <p class="empty" id="spEmpty" style="display:none">해당하는 선수가 없습니다.</p>
 </div>
 
 <!-- 탭 3: 지표 설명 · 사용법 -->
@@ -300,14 +313,17 @@ let sortKey='save_pct', q='', limit=PAGE;
 const pct=v=>v==null?'N/A':(v*100).toFixed(1)+'%';
 const gps=v=>v==null?'':(v*100>=0?'+':'')+(v*100).toFixed(1);
 const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;};
+// esc 는 따옴표를 escape 하지 않는다 → 속성값에 쓸 땐 escAttr 로 감싼다.
+const escAttr=s=>esc(s).replace(/"/g,'&quot;');
 __IMAGE_JS__
+__FILTER_JS__
 // 썸네일은 얼굴 → 플레이스홀더 2단. 히어로는 액션샷 → 얼굴 → 플레이스홀더 3단(data-fb).
 const thumbImg=(spid,name)=>spid==null?'':
-  `<img class="thumb" src="${thumbUrl(spid)}" alt="${esc(name||'')}" width="36" height="36" `+
+  `<img class="thumb" src="${thumbUrl(spid)}" alt="${escAttr(name||'')}" width="36" height="36" `+
   `loading="lazy" decoding="async" onerror="imgFallback(this)">`;
 const heroImg=(spid,name)=>spid==null?'':
   `<img class="hero-img" src="${actionUrl(spid)}" data-fb="${portraitUrl(spid)}" `+
-  `alt="${esc(name||'')}" width="112" height="112" loading="lazy" decoding="async" `+
+  `alt="${escAttr(name||'')}" width="112" height="112" loading="lazy" decoding="async" `+
   `onerror="imgFallback(this)">`;
 
 const dr=D.date_range||{};
@@ -363,7 +379,7 @@ function toggle(tr,c){
 function render(){
   const tb=document.querySelector('#lb tbody'); tb.innerHTML='';
   const more=document.getElementById('more'); more.innerHTML='';
-  let rows=D.leaderboard.filter(c=>!q||(c.player_name||'').toLowerCase().includes(q));
+  let rows=D.leaderboard.filter(c=>matchName(c.player_name,q));
   rows=rows.slice().sort((a,b)=>{
     const av=a[sortKey], bv=b[sortKey];
     if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1; return bv-av;
@@ -413,12 +429,13 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.getElementById('panel-'+t.dataset.tab).classList.add('active');
 });
 
+// 강화 효과는 귀무 결과다(신뢰구간이 0 포함). 상단 배너에 상시 고정하면 '카드 추천 아님'
+// 경고의 주목도를 갉아먹어, 지표 설명 탭에서만 전문을 보여준다.
 const ge=D.grade_effect||{}, de=ge.mean_save_pct_delta_per_grade, se=ge.se_per_grade;
 const pp=v=>(v*100>=0?'+':'')+(v*100).toFixed(2)+'%p';
-// 95% 신뢰구간이 0을 포함하면 방향을 단정할 수 없음 → '사실상 차이 없음'으로 표기해 오해 차단
-let geShort, geLong;
+let geLong;
 if(de==null){
-  geShort='표본 부족'; geLong='표본이 부족해 강화 효과를 추정할 수 없습니다.';
+  geLong='표본이 부족해 강화 효과를 추정할 수 없습니다.';
 }else{
   const lo=se==null?null:de-1.96*se, hi=se==null?null:de+1.96*se;
   const ciTxt=(lo!=null)?`[${pp(lo)}, ${pp(hi)}]`:'';
@@ -426,15 +443,11 @@ if(de==null){
   const split=`올라간 페어 ${ge.up_pairs||0} : 내려간 페어 ${ge.down_pairs||0}`;
   const nulEffect = (lo!=null && lo<=0 && hi>=0);
   if(nulEffect){
-    geShort=`<b>사실상 차이 없음(≈0)</b> <span class="muted">— 단계당 ${pp(de)}, 신뢰구간이 0 포함</span>`;
-    geLong=`강화단계 1 상승당 평균 선방률 변화는 <b>${pp(de)}</b>지만, 95% 신뢰구간이 ${ciTxt} 로 <b>0을 포함</b>합니다. 즉 이 표본에서 강화단계는 선방률에 <b>유의미한 차이를 만들지 못했습니다</b>(${split} 로 거의 반반). 표본이 쌓이면 값이 달라질 수 있습니다.`;
+    geLong=`강화단계 1 상승당 평균 선방률 변화는 <b>${pp(de)}</b>지만, 95% 신뢰구간이 ${ciTxt} 로 <b>0을 포함</b>합니다. 즉 이 표본에서 강화단계는 선방률에 <b>유의미한 차이를 만들지 못했습니다</b>(${split} 로 거의 반반, 페어 ${ge.pairs||0}). 표본이 쌓이면 값이 달라질 수 있습니다.`;
   }else{
-    geShort=`강화단계 1 상승당 평균 선방률 <b>${pp(de)}</b>${ci}`;
-    geLong=`강화단계 1 상승당 평균 선방률 변화: <b>${pp(de)}</b>${ci} (${split}).`;
+    geLong=`강화단계 1 상승당 평균 선방률 변화: <b>${pp(de)}</b>${ci} (${split}, 페어 ${ge.pairs||0}).`;
   }
 }
-document.getElementById('ge').innerHTML =
-  `<b>⚡ 강화 효과:</b> ${geShort} <span class="muted">(유저 실력 교란 제거, 페어 ${ge.pairs||0})</span>`;
 document.getElementById('geDetail').innerHTML = geLong;
 
 document.getElementById('sp').innerHTML=(D.same_player||[]).map(g=>{
@@ -444,11 +457,24 @@ document.getElementById('sp').innerHTML=(D.same_player||[]).map(g=>{
     `<td class="num">${c.matches}</td></tr>`).join('');
   // 그룹 내 카드는 시즌만 다르고 pid 는 같다(182그룹 전수 확인) → 첫 카드로 썸네일을 만든다.
   const sp=(g.cards[0]||{}).gk_sp_id;
-  return `<details><summary><span class="pcell">${thumbImg(sp,g.player_name)}`+
+  return `<details data-name="${escAttr(g.player_name)}"><summary><span class="pcell">${thumbImg(sp,g.player_name)}`+
     `<span class="pn">${esc(g.player_name)}</span></span></summary><table class="mini">`+
     `<thead><tr><th>시즌</th><th>강화</th><th>선방률</th><th>GSAx/100</th><th>표본</th></tr></thead>`+
     `<tbody>${rows}</tbody></table></details>`;
 }).join('') || '<span class="muted">비교할 동일선수 데이터가 아직 없습니다.</span>';
+
+// 재렌더 대신 display 토글로 거른다 → 펼쳐둔 그룹이 닫히지 않고, 182개를 다시 그리지도 않는다.
+const spEls=[...document.querySelectorAll('#sp details')];
+const spCount=document.getElementById('spCount'), spEmpty=document.getElementById('spEmpty');
+function spFilter(){
+  const q=(document.getElementById('spSearch').value||'').trim().toLowerCase();
+  let n=0;
+  spEls.forEach(d=>{const ok=matchName(d.dataset.name,q); d.style.display=ok?'':'none'; if(ok)n++;});
+  spCount.textContent = spEls.length ? (q?`${n} / ${spEls.length}명`:`${spEls.length}명`) : '';
+  spEmpty.style.display = (spEls.length && !n) ? '' : 'none';
+}
+document.getElementById('spSearch').oninput=spFilter;
+spFilter();
 
 render();
 </script>
