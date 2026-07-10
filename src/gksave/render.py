@@ -12,6 +12,31 @@ from __future__ import annotations
 import json
 from typing import Any
 
+IMAGE_CDN = "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common"
+
+# 페이지에 그대로 실려 나가는 이미지 JS. tests/test_render.py 가 node 로 이 문자열을
+# 직접 실행해 pid 파생과 폴백 체인을 검증하므로, DOM 에 의존하는 코드를 넣지 말 것.
+IMAGE_JS = r"""
+const CDN='https://fco.dn.nexoncdn.co.kr/live/externalAssets/common';
+// pid 는 spid 뒤 6자리이고 선행 0 을 지워야 한다. p000488.png 는 403, p488.png 는 200.
+const pidOf=spid=>String(spid).slice(-6).replace(/^0+/,'');
+const portraitUrl=spid=>CDN+'/players/p'+pidOf(spid)+'.png';
+const actionUrl=spid=>CDN+'/playersAction/p'+spid+'.png';
+// 목록 썸네일은 커버리지 100% 인 얼굴만 쓴다. 액션샷은 38% 가 없어 403 이 쏟아진다.
+const thumbUrl=portraitUrl;
+const PLACEHOLDER='data:image/svg+xml;utf8,'+encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">'+
+  '<circle cx="64" cy="46" r="26" fill="#26305a"/>'+
+  '<path d="M12 128c0-31 23-52 52-52s52 21 52 52z" fill="#26305a"/></svg>');
+// data-fb 가 있으면 그쪽으로 한 번 더 시도하고, 없으면 플레이스홀더에서 멈춘다.
+function imgFallback(el){
+  el.onerror=null;
+  const fb=el.dataset.fb;
+  if(fb){el.removeAttribute('data-fb');el.onerror=()=>imgFallback(el);el.src=fb;}
+  else{el.src=PLACEHOLDER;}
+}
+"""
+
 
 def build_html(payload: dict[str, Any]) -> str:
     page = {
@@ -27,7 +52,7 @@ def build_html(payload: dict[str, Any]) -> str:
     }
     # <script> 탈출 방지: '<' → <
     data_json = json.dumps(page, ensure_ascii=False).replace("<", "\\u003c")
-    return _TEMPLATE.replace("__DATA__", data_json)
+    return _TEMPLATE.replace("__IMAGE_JS__", IMAGE_JS).replace("__DATA__", data_json)
 
 
 _TEMPLATE = r"""<!doctype html>
@@ -143,6 +168,35 @@ _TEMPLATE = r"""<!doctype html>
   .help details p{font-size:.86rem;color:var(--mut);margin:4px 0 8px}
   .help dl.terms dt{color:var(--gold2);font-weight:700;margin-top:9px;font-size:.86rem}
   .help dl.terms dd{margin:1px 0 0;color:var(--mut);font-size:.85rem;line-height:1.55}
+  /* 선수 이미지 — 투명 PNG 라 어두운 원판을 깔고 골드 링을 두른다.
+     얼굴 중심이 캔버스 (62,68) 이라 42% 로 위로 당겨야 원 안에 들어온다. */
+  .thumb{width:36px;height:36px;border-radius:50%;object-fit:cover;object-position:50% 42%;
+        background:#141a35;border:1px solid var(--gold2);flex:0 0 auto}
+  .pcell{display:flex;align-items:center;gap:9px;min-width:0}
+  /* min-width:0 이 없으면 flex 아이템이 콘텐츠 폭 아래로 못 줄어 말줄임이 안 걸린다.
+     한글은 공백이 없어 줄바꿈을 허용하면 글자 단위로 쪼개진다 → 반드시 nowrap + 말줄임. */
+  .pcell .pn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  summary .pcell{display:inline-flex;vertical-align:middle}
+  /* 상세 히어로 — 원본이 128px 이라 112px 를 넘겨 키우지 않는다 */
+  .hero{display:flex;align-items:center;gap:16px;padding-bottom:14px;margin-bottom:14px;
+        border-bottom:1px solid var(--line)}
+  .hero-img{width:112px;height:112px;border-radius:12px;object-fit:cover;flex:0 0 auto;
+        background:radial-gradient(circle at 50% 34%,#1b2242,#0b1024);border:1px solid var(--line)}
+  .hero-meta h3{margin:0 0 3px;font-size:1.05rem;font-weight:800;letter-spacing:-.01em}
+  .hero-meta .sub{margin:0 0 9px;color:var(--mut);font-size:.85rem}
+  .hero-meta .big{font-size:1.5rem;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums}
+  .hero-meta .big small{margin-left:7px;font-size:.78rem;font-weight:600;color:var(--mut)}
+  /* 표는 375px 에서 606px 다. 본문이 아니라 표만 가로로 스크롤시킨다.
+     overflow-x 를 상시로 걸면 overflow-y 가 auto 로 승격돼 sticky thead 가 깨진다.
+     데스크톱은 표가 안 넘치므로 모바일에서만 감싼다. */
+  @media(max-width:640px){
+    .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .hero{flex-direction:column;align-items:flex-start;gap:12px}
+    .thumb{width:28px;height:28px}
+    /* 선수 컬럼 폭을 묶어 긴 이름을 말줄임한다(줄바꿈 금지 — 세로로 쪼개진다) */
+    .pcell{gap:7px;max-width:118px}
+    th,td{padding:9px 8px}
+  }
 </style></head><body>
 <h1><span class="star">★</span><span class="t">FC온라인 골키퍼 선방률 리더보드</span></h1>
 <p class="meta" id="meta"></p>
@@ -169,10 +223,12 @@ _TEMPLATE = r"""<!doctype html>
     <button class="sort" data-sort="matches">표본</button>
   </div>
   <p class="muted">행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
-  <table id="lb">
-    <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>선방률</th><th id="gsaxHdr">GSAx/100</th><th>표본</th></tr></thead>
-    <tbody></tbody>
-  </table>
+  <div class="tw">
+    <table id="lb">
+      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>선방률</th><th id="gsaxHdr">GSAx/100</th><th>표본</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
   <div class="more" id="more"></div>
 </div>
 
@@ -244,6 +300,15 @@ let sortKey='save_pct', q='', limit=PAGE;
 const pct=v=>v==null?'N/A':(v*100).toFixed(1)+'%';
 const gps=v=>v==null?'':(v*100>=0?'+':'')+(v*100).toFixed(1);
 const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;};
+__IMAGE_JS__
+// 썸네일은 얼굴 → 플레이스홀더 2단. 히어로는 액션샷 → 얼굴 → 플레이스홀더 3단(data-fb).
+const thumbImg=(spid,name)=>spid==null?'':
+  `<img class="thumb" src="${thumbUrl(spid)}" alt="${esc(name||'')}" width="36" height="36" `+
+  `loading="lazy" decoding="async" onerror="imgFallback(this)">`;
+const heroImg=(spid,name)=>spid==null?'':
+  `<img class="hero-img" src="${actionUrl(spid)}" data-fb="${portraitUrl(spid)}" `+
+  `alt="${esc(name||'')}" width="112" height="112" loading="lazy" decoding="async" `+
+  `onerror="imgFallback(this)">`;
 
 const dr=D.date_range||{};
 const period=(dr.min&&dr.max)?`데이터 기간 ${dr.min} ~ ${dr.max} · `:'';
@@ -278,7 +343,14 @@ function detailHtml(c){
     stat('경기당 평균 평점', e.gk_rating==null?'-':e.gk_rating)+
     stat('패스 성공률', pct(e.pass_pct));
     // 공중볼(aerial)은 게임상 GK에 거의 안 잡혀(중앙값 1) 노이즈 → 화면 미표시. 데이터는 DB 유지.
-  return `<div class="detail-grid"><div><h4>거리 구간별 (근사 미터)</h4>${zones}</div>`+
+  const hero=
+    `<div class="hero">${heroImg(c.gk_sp_id,c.player_name)}<div class="hero-meta">`+
+    `<h3>${esc(c.player_name||('spId '+c.gk_sp_id))}</h3>`+
+    `<p class="sub">${esc(c.season_name||'')} · ${c.grade}강</p>`+
+    `<div class="big">${pct(c.save_pct)}<small>선방률 · 표본 ${c.matches}경기</small></div>`+
+    `</div></div>`;
+  return hero+
+         `<div class="detail-grid"><div><h4>거리 구간별 (근사 미터)</h4>${zones}</div>`+
          `<div><h4>슛 타입별</h4><table class="mini"><tbody>${types}</tbody></table></div></div>`+
          `<h4 style="margin-top:14px">상황 · 수비 맥락 · GK 스탯</h4><div class="stats">${statsHtml}</div>`;
 }
@@ -304,7 +376,9 @@ function render(){
   const vis = q ? rows : rows.slice(0, limit);
   vis.forEach((c,i)=>{
     const tr=document.createElement('tr'); tr.className='row';
-    tr.innerHTML=`<td class="rank">${i+1}</td><td>${esc(c.player_name||('spId '+c.gk_sp_id))}</td>`+
+    tr.innerHTML=`<td class="rank">${i+1}</td>`+
+      `<td><div class="pcell">${thumbImg(c.gk_sp_id,c.player_name)}`+
+      `<span class="pn">${esc(c.player_name||('spId '+c.gk_sp_id))}</span></div></td>`+
       `<td class="season">${esc(c.season_name||'')}</td><td class="num">${c.grade}강</td>`+
       `<td class="pct">${pct(c.save_pct)}</td><td class="num">${gps(c[gf])}</td>`+
       `<td class="num">${c.matches}</td>`;
@@ -368,7 +442,10 @@ document.getElementById('sp').innerHTML=(D.same_player||[]).map(g=>{
     `<tr><td>${esc(c.season_name||'')}</td><td class="num">${c.grade}강</td>`+
     `<td class="pct">${pct(c.save_pct)}</td><td class="num">${gps(c.gsax_per_shot)}</td>`+
     `<td class="num">${c.matches}</td></tr>`).join('');
-  return `<details><summary>${esc(g.player_name)}</summary><table class="mini">`+
+  // 그룹 내 카드는 시즌만 다르고 pid 는 같다(182그룹 전수 확인) → 첫 카드로 썸네일을 만든다.
+  const sp=(g.cards[0]||{}).gk_sp_id;
+  return `<details><summary><span class="pcell">${thumbImg(sp,g.player_name)}`+
+    `<span class="pn">${esc(g.player_name)}</span></span></summary><table class="mini">`+
     `<thead><tr><th>시즌</th><th>강화</th><th>선방률</th><th>GSAx/100</th><th>표본</th></tr></thead>`+
     `<tbody>${rows}</tbody></table></details>`;
 }).join('') || '<span class="muted">비교할 동일선수 데이터가 아직 없습니다.</span>';
