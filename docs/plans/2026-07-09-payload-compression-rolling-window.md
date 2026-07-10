@@ -50,22 +50,37 @@
 
 ## 마이그레이션 전 기준값
 
+계획 작성(7/9) 이후에도 수집이 계속 돌아 아래 값은 전부 낡았다. **2026-07-10 실행 시점에
+재측정한 값으로 대체한다.** 또한 `parsed_at IS NULL` 이 60,000건이라 AC7·AC8 이 성립하지
+않아, 마이그레이션 직전에 `gksave build`(증분)를 한 번 돌려 NULL 을 0으로 만들었다.
+
 ```
+[낡음 — 7/9 작성 시점]
 raw_match  446,802      frontier 205,455 (done 4,424 / pending 201,031)
 gk_match   820,921      shot     4,214,106
 DB 파일    11.4 GB      match_date 범위 2026-06-01 ~ 2026-07-08
+
+[실측 — 7/10, gksave build 직후]
+raw_match  656,802      frontier 253,876 (done 6,662 / pending 247,214)
+gk_match 1,204,518      shot     6,191,992
+parsed_at  NULL 0 / 비NULL 656,802
+DB 파일    15.04 GB     match_date 범위 2026-06-01 ~ 2026-07-10
+payload 압축 추정 1.75 GB (압축률 13.3% — 표본 200건 실측, 계획서 13.2% 와 일치)
 ```
+
+롤링 30일 창의 실제 비용도 재측정했다: 게이트 통과 카드 2,051 → **1,979장(-72, -3.5%)**.
+계획서가 우려한 "창 절반이면 24.8% 소실" 보다 훨씬 가볍다.
 
 ## 수용 기준
 
 | # | 기준 |
 |---|---|
-| AC1 | 새 `data/gksave.duckdb` ≤ 2.5GB |
-| AC2 | raw_match 446,802행 |
+| AC1 | 새 `data/gksave.duckdb` ≤ 3.5GB (payload 압축 추정 1.75GB + 나머지 테이블) |
+| AC2 | raw_match 656,802행 |
 | AC3 | 무작위 1,000행에서 `decode_payload(신규)` == 구 payload의 `json.loads` |
-| AC4 | `parsed_at` NULL/비NULL 분포가 이전과 동일 |
-| AC5 | frontier 205,455행, state 분포 동일 |
-| AC6 | gk_match 820,921행, shot 4,214,106행 |
+| AC4 | `parsed_at` NULL 0 / 비NULL 656,802 (이전과 동일) |
+| AC5 | frontier 253,876행, state 분포 동일 (done 6,662 / pending 247,214) |
+| AC6 | gk_match 1,204,518행, shot 6,191,992행 |
 | AC7 | `gksave build`(증분) 파싱 대상 0건 |
 | AC8 | `gksave build --full` 후 gk_match·shot 행수가 기준값과 동일 |
 | AC9 | `gksave collect --max 50` 후 새 행이 BLOB으로 저장·디코드됨 |
