@@ -23,10 +23,10 @@ from .config import (
     MIN_MATCHES_GATE,
     PITCH_SCALE_M,
     SHOT_TYPE_HEADER,
-    SHOT_TYPE_NAMES,
     ZONE_CUTS_M,
     ZONE_NAMES,
     Settings,
+    shot_type_name,
 )
 from .parse import ParseStats, parse_match
 
@@ -390,7 +390,7 @@ def type_breakdown(
         params,
     ).fetchall()
     by_type = [
-        {"type": t, "name": SHOT_TYPE_NAMES.get(t, str(t)), "shots": n, "saves": sv,
+        {"type": t, "name": shot_type_name(t), "shots": n, "saves": sv,
          "save_pct": _save_pct(sv, n - sv)}
         for t, n, sv in rows
     ]
@@ -468,7 +468,7 @@ def type_breakdown_all(
     for key, lst in acc.items():
         lst.sort(key=lambda r: r[1], reverse=True)
         out[key] = [
-            {"type": t, "name": SHOT_TYPE_NAMES.get(t, str(t)), "shots": n, "saves": sv,
+            {"type": t, "name": shot_type_name(t), "shots": n, "saves": sv,
              "save_pct": _save_pct(sv, n - sv)}
             for t, n, sv in lst
         ]

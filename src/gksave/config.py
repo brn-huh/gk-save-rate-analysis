@@ -62,10 +62,23 @@ EFFECTIVE_RESULTS = (RESULT_SAVE, RESULT_GOAL)
 SHOT_TYPE_PENALTY = 9            # PK → 불가항력, 헤드라인 분모 제외
 SHOT_TYPE_HEADER = 3             # 헤더
 
+# 넥슨 명세(api-3-match.yaml)가 정의하는 전부. 1~12.
 SHOT_TYPE_NAMES = {
     1: "노멀", 2: "감아차기", 3: "헤더", 4: "로빙", 5: "플레어", 6: "낮은슛",
     7: "발리", 8: "프리킥", 9: "PK", 10: "너클", 11: "바이시클", 12: "파워샷",
 }
+
+
+def shot_type_name(t: int | None) -> str:
+    """슛 타입 이름. 명세에 없는 값은 이름을 지어내지 않는다.
+
+    실데이터에는 13(0.59%)·14(2.09%)가 있고 정작 5(플레어)는 0건이다. 원본 payload
+    에 `"type": 14` 가 그대로 들어오므로 파싱 문제가 아니라 게임 업데이트로 타입이
+    늘고 명세가 낡은 것이다. 맨숫자를 그대로 노출하면 화면에 버그처럼 보인다.
+    """
+    if t in SHOT_TYPE_NAMES:
+        return SHOT_TYPE_NAMES[t]
+    return f"기타(#{t if t is not None else '?'})"
 
 # 거리(미터) 환산 — 정규화 유클리드거리 sqrt((1-x)^2+(0.5-y)^2) × 스케일.
 # 스케일은 실데이터로 캘리브레이션: inPenalty(박스 경계)가 정규화거리 ~0.18에서
