@@ -113,6 +113,28 @@ def test_urls_point_at_nexon_cdn():
     )
 
 
+def test_nexon_analytics_script_is_present_and_async():
+    """넥슨 Open API 애널리틱스. app_id 는 스크립트가 자기 src 에서 읽으므로 공개가 정상.
+
+    async 가 빠지면 4.2MB 페이지의 첫 렌더를 외부 요청이 막는다.
+    """
+    html = render.build_html(_PAYLOAD)
+    assert "openapi.nexon.com/js/analytics.js?app_id=307467" in html
+    m = re.search(r"<script[^>]*analytics\.js[^>]*>", html)
+    assert m, "analytics 스크립트 태그 없음"
+    assert "async" in m.group(0)
+
+
+def test_analytics_is_the_only_external_dependency():
+    """자기완결형 HTML 기조: 애널리틱스 말고 외부에서 끌어오는 리소스가 늘면 안 된다.
+
+    선수 이미지는 <img src> 라 여기 걸리지 않는다(렌더 차단 아님, 폴백 있음).
+    """
+    html = render.build_html(_PAYLOAD)
+    srcs = re.findall(r'<(?:script|link)[^>]*(?:src|href)="(https?://[^"]+)"', html)
+    assert srcs == ["https://openapi.nexon.com/js/analytics.js?app_id=307467"]
+
+
 def test_meta_line_does_not_leak_raw_since_timestamp():
     """롤링 창을 켜자 since 접미사가 '2026-06-10T05:52:24.383976 이후' 로 노출됐다.
 

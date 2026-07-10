@@ -1,6 +1,7 @@
 """정적 HTML 표출 (인터랙티브).
 
-export 페이로드를 자기완결형 HTML 한 장으로 렌더. 외부 의존 없음(inline CSS/JS).
+export 페이로드를 자기완결형 HTML 한 장으로 렌더. CSS/JS 는 전부 inline.
+외부 의존은 둘뿐이다 — 넥슨 애널리틱스 스크립트(약관), 선수 이미지 CDN(폴백 있음).
 데이터를 JSON 으로 embed 하고 vanilla JS 로 렌더 → 검색·정렬·행 클릭 시 거리존별·
 타입별 드릴다운. 그대로 열거나 GitHub Pages 등에 올려도 된다.
 
@@ -69,6 +70,9 @@ _TEMPLATE = r"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FC온라인 GK 선방률 리더보드</title>
+<!-- 넥슨 Open API 애널리틱스(페이지뷰 집계). app_id 는 스크립트가 자기 src 에서 읽으므로
+     공개가 정상 설계다. async 없으면 외부 요청이 첫 렌더를 막는다. -->
+<script type="text/javascript" src="https://openapi.nexon.com/js/analytics.js?app_id=307467" async></script>
 <style>
   :root{ --bg:#04060f; --panel:#0b1024; --panel2:#0e1533; --line:#1c2444;
          --gold:#f0d17a; --gold2:#caa966; --text:#eaeefb; --mut:#8792ac; }
