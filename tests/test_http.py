@@ -71,3 +71,58 @@ def test_async_retries_and_concurrency():
 
     res = asyncio.run(go())
     assert len(res) == 3 and all("ok" in r for r in res)   # 429 재시도 후 전부 성공
+
+
+# ── 429 카운터 ─────────────────────────────────────────────────────────────
+# 백오프가 429 를 조용히 삼켜, 수집이 한도에 얼마나 근접했는지 알 수가 없었다.
+# 동시성을 안전하게 올리려면 "지금 몇 번 맞고 있나"를 봐야 한다.
+
+
+def test_counts_429_across_retries():
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        return httpx.Response(429 if calls["n"] < 3 else 200, json=["ok"])
+
+    with _client(handler) as c:
+        c.get("/fconline/v1/match")
+    assert c.rate_limited_count == 2       # 429 두 번을 셌다
+
+
+def test_counts_5xx_separately_from_429():
+    seq = [503, 429, 200]
+    calls = {"n": 0}
+
+    def handler(request):
+        r = seq[calls["n"]]
+        calls["n"] += 1
+        return httpx.Response(r, json=["ok"])
+
+    with _client(handler) as c:
+        c.get("/fconline/v1/match")
+    assert c.rate_limited_count == 1       # 429 만
+    assert c.server_error_count == 1       # 5xx 는 따로
+
+
+def test_counters_start_at_zero_and_stay_zero_on_success():
+    with _client(lambda req: httpx.Response(200, json=["ok"])) as c:
+        c.get("/fconline/v1/match")
+    assert c.rate_limited_count == 0 and c.server_error_count == 0
+
+
+def test_async_counts_429():
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        return httpx.Response(429 if calls["n"] < 3 else 200, json={"ok": 1})
+
+    async def go():
+        s = Settings(max_requests_per_sec=1000, backoff_base_sec=0.0, backoff_max_sec=0.0)
+        async with AsyncResilientClient(s, transport=httpx.MockTransport(handler),
+                                        concurrency=5) as c:
+            await c.get("/a")
+            return c.rate_limited_count
+
+    assert asyncio.run(go()) == 2

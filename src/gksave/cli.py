@@ -171,8 +171,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="쉼표로 구분한 시드 닉네임 (예: '아이콘,랭커2'). 재개 시 생략 가능")
     c.add_argument("--max-matches", type=int, default=5000)
     c.add_argument("--concurrency", type=int,
-                   default=int(os.environ.get("GKSAVE_CONCURRENCY", "10")),
-                   help="동시 요청 수 (기본 10, 1 이하=순차). 레이트리밋은 그대로 지켜짐")
+                   default=int(os.environ.get("GKSAVE_CONCURRENCY", "18")),
+                   help="동시 요청 수 (기본 18, 1 이하=순차). 레이트리밋은 그대로 지켜짐")
     c.add_argument("--refresh", action="store_true",
                    help="처리 끝난 유저를 다시 열어 새 경기 보충 (중복은 자동 차단)")
     c.add_argument("--since", help="이 날짜(YYYY-MM-DD) 이후 매치만 수집 "

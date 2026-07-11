@@ -62,6 +62,9 @@ class ResilientClient:
         self.s = settings
         self._sleep = sleep
         self._limiter = RateLimiter(settings.max_requests_per_sec)
+        # 백오프가 429/5xx 를 삼키므로, 한도에 얼마나 근접했는지 보려면 직접 센다.
+        self.rate_limited_count = 0   # 429
+        self.server_error_count = 0   # 5xx
         self._client = httpx.Client(
             base_url=BASE_URL,
             timeout=settings.request_timeout_sec,
@@ -106,6 +109,10 @@ class ResilientClient:
 
             # 429 / 5xx → 재시도. 4xx(400/403/404 등)는 즉시 실패.
             if resp.status_code == 429 or 500 <= resp.status_code < 600:
+                if resp.status_code == 429:
+                    self.rate_limited_count += 1
+                else:
+                    self.server_error_count += 1
                 if attempt >= self.s.max_retries:
                     raise ApiError(resp.status_code, resp.text)
                 self._sleep(self._backoff_delay(attempt, resp.headers.get("Retry-After")))
@@ -156,6 +163,9 @@ class AsyncResilientClient:
         self.s = settings
         self._limiter = AsyncRateLimiter(settings.max_requests_per_sec)
         self._sem = asyncio.Semaphore(concurrency)
+        # 백오프가 429/5xx 를 삼키므로, 한도에 얼마나 근접했는지 보려면 직접 센다.
+        self.rate_limited_count = 0   # 429
+        self.server_error_count = 0   # 5xx
         self._client = httpx.AsyncClient(
             base_url=BASE_URL,
             timeout=settings.request_timeout_sec,
@@ -198,6 +208,10 @@ class AsyncResilientClient:
             if resp.status_code == 200:
                 return resp.json()
             if resp.status_code == 429 or 500 <= resp.status_code < 600:
+                if resp.status_code == 429:
+                    self.rate_limited_count += 1
+                else:
+                    self.server_error_count += 1
                 if attempt >= self.s.max_retries:
                     raise ApiError(resp.status_code, resp.text)
                 await asyncio.sleep(self._backoff_delay(attempt, resp.headers.get("Retry-After")))

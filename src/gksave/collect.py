@@ -319,6 +319,9 @@ async def run_async(
                 return
             log("=== 스노우볼 확장 (동시) ===")
             await snowball_async(con, client, max_new_matches=max_new_matches, since=since, log=log)
+            # 백오프에 삼켜진 429/5xx 를 드러낸다 — 동시성을 올릴 여지가 있는지 판단용.
+            log(f"레이트리밋 429 {client.rate_limited_count}회 · 서버오류 5xx "
+                f"{client.server_error_count}회 (백오프가 재시도로 흡수)")
         log(f"총 raw_match: {raw_match_count(con)}건")
     finally:
         con.close()
