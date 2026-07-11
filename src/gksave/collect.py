@@ -320,8 +320,12 @@ async def run_async(
             log("=== 스노우볼 확장 (동시) ===")
             await snowball_async(con, client, max_new_matches=max_new_matches, since=since, log=log)
             # 백오프에 삼켜진 429/5xx 를 드러낸다 — 동시성을 올릴 여지가 있는지 판단용.
+            # 429 가 나면 레이트를 반토막내고 천천히 회복하므로, 끝 레이트도 함께 찍는다.
+            rate_note = ""
+            if client.rate.current < client.rate.base:
+                rate_note = f" · 레이트 {client.rate.base:.0f}→{client.rate.current:.1f}/s 감속됨"
             log(f"레이트리밋 429 {client.rate_limited_count}회 · 서버오류 5xx "
-                f"{client.server_error_count}회 (백오프가 재시도로 흡수)")
+                f"{client.server_error_count}회 (백오프가 재시도로 흡수){rate_note}")
         log(f"총 raw_match: {raw_match_count(con)}건")
     finally:
         con.close()

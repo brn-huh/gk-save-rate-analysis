@@ -21,18 +21,71 @@ import httpx
 from .config import DEFAULT, BASE_URL, Settings, api_key
 
 
-class RateLimiter:
-    """단순 토큰버킷: 초당 rate 개까지 허용, 부족하면 sleep."""
+class AdaptiveRate:
+    """429 에 반응해 초당 요청률을 조절한다.
 
-    def __init__(self, rate_per_sec: float) -> None:
-        self.min_interval = 1.0 / rate_per_sec if rate_per_sec > 0 else 0.0
+    429 = "이 속도가 한계를 넘었다". 즉시 반토막으로 크게 물러서고(감소는 빠르고
+    크게), 429 없이 조용한 시간이 쌓이면 recover_interval 마다 recover_step 씩만
+    아주 천천히 회복한다(증가는 느리고 조금씩). 이 비대칭이 한계선을 자주 두드리지
+    않게 해 차단 리스크를 낮춘다. 회복 중 429 가 또 나면 즉시 다시 반토막.
+
+    clock 은 테스트에서 주입한다(단조 시계 초).
+    """
+
+    def __init__(
+        self,
+        base: float,
+        *,
+        floor: float = 2.0,
+        recover_step: float = 0.5,
+        recover_interval: float = 300.0,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.base = base
+        self.floor = min(floor, base) if base > 0 else 0.0
+        self.recover_step = recover_step
+        self.recover_interval = recover_interval
+        self._clock = clock
+        self.current = base
+        self._last_change = clock()
+
+    @property
+    def min_interval(self) -> float:
+        return 1.0 / self.current if self.current > 0 else 0.0
+
+    def on_rate_limited(self) -> None:
+        if self.base <= 0:
+            return  # 무제한 설정이면 감속 개념이 없다
+        self.current = max(self.floor, self.current / 2)
+        self._last_change = self._clock()
+
+    def maybe_recover(self) -> None:
+        if self.base <= 0 or self.current >= self.base:
+            return
+        elapsed = self._clock() - self._last_change
+        steps = int(elapsed // self.recover_interval)
+        if steps <= 0:
+            return
+        self.current = min(self.base, self.current + steps * self.recover_step)
+        self._last_change += steps * self.recover_interval
+
+
+class RateLimiter:
+    """단순 토큰버킷: 초당 rate 개까지 허용, 부족하면 sleep.
+
+    간격은 AdaptiveRate 에서 매번 읽어, 429 감속이 즉시 반영되게 한다.
+    """
+
+    def __init__(self, rate: AdaptiveRate) -> None:
+        self._rate = rate
         self._last = 0.0
 
     def acquire(self, *, sleep: Callable[[float], None] = time.sleep) -> None:
-        if self.min_interval <= 0:
+        interval = self._rate.min_interval
+        if interval <= 0:
             return
         now = time.monotonic()
-        wait = self._last + self.min_interval - now
+        wait = self._last + interval - now
         if wait > 0:
             sleep(wait)
             now = time.monotonic()
@@ -61,7 +114,8 @@ class ResilientClient:
     ) -> None:
         self.s = settings
         self._sleep = sleep
-        self._limiter = RateLimiter(settings.max_requests_per_sec)
+        self.rate = AdaptiveRate(settings.max_requests_per_sec)
+        self._limiter = RateLimiter(self.rate)
         # 백오프가 429/5xx 를 삼키므로, 한도에 얼마나 근접했는지 보려면 직접 센다.
         self.rate_limited_count = 0   # 429
         self.server_error_count = 0   # 5xx
@@ -94,6 +148,7 @@ class ResilientClient:
     def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         attempt = 0
         while True:
+            self.rate.maybe_recover()   # 조용한 시간이 쌓였으면 조금씩 회복
             self._limiter.acquire(sleep=self._sleep)
             try:
                 resp = self._client.get(path, params=params)
@@ -111,6 +166,7 @@ class ResilientClient:
             if resp.status_code == 429 or 500 <= resp.status_code < 600:
                 if resp.status_code == 429:
                     self.rate_limited_count += 1
+                    self.rate.on_rate_limited()   # 한계 신호 → 즉시 반토막
                 else:
                     self.server_error_count += 1
                 if attempt >= self.s.max_retries:
@@ -129,13 +185,14 @@ class AsyncRateLimiter:
     겹쳐 레이트 예산을 꽉 채운다(순차 대기 병목 제거).
     """
 
-    def __init__(self, rate_per_sec: float) -> None:
-        self.min_interval = 1.0 / rate_per_sec if rate_per_sec > 0 else 0.0
+    def __init__(self, rate: AdaptiveRate) -> None:
+        self._rate = rate
         self._next = 0.0
         self._lock = asyncio.Lock()
 
     async def acquire(self) -> None:
-        if self.min_interval <= 0:
+        interval = self._rate.min_interval
+        if interval <= 0:
             return
         async with self._lock:
             now = asyncio.get_event_loop().time()
@@ -143,7 +200,7 @@ class AsyncRateLimiter:
             if wait > 0:
                 await asyncio.sleep(wait)
                 now = asyncio.get_event_loop().time()
-            self._next = max(self._next, now) + self.min_interval
+            self._next = max(self._next, now) + interval
 
 
 class AsyncResilientClient:
@@ -161,7 +218,8 @@ class AsyncResilientClient:
         concurrency: int = 10,
     ) -> None:
         self.s = settings
-        self._limiter = AsyncRateLimiter(settings.max_requests_per_sec)
+        self.rate = AdaptiveRate(settings.max_requests_per_sec)
+        self._limiter = AsyncRateLimiter(self.rate)
         self._sem = asyncio.Semaphore(concurrency)
         # 백오프가 429/5xx 를 삼키므로, 한도에 얼마나 근접했는지 보려면 직접 센다.
         self.rate_limited_count = 0   # 429
@@ -194,6 +252,7 @@ class AsyncResilientClient:
     async def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         attempt = 0
         while True:
+            self.rate.maybe_recover()   # 조용한 시간이 쌓였으면 조금씩 회복
             await self._limiter.acquire()
             try:
                 async with self._sem:
@@ -210,6 +269,7 @@ class AsyncResilientClient:
             if resp.status_code == 429 or 500 <= resp.status_code < 600:
                 if resp.status_code == 429:
                     self.rate_limited_count += 1
+                    self.rate.on_rate_limited()   # 한계 신호 → 즉시 반토막
                 else:
                     self.server_error_count += 1
                 if attempt >= self.s.max_retries:

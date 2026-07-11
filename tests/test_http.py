@@ -126,3 +126,20 @@ def test_async_counts_429():
             return c.rate_limited_count
 
     assert asyncio.run(go()) == 2
+
+
+def test_429_halves_the_live_rate():
+    """429 를 맞으면 클라이언트의 실제 레이트가 반토막나야 한다(카운터만이 아니라)."""
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        return httpx.Response(429 if calls["n"] < 2 else 200, json=["ok"])
+
+    s = Settings(max_requests_per_sec=15, backoff_base_sec=0.0, backoff_max_sec=0.0)
+    c = ResilientClient(s, transport=httpx.MockTransport(handler), sleep=lambda _x: None)
+    before = c.rate.current
+    with c:
+        c.get("/fconline/v1/match")
+    assert before == 15
+    assert c.rate.current == 7.5      # 429 한 번 → 반토막
