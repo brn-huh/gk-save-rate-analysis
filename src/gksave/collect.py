@@ -11,6 +11,7 @@ dedup: matchId는 raw_match PK, ouid는 frontier PK로 자동 중복 제거.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
@@ -42,6 +43,28 @@ def _pct(n: int, total: int) -> str:
     return f"{n / total * 100:.1f}%"
 
 
+@dataclass(frozen=True)
+class FrontierCounts:
+    done: int
+    pending: int
+
+    @property
+    def total(self) -> int:
+        return self.done + self.pending
+
+    @property
+    def done_pct(self) -> float:
+        return self.done / self.total * 100 if self.total else 0.0
+
+
+def frontier_counts(con: duckdb.DuckDBPyConnection) -> FrontierCounts:
+    """수집 대기열 요약: 완료·대기 유저 수. 한 번의 GROUP BY 로 센다."""
+    rows = dict(
+        con.execute("SELECT state, count(*) FROM frontier GROUP BY state").fetchall()
+    )
+    return FrontierCounts(done=rows.get("done", 0), pending=rows.get("pending", 0))
+
+
 def _log_progress(
     con: duckdb.DuckDBPyConnection,
     *,
@@ -49,14 +72,11 @@ def _log_progress(
     max_new_matches: int,
     log: Logger,
 ) -> None:
-    done = con.execute(
-        "SELECT count(*) FROM frontier WHERE state = 'done'"
-    ).fetchone()[0]
-    total = con.execute("SELECT count(*) FROM frontier").fetchone()[0]
+    c = frontier_counts(con)
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log(
         f"{ts} | 매치 {stored:,}/{max_new_matches:,} ({_pct(stored, max_new_matches)}) "
-        f"· 유저 {done:,}/{total:,} ({_pct(done, total)})"
+        f"· 유저 {c.done:,}/{c.total:,} ({_pct(c.done, c.total)}) · 대기 {c.pending:,}"
     )
 
 
@@ -311,14 +331,17 @@ async def run_async(
             if refresh:
                 n = reset_done(con)
                 log(f"=== 갱신 모드: done ouid {n}개를 pending 으로 ===")
-            pending = con.execute(
-                "SELECT count(*) FROM frontier WHERE state = 'pending'"
-            ).fetchone()[0]
-            if pending == 0:
+            start = frontier_counts(con)
+            if start.pending == 0:
                 log("시드도 없고 pending ouid도 없음 — 닉네임을 넘겨 시드하세요.")
                 return
-            log("=== 스노우볼 확장 (동시) ===")
+            log(f"=== 스노우볼 확장 (동시) · 시작 대기 {start.pending:,} "
+                f"(완료 {start.done:,} / 전체 {start.total:,}, {start.done_pct:.1f}%) ===")
             await snowball_async(con, client, max_new_matches=max_new_matches, since=since, log=log)
+            end = frontier_counts(con)
+            delta = end.pending - start.pending
+            log(f"=== 수집 종료 · 대기 {start.pending:,} → {end.pending:,} "
+                f"({delta:+,}) · 완료 {end.done:,} / 전체 {end.total:,} ({end.done_pct:.1f}%) ===")
             # 백오프에 삼켜진 429/5xx 를 드러낸다 — 동시성을 올릴 여지가 있는지 판단용.
             # 429 가 나면 레이트를 반토막내고 천천히 회복하므로, 끝 레이트도 함께 찍는다.
             rate_note = ""
@@ -361,14 +384,17 @@ def run(
             if refresh:
                 n = reset_done(con)
                 log(f"=== 갱신 모드: done ouid {n}개를 pending 으로 되돌림 ===")
-            pending = con.execute(
-                "SELECT count(*) FROM frontier WHERE state = 'pending'"
-            ).fetchone()[0]
-            if pending == 0:
+            start = frontier_counts(con)
+            if start.pending == 0:
                 log("시드도 없고 pending ouid도 없음 — 닉네임을 넘겨 시드하세요.")
                 return
-            log("=== 스노우볼 확장 ===")
+            log(f"=== 스노우볼 확장 · 시작 대기 {start.pending:,} "
+                f"(완료 {start.done:,} / 전체 {start.total:,}, {start.done_pct:.1f}%) ===")
             snowball(con, client, max_new_matches=max_new_matches, since=since, log=log)
+            end = frontier_counts(con)
+            delta = end.pending - start.pending
+            log(f"=== 수집 종료 · 대기 {start.pending:,} → {end.pending:,} "
+                f"({delta:+,}) · 완료 {end.done:,} / 전체 {end.total:,} ({end.done_pct:.1f}%) ===")
         log(f"총 raw_match: {raw_match_count(con)}건")
     finally:
         con.close()
