@@ -14,7 +14,7 @@ from pathlib import Path
 
 import duckdb
 
-from . import agg, meta, render
+from . import agg, meta, playerinfo, render
 from .config import MIN_MATCHES_GATE, ZONE_CUTS_M
 
 WARNING = (
@@ -82,6 +82,9 @@ def build_payload(
         c["zones"] = zones_all.get(key, [])
         c["types"] = types_all.get(key, [])
         c["extras"] = extras_all.get(key, {})
+
+    # 선수 부가정보(급여·기본OVR·키·몸무게·체형) 붙이기 — 있는 카드만
+    playerinfo.attach_info(con, leaderboard)
 
     # 메타 캐시가 있으면 선수명·시즌 붙이고 동일선수 시즌 비교표 추가
     if meta.has_meta(con):

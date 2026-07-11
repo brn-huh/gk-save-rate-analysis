@@ -113,6 +113,17 @@ def test_urls_point_at_nexon_cdn():
     )
 
 
+def test_hero_shows_player_info_chips_when_present():
+    payload = dict(_PAYLOAD)
+    c = dict(payload["leaderboard"][0])
+    c["info"] = {"salary": 24, "ovr": 113, "height": 187, "weight": 85, "body_type": "보통"}
+    payload["leaderboard"] = [c]
+    html = render.build_html(payload)
+    # 칩 렌더 로직과 라벨이 템플릿에 있어야
+    assert "chips" in html and "info.salary" in html
+    assert "급여" in html and "체형" in html and "기본 OVR" in html
+
+
 def test_nexon_analytics_script_is_present_and_async():
     """넥슨 Open API 애널리틱스. app_id 는 스크립트가 자기 src 에서 읽으므로 공개가 정상.
 

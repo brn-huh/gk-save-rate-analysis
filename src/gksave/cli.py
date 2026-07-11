@@ -15,7 +15,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import agg, collect, export as export_mod, meta, spike
+from . import agg, collect, export as export_mod, meta, playerinfo, spike
 from .config import DEFAULT, MIN_MATCHES_GATE, ZONE_CUTS_M
 from .db import DbLockedError, connect, raw_match_count
 from .http import ResilientClient
@@ -71,6 +71,14 @@ def _cmd_meta(_args) -> None:
         with ResilientClient(DEFAULT) as client:
             n_sp, n_se = meta.refresh(con, client)
         print(f"메타 캐시 갱신: 선수 {n_sp}, 시즌 {n_se}")
+    finally:
+        con.close()
+
+
+def _cmd_playerinfo(_args) -> None:
+    con = connect(DEFAULT)
+    try:
+        playerinfo.sync_player_info(con)
     finally:
         con.close()
 
@@ -185,6 +193,10 @@ def build_parser() -> argparse.ArgumentParser:
     b.set_defaults(func=_cmd_build)
 
     sub.add_parser("meta", help="선수명·시즌 메타 캐시 갱신").set_defaults(func=_cmd_meta)
+
+    sub.add_parser(
+        "playerinfo", help="선수 급여·기본OVR·키·몸무게·체형 캐시 (fc-info, 우리 GK만·1회)"
+    ).set_defaults(func=_cmd_playerinfo)
 
     e = sub.add_parser("export", help="JSON/CSV/HTML 산출")
     e.add_argument("--gate", type=int, default=MIN_MATCHES_GATE)

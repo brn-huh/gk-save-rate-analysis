@@ -199,6 +199,10 @@ _TEMPLATE = r"""<!doctype html>
   .hero-meta .sub{margin:0 0 9px;color:var(--mut);font-size:.85rem}
   .hero-meta .big{font-size:1.5rem;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums}
   .hero-meta .big small{margin-left:7px;font-size:.78rem;font-weight:600;color:var(--mut)}
+  .hero-meta .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .chips .chip{font-size:.78rem;color:var(--text);background:var(--panel2);border:1px solid var(--line);
+        border-radius:7px;padding:3px 8px;font-variant-numeric:tabular-nums}
+  .chips .chip b{color:var(--gold2);font-weight:700}
   /* 표는 375px 에서 606px 다. 본문이 아니라 표만 가로로 스크롤시킨다.
      overflow-x 를 상시로 걸면 overflow-y 가 auto 로 승격돼 sticky thead 가 깨진다.
      데스크톱은 표가 안 넘치므로 모바일에서만 감싼다. */
@@ -363,11 +367,21 @@ function detailHtml(c){
     stat('경기당 평균 평점', e.gk_rating==null?'-':e.gk_rating)+
     stat('패스 성공률', pct(e.pass_pct));
     // 공중볼(aerial)은 게임상 GK에 거의 안 잡혀(중앙값 1) 노이즈 → 화면 미표시. 데이터는 DB 유지.
+  const info=c.info||{};
+  const chip=(label,val)=>val==null?'':`<span class="chip"><b>${label}</b>${esc(val)}</span>`;
+  const infoRow=[
+    chip('급여 ', info.salary),
+    chip('기본 OVR ', info.ovr),
+    chip('키 ', info.height==null?null:info.height+'cm'),
+    chip('몸무게 ', info.weight==null?null:info.weight+'kg'),
+    chip('체형 ', info.body_type),
+  ].join('');
   const hero=
     `<div class="hero">${heroImg(c.gk_sp_id,c.player_name)}<div class="hero-meta">`+
     `<h3>${esc(c.player_name||('spId '+c.gk_sp_id))}</h3>`+
     `<p class="sub">${esc(c.season_name||'')} · ${c.grade}강</p>`+
     `<div class="big">${pct(c.save_pct)}<small>선방률 · 표본 ${c.matches}경기</small></div>`+
+    (infoRow?`<div class="chips">${infoRow}</div>`:'')+
     `</div></div>`;
   return hero+
          `<div class="detail-grid"><div><h4>거리 구간별 (근사 미터)</h4>${zones}</div>`+

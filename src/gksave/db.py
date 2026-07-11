@@ -42,6 +42,19 @@ CREATE TABLE IF NOT EXISTS meta_season (
     class_name VARCHAR
 );
 
+-- 선수 부가정보 캐시 (fc-info GK 검색). 우리 gk_sp_id 만, 카드당 1회.
+-- 급여·기본OVR 은 카드(spid)별, 키·몸무게·체형은 실선수 속성. 반복 수집 안 함.
+CREATE TABLE IF NOT EXISTS player_info (
+    spid       BIGINT PRIMARY KEY,
+    name       VARCHAR,
+    salary     INTEGER,
+    ovr        INTEGER,      -- 기본(1강) OVR
+    height     INTEGER,      -- cm
+    weight     INTEGER,      -- kg
+    body_type  VARCHAR,      -- 보통 | 건장 | 마름
+    fetched_at TIMESTAMP DEFAULT now()
+);
+
 -- GK 출전: 카드가 GK로 뛴 경기 1건 = 1행 (슛 0개 경기도 표본 게이트에 반영)
 CREATE TABLE IF NOT EXISTS gk_match (
     match_id       VARCHAR,
