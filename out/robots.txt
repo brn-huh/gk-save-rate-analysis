@@ -1,0 +1,52 @@
+# 이 사이트의 데이터를 자동 수집(크롤링·스크래핑·AI 학습/입력)하는 것을 허용하지 않습니다.
+# 아래 Content-Signal 로 표현된 제한은 EU DIRECTIVE 2019/790 제4조에 따른 명시적 권리 유보입니다.
+# This site does not permit automated collection (crawling, scraping, AI training/input).
+# The restrictions expressed via Content-Signal are express reservations of rights under
+# Article 4 of EU Directive 2019/790.
+
+User-agent: *
+Content-Signal: search=no,ai-input=no,ai-train=no
+Disallow: /
+
+# 주요 AI 크롤러 명시 차단
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: OAI-SearchBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: meta-externalagent
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
