@@ -62,67 +62,69 @@ def test_non_gk_position_ovr_still_taken_from_first():
 
 # ── sync_player_info: 우리 spid만 · 카드당 한 번 · 반복 안 함 ─────────────────
 
-def _gk_page(items, cursor=None):
-    return httpx.Response(200, json={"items": items, "nextCursor": cursor, "hasNext": bool(cursor)})
-
-
-def _mock_client(pages):
-    """pages: 응답 리스트. 순서대로 반환하는 fc-info 목 클라이언트."""
-    calls = {"n": 0}
+def _mock_by_name(catalog):
+    """catalog: {name: [player dict, ...]}. names 배열 요청에 매칭 카드를 돌려주는 목."""
+    import json as _json
+    calls = {"n": 0, "names": []}
 
     def handler(request):
-        i = calls["n"]
         calls["n"] += 1
-        return pages[min(i, len(pages) - 1)]
+        names = _json.loads(request.content).get("names", [])
+        calls["names"].extend(names)
+        items = [p for nm in names for p in catalog.get(nm, [])]
+        return httpx.Response(200, json={"items": items, "nextCursor": None, "hasNext": False})
 
     client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
     client._calls = calls
     return client
 
 
-def _seed_gk(con, *spids):
-    for sp in spids:
-        con.execute(
-            "INSERT INTO gk_match (match_id, gk_sp_id, gk_sp_grade) VALUES (?, ?, ?)",
-            [f"m{sp}", sp, 1],
-        )
+def _seed_gk(con, spid, name):
+    con.execute("INSERT INTO gk_match (match_id, gk_sp_id, gk_sp_grade) VALUES (?, ?, ?)",
+                [f"m{spid}", spid, 1])
+    con.execute("INSERT INTO meta_spid (sp_id, name) VALUES (?, ?) ON CONFLICT DO NOTHING",
+                [spid, name])
 
 
-def test_stores_only_our_spids():
+def test_searches_by_our_player_names_and_stores_matches():
     con = connect_memory()
-    _seed_gk(con, 100, 200)                       # 우리는 100, 200 만 가짐
-    client = _mock_client([_gk_page([
-        {"id": 100, "name": "가", "salary": 5, "height": 190, "weight": 80,
-         "bodyType": "보통", "positions": [{"ovr": 100}]},
-        {"id": 999, "name": "남", "salary": 9, "positions": [{"ovr": 130}]},   # 우리 것 아님
-    ])])
+    _seed_gk(con, 100, "가")
+    _seed_gk(con, 200, "나")
+    client = _mock_by_name({
+        "가": [{"id": 100, "name": "가", "salary": 5, "height": 190, "weight": 80,
+                "bodyType": "보통", "positions": [{"ovr": 100}]},
+               {"id": 999, "name": "가", "salary": 9, "positions": [{"ovr": 130}]}],  # 우리 것 아님
+        "나": [{"id": 200, "name": "나", "salary": 7, "positions": [{"ovr": 110}]}],
+    })
     r = sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
     rows = con.execute("SELECT spid, salary FROM player_info ORDER BY spid").fetchall()
-    assert rows == [(100, 5)]                     # 999 는 저장 안 됨
-    assert r["new"] == 1
+    assert rows == [(100, 5), (200, 7)]          # 999(우리 것 아님)는 저장 안 됨
+    assert r["new"] == 2
+    assert set(client._calls["names"]) == {"가", "나"}   # 우리 이름만 물어봄
 
 
 def test_skips_already_cached_and_short_circuits_network():
     con = connect_memory()
-    _seed_gk(con, 100)
+    _seed_gk(con, 100, "가")
     con.execute("INSERT INTO player_info (spid, salary) VALUES (100, 5)")   # 이미 있음
-    client = _mock_client([_gk_page([{"id": 100, "salary": 999, "positions": []}])])
+    client = _mock_by_name({"가": [{"id": 100, "salary": 999, "positions": []}]})
     r = sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert client._calls["n"] == 0               # 받을 게 없으니 fc-info 호출 0
+    assert client._calls["n"] == 0               # 채울 게 없으니 fc-info 호출 0
     assert r["new"] == 0
-    assert con.execute("SELECT salary FROM player_info WHERE spid=100").fetchone()[0] == 5  # 덮어쓰지 않음
+    assert con.execute("SELECT salary FROM player_info WHERE spid=100").fetchone()[0] == 5
 
 
-def test_paginates_with_cursor():
+def test_batches_names_max_10_per_request():
     con = connect_memory()
-    _seed_gk(con, 1, 2)
-    client = _mock_client([
-        _gk_page([{"id": 1, "salary": 5, "positions": [{"ovr": 90}]}], cursor="c1"),
-        _gk_page([{"id": 2, "salary": 7, "positions": [{"ovr": 92}]}], cursor=None),
-    ])
-    r = sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert r["new"] == 2
-    assert client._calls["n"] == 2               # 두 페이지 다 넘김
+    cat = {}
+    for i in range(23):
+        _seed_gk(con, 1000 + i, f"p{i}")
+        cat[f"p{i}"] = [{"id": 1000 + i, "salary": i, "positions": [{"ovr": 90}]}]
+    client = _mock_by_name(cat)
+    r = sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None,
+                         name_batch=10)
+    assert r["new"] == 23
+    assert client._calls["n"] == 3               # 23개 이름 → 10,10,3 → 3 요청
 
 
 def test_export_attaches_player_info_by_spid():
@@ -184,12 +186,12 @@ def test_export_backfills_physical_by_pid():
 
 def test_salary_and_all_fields_persisted():
     con = connect_memory()
-    _seed_gk(con, 825192448)
-    client = _mock_client([_gk_page([{
+    _seed_gk(con, 825192448, "M. 테어슈테겐")
+    client = _mock_by_name({"M. 테어슈테겐": [{
         "id": 825192448, "name": "M. 테어슈테겐", "salary": 24,
         "height": 187, "weight": 85, "bodyType": "보통",
         "positions": [{"ovr": 113}],
-    }])])
+    }]})
     sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
     row = con.execute(
         "SELECT salary, ovr, height, weight, body_type FROM player_info WHERE spid=825192448"

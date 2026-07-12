@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 import duckdb
 import httpx
@@ -83,49 +83,41 @@ def attach_info(con: duckdb.DuckDBPyConnection, leaderboard: list[dict[str, Any]
         }
 
 
-def _iter_gk_players(
-    client: httpx.Client,
-    *,
-    page_delay: float,
-    max_pages: int,
-    sleep: Callable[[float], None] = time.sleep,
-) -> Iterable[dict[str, Any]]:
-    """fc-info GK 목록을 커서 페이지네이션으로 훑는다. 페이지 사이 지연으로 예의."""
-    cursor: str | None = None
-    for page in range(max_pages):
-        if page > 0:
-            sleep(page_delay)
-        body: dict[str, Any] = {"positionIds": [_GK_POSITION]}
-        if cursor:
-            body["cursor"] = cursor
-        resp = client.post(_SEARCH_PATH, json=body)
-        resp.raise_for_status()
-        data = resp.json()
-        yield from data.get("items", [])
-        cursor = data.get("nextCursor")
-        if not data.get("hasNext") or not cursor:
-            return
+def _search_names(client: httpx.Client, names: list[str]) -> list[dict[str, Any]]:
+    """이름 배열(≤10)로 GK 검색. fc-info 는 이 선수들의 모든 시즌 카드를 돌려준다."""
+    resp = client.post(_SEARCH_PATH, json={"positionIds": [_GK_POSITION], "names": names})
+    resp.raise_for_status()
+    return resp.json().get("items", [])
 
 
 def sync_player_info(
     con: duckdb.DuckDBPyConnection,
     *,
     client: httpx.Client | None = None,
-    page_delay: float = 1.0,
-    max_pages: int = 200,
+    batch_delay: float = 1.0,
+    name_batch: int = 10,
     sleep: Callable[[float], None] = time.sleep,
     log: Callable[[str], None] = print,
 ) -> dict[str, int]:
     """우리 gk_match 에 있는 spid 중 player_info 에 없는 것만 fc-info 에서 채운다.
 
-    반환: {'ours','already','fetched','new'} 카운트.
+    per-spid 조회가 없어(404) 검색 API 의 names 필터(배열, ≤10)로 **우리 선수 이름만**
+    콕 집어 조회한다 — 전체 목록을 훑지 않는다. 이름당 여러 시즌 카드가 오므로 그 중
+    우리 need 에 든 spid 만 upsert. 배치 사이 지연으로 예의.
+
+    반환: {'ours','already','need','new'} 카운트.
     """
     ours = {r[0] for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()}
     have = {r[0] for r in con.execute("SELECT spid FROM player_info").fetchall()}
     need = ours - have
     if not need:
         log(f"player_info: 우리 GK {len(ours):,} 전부 캐시됨 — fc-info 호출 없음")
-        return {"ours": len(ours), "already": len(have & ours), "fetched": 0, "new": 0}
+        return {"ours": len(ours), "already": len(have & ours), "need": 0, "new": 0}
+
+    # need 에 든 spid 의 이름만 추려 fc-info 에 물어본다 (이름으로만 조회 가능).
+    name_by_spid = {r[0]: r[1] for r in con.execute(
+        "SELECT sp_id, name FROM meta_spid WHERE name IS NOT NULL").fetchall()}
+    need_names = sorted({name_by_spid[s] for s in need if s in name_by_spid})
 
     owns_client = client is None
     client = client or httpx.Client(
@@ -135,22 +127,23 @@ def sync_player_info(
                  "Origin": FCINFO_BASE},
     )
     new = 0
-    seen = 0
     try:
-        for item in _iter_gk_players(client, page_delay=page_delay, max_pages=max_pages, sleep=sleep):
-            seen += 1
-            p = parse_player(item)
-            if p is None or p.spid not in need:
-                continue
-            con.execute(
-                "INSERT INTO player_info (spid, name, salary, ovr, height, weight, body_type) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
-                [p.spid, p.name, p.salary, p.ovr, p.height, p.weight, p.body_type],
-            )
-            new += 1
+        for i in range(0, len(need_names), name_batch):
+            if i > 0:
+                sleep(batch_delay)
+            for item in _search_names(client, need_names[i:i + name_batch]):
+                p = parse_player(item)
+                if p is None or p.spid not in need:
+                    continue
+                con.execute(
+                    "INSERT INTO player_info (spid, name, salary, ovr, height, weight, body_type) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                    [p.spid, p.name, p.salary, p.ovr, p.height, p.weight, p.body_type],
+                )
+                new += 1
     finally:
         if owns_client:
             client.close()
     log(f"player_info: 우리 GK {len(ours):,} · 이미 {len(have & ours):,} · "
-        f"fc-info GK {seen:,} 훑음 · 신규 {new:,}")
-    return {"ours": len(ours), "already": len(have & ours), "fetched": seen, "new": new}
+        f"이름 {len(need_names):,}개 조회 · 신규 {new:,}")
+    return {"ours": len(ours), "already": len(have & ours), "need": len(need), "new": new}
