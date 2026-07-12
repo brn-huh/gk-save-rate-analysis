@@ -47,10 +47,9 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 | 스크립트 | 하는 일 |
 |---|---|
 | `./scripts/status.sh` | 현재 매치 수 · 대기 유저(pending) 확인 |
-| `./scripts/collect.sh` | 수집 (pending 있을 때) |
-| `./scripts/collect.sh --refresh` | 수집 (pending 없을 때, 새 경기 보충) |
+| `./scripts/collect.sh` | 수집 후 **묻지 않고 자동으로** update.sh(build+export) 실행 |
+| `./scripts/collect.sh --refresh` | 수집 (pending 없을 때, 새 경기 보충) + 자동 update |
 | `./scripts/collect.sh --max 50000` | 수집량 직접 지정 |
-| `./scripts/collect.sh --yes` | 수집 후 묻지 않고 update.sh 까지 |
 | `./scripts/collect.sh --no-update` | 수집만, update.sh 건너뜀 |
 | `./scripts/build.sh` | 증분 빌드 (수집한 것만 파싱 — 빠름) |
 | `./scripts/build.sh --full` | 전체 재파싱 (파싱 로직 바뀌었을 때만) |
