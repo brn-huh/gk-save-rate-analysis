@@ -55,6 +55,13 @@ CREATE TABLE IF NOT EXISTS player_info (
     fetched_at TIMESTAMP DEFAULT now()
 );
 
+-- 시즌 엠블럼 이미지 (season_id → 넥슨 CDN URL). fc-info classImg 에서 얻어 매핑만 저장,
+-- 이미지 자체는 ssl.nexon.com 에서 직접 로드. 시즌은 ~149개뿐이라 가볍다.
+CREATE TABLE IF NOT EXISTS season_img (
+    season_id INTEGER PRIMARY KEY,
+    img       VARCHAR
+);
+
 -- GK 출전: 카드가 GK로 뛴 경기 1건 = 1행 (슛 0개 경기도 표본 게이트에 반영)
 CREATE TABLE IF NOT EXISTS gk_match (
     match_id       VARCHAR,

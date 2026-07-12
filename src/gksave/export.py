@@ -83,17 +83,19 @@ def build_payload(
         c["types"] = types_all.get(key, [])
         c["extras"] = extras_all.get(key, {})
 
-    # 선수 부가정보(급여·기본OVR·키·몸무게·체형) 붙이기 — 있는 카드만
+    # 선수 부가정보(급여·기본OVR·키·몸무게·체형)와 시즌 엠블럼 붙이기 — 있는 카드만
     playerinfo.attach_info(con, leaderboard)
+    playerinfo.attach_season_img(con, leaderboard)
 
     # 메타 캐시가 있으면 선수명·시즌 붙이고 동일선수 시즌 비교표 추가
     if meta.has_meta(con):
         meta.enrich(con, leaderboard)
         meta.enrich(con, gsax)
         payload["same_player"] = meta.same_player_view(leaderboard)
-        # 동일선수 비교 표에도 급여를 붙인다(각 그룹의 시즌별 카드 단위)
+        # 동일선수 비교 표에도 급여·시즌 엠블럼을 붙인다(각 그룹의 시즌별 카드 단위)
         for group in payload["same_player"]:
             playerinfo.attach_info(con, group.get("cards", []))
+            playerinfo.attach_season_img(con, group.get("cards", []))
     return payload
 
 

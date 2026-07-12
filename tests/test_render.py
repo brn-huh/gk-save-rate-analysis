@@ -113,6 +113,20 @@ def test_urls_point_at_nexon_cdn():
     )
 
 
+def test_season_name_shows_emblem_icon_when_present():
+    payload = dict(_PAYLOAD)
+    c = dict(payload["leaderboard"][0])
+    c["season_img"] = "https://ssl.nexon.com/…/season/ICON.png"
+    payload["leaderboard"] = [c]
+    payload["same_player"] = [{"player_name": "야신", "cards": [
+        {"season_name": "ICON", "grade": 10, "save_pct": 0.7, "gsax_per_shot": 0.05,
+         "matches": 60, "season_img": "https://ssl.nexon.com/…/season/ICON.png"},
+    ]}]
+    html = render.build_html(payload)
+    assert "seasonIcon" in html or "season-ico" in html   # 시즌 아이콘 렌더 로직
+    assert "c.season_img" in html                          # 메인 목록이 시즌 이미지를 그림
+
+
 def test_same_player_summary_shows_total_games():
     payload = dict(_PAYLOAD)
     payload["same_player"] = [{"player_name": "노이어", "cards": [

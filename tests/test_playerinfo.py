@@ -8,7 +8,14 @@ import httpx
 import pytest
 
 from gksave.db import connect_memory
-from gksave.playerinfo import FCINFO_BASE, PlayerInfo, parse_player, sync_player_info
+from gksave.playerinfo import (
+    FCINFO_BASE,
+    PlayerInfo,
+    parse_player,
+    season_of,
+    season_img_url,
+    sync_player_info,
+)
 
 _ITEM = {
     "id": 825192448,
@@ -127,6 +134,24 @@ def test_batches_names_max_10_per_request():
     assert client._calls["n"] == 3               # 23개 이름 → 10,10,3 → 3 요청
 
 
+def test_season_of_is_first_three_digits():
+    assert season_of(861048940) == 861      # WG 861...
+    assert season_of(100238380) == 100      # ICON 100...
+
+
+def test_season_img_url_from_classimg():
+    # fc-info classImg 에서 시즌 엠블럼 URL 을 그대로 뽑는다(넥슨 CDN).
+    it = {"id": 861048940, "classImg":
+          "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/WG.png"}
+    assert season_img_url(it) == \
+        "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/WG.png"
+
+
+def test_season_img_url_none_when_missing():
+    assert season_img_url({"id": 1}) is None
+    assert season_img_url({"id": 1, "classImg": ""}) is None
+
+
 def test_export_attaches_player_info_by_spid():
     from gksave import agg, export
 
@@ -151,6 +176,27 @@ def test_export_attaches_player_info_by_spid():
     assert c["info"]["ovr"] == 113
     assert c["info"]["height"] == 187
     assert c["info"]["body_type"] == "보통"
+
+
+def test_export_attaches_season_img():
+    from gksave import agg, export
+    from gksave.codec import encode_payload
+
+    con = connect_memory()
+    detail = {
+        "matchId": "s1", "matchType": 50, "matchDate": "2026-06-20T00:00:00",
+        "matchInfo": [
+            {"ouid": "U", "player": [{"spId": 861048940, "spPosition": 0, "spGrade": 9}], "shootDetail": []},
+            {"ouid": "O", "player": [{"spId": 600, "spPosition": 0, "spGrade": 10}],
+             "shootDetail": [{"result": 1, "type": 1, "x": 0.9, "y": 0.5}]},
+        ],
+    }
+    con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)", ["s1", encode_payload(detail)])
+    agg.rebuild(con)
+    con.execute("INSERT INTO season_img (season_id, img) VALUES (861, 'https://x/WG.png')")
+
+    c = export.build_payload(con, gate=1)["leaderboard"][0]
+    assert c["season_img"] == "https://x/WG.png"   # season_id 861 로 매칭
 
 
 def test_export_backfills_physical_by_pid():

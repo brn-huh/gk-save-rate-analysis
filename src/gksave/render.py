@@ -126,6 +126,8 @@ _TEMPLATE = r"""<!doctype html>
   td.rank{color:var(--gold2);width:2.4rem;font-weight:700;font-variant-numeric:tabular-nums}
   td.pct{font-variant-numeric:tabular-nums;font-weight:700;color:var(--gold)}
   td.num,td.season{color:var(--mut);font-variant-numeric:tabular-nums}
+  .scell{display:inline-flex;align-items:center;gap:6px}
+  .season-ico{flex:0 0 auto;object-fit:contain;vertical-align:middle}
   tr.row{cursor:pointer;transition:background .12s}
   tr.row:hover{background:var(--panel2)}
   tr.detail>td{background:#070c1e;padding:14px 18px}
@@ -336,6 +338,10 @@ const heroImg=(spid,name)=>spid==null?'':
   `<img class="hero-img" src="${actionUrl(spid)}" data-fb="${portraitUrl(spid)}" `+
   `alt="${escAttr(name||'')}" width="112" height="112" loading="lazy" decoding="async" `+
   `onerror="imgFallback(this)">`;
+// 시즌명 앞 엠블럼 아이콘. 이미지는 넥슨 CDN 직접. 없거나 실패하면 숨기고 이름만.
+const seasonIcon=img=>img?
+  `<img class="season-ico" src="${img}" alt="" width="18" height="18" loading="lazy" `+
+  `decoding="async" onerror="this.style.display='none'">`:'';
 
 const dr=D.date_range||{};
 // date_range 는 since 를 반영한 실제 집계 창이다. 원시 ISO since 를 덧붙이면 중복이자 노이즈.
@@ -382,7 +388,7 @@ function detailHtml(c){
   const hero=
     `<div class="hero">${heroImg(c.gk_sp_id,c.player_name)}<div class="hero-meta">`+
     `<h3>${esc(c.player_name||('spId '+c.gk_sp_id))}</h3>`+
-    `<p class="sub">${esc(c.season_name||'')} · ${c.grade}강</p>`+
+    `<p class="sub"><span class="scell">${seasonIcon(c.season_img)}${esc(c.season_name||'')}</span> · ${c.grade}강</p>`+
     `<div class="big">${pct(c.save_pct)}<small>선방률 · 경기수 ${c.matches}</small></div>`+
     (infoRow?`<div class="chips">${infoRow}</div>`:'')+
     `</div></div>`;
@@ -416,7 +422,7 @@ function render(){
     tr.innerHTML=`<td class="rank">${i+1}</td>`+
       `<td><div class="pcell">${thumbImg(c.gk_sp_id,c.player_name)}`+
       `<span class="pn">${esc(c.player_name||('spId '+c.gk_sp_id))}</span></div></td>`+
-      `<td class="season">${esc(c.season_name||'')}</td><td class="num">${c.grade}강</td>`+
+      `<td class="season"><span class="scell">${seasonIcon(c.season_img)}${esc(c.season_name||'')}</span></td><td class="num">${c.grade}강</td>`+
       `<td class="num">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
       `<td class="pct">${pct(c.save_pct)}</td><td class="num">${gps(c[gf])}</td>`+
       `<td class="num">${c.matches}</td>`;
@@ -474,7 +480,7 @@ document.getElementById('geDetail').innerHTML = geLong;
 
 document.getElementById('sp').innerHTML=(D.same_player||[]).map(g=>{
   const rows=g.cards.map(c=>
-    `<tr><td>${esc(c.season_name||'')}</td><td class="num">${c.grade}강</td>`+
+    `<tr><td><span class="scell">${seasonIcon(c.season_img)}${esc(c.season_name||'')}</span></td><td class="num">${c.grade}강</td>`+
     `<td class="num">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
     `<td class="pct">${pct(c.save_pct)}</td><td class="num">${gps(c.gsax_per_shot)}</td>`+
     `<td class="num">${c.matches}</td></tr>`).join('');

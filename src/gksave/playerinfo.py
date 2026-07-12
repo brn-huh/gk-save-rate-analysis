@@ -56,6 +56,24 @@ def _pid_of(spid: int) -> int:
     return int(str(spid)[-6:])
 
 
+def season_of(spid: int) -> int:
+    """시즌 id = spid 앞 3자리 (meta_season.season_id 와 같은 체계)."""
+    return int(str(spid)[:3])
+
+
+def season_img_url(item: dict[str, Any]) -> str | None:
+    """fc-info classImg = 넥슨 CDN 의 시즌 엠블럼 URL. 그대로 쓴다(이미지는 넥슨에서 로드)."""
+    ci = item.get("classImg")
+    return ci or None
+
+
+def attach_season_img(con: duckdb.DuckDBPyConnection, cards: list[dict[str, Any]]) -> None:
+    """각 카드에 c['season_img'] 를 붙인다. season_id(=spid 앞 3자리)로 매칭."""
+    img_by = {r[0]: r[1] for r in con.execute("SELECT season_id, img FROM season_img").fetchall()}
+    for c in cards:
+        c["season_img"] = img_by.get(season_of(c["gk_sp_id"]))
+
+
 def attach_info(con: duckdb.DuckDBPyConnection, leaderboard: list[dict[str, Any]]) -> None:
     """리더보드 각 카드에 c['info'] 를 붙인다.
 
@@ -90,6 +108,77 @@ def _search_names(client: httpx.Client, names: list[str]) -> list[dict[str, Any]
     return resp.json().get("items", [])
 
 
+def _record_season_img(con: duckdb.DuckDBPyConnection, item: dict[str, Any]) -> None:
+    """카드 하나에서 season_id→엠블럼 URL 을 season_img 에 남긴다(이미 있으면 무시)."""
+    spid, url = item.get("id"), season_img_url(item)
+    if spid is None or not url:
+        return
+    con.execute(
+        "INSERT INTO season_img (season_id, img) VALUES (?, ?) ON CONFLICT DO NOTHING",
+        [season_of(spid), url],
+    )
+
+
+def _new_client() -> httpx.Client:
+    return httpx.Client(
+        base_url=FCINFO_BASE, timeout=20,
+        headers={"User-Agent": "gk-save-rate-analysis", "Content-Type": "application/json",
+                 "Referer": f"{FCINFO_BASE}/player/search/result?positionIds={_GK_POSITION}",
+                 "Origin": FCINFO_BASE},
+    )
+
+
+def sync_season_img(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    client: httpx.Client | None = None,
+    page_delay: float = 1.0,
+    max_pages: int = 60,
+    sleep: Callable[[float], None] = time.sleep,
+    log: Callable[[str], None] = print,
+) -> dict[str, int]:
+    """우리 리더보드 시즌 중 season_img 에 없는 것을 채운다.
+
+    per-season 조회가 없어 GK 목록을 커서로 훑되, 필요한 시즌이 다 채워지면 조기중단.
+    시즌은 목록 곳곳에 등장해 몇 페이지면 대부분 덮인다.
+    """
+    ours = {season_of(r[0]) for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()}
+    have = {r[0] for r in con.execute("SELECT season_id FROM season_img").fetchall()}
+    need = ours - have
+    if not need:
+        log(f"season_img: 우리 시즌 {len(ours)} 전부 있음 — 호출 없음")
+        return {"seasons": len(ours), "need": 0, "new": 0}
+
+    owns = client is None
+    client = client or _new_client()
+    before = len(have)
+    cursor: str | None = None
+    try:
+        for page in range(max_pages):
+            if page > 0:
+                sleep(page_delay)
+            body: dict[str, Any] = {"positionIds": [_GK_POSITION]}
+            if cursor:
+                body["cursor"] = cursor
+            resp = client.post(_SEARCH_PATH, json=body)
+            resp.raise_for_status()
+            data = resp.json()
+            for item in data.get("items", []):
+                _record_season_img(con, item)
+                need.discard(season_of(item["id"])) if item.get("id") else None
+            if not need:
+                break
+            cursor = data.get("nextCursor")
+            if not data.get("hasNext") or not cursor:
+                break
+    finally:
+        if owns:
+            client.close()
+    now = con.execute("SELECT count(*) FROM season_img").fetchone()[0]
+    log(f"season_img: 우리 시즌 {len(ours)} · 신규 {now - before} · 미확보 {len(need)}")
+    return {"seasons": len(ours), "need": len(need), "new": now - before}
+
+
 def sync_player_info(
     con: duckdb.DuckDBPyConnection,
     *,
@@ -120,18 +209,14 @@ def sync_player_info(
     need_names = sorted({name_by_spid[s] for s in need if s in name_by_spid})
 
     owns_client = client is None
-    client = client or httpx.Client(
-        base_url=FCINFO_BASE, timeout=20,
-        headers={"User-Agent": "gk-save-rate-analysis", "Content-Type": "application/json",
-                 "Referer": f"{FCINFO_BASE}/player/search/result?positionIds={_GK_POSITION}",
-                 "Origin": FCINFO_BASE},
-    )
+    client = client or _new_client()
     new = 0
     try:
         for i in range(0, len(need_names), name_batch):
             if i > 0:
                 sleep(batch_delay)
             for item in _search_names(client, need_names[i:i + name_batch]):
+                _record_season_img(con, item)   # 본 카드마다 시즌 엠블럼도 채운다(무료 부산물)
                 p = parse_player(item)
                 if p is None or p.spid not in need:
                     continue

@@ -79,6 +79,7 @@ def _cmd_playerinfo(_args) -> None:
     con = connect(DEFAULT)
     try:
         playerinfo.sync_player_info(con)
+        playerinfo.sync_season_img(con)
     finally:
         con.close()
 
