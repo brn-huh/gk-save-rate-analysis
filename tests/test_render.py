@@ -113,6 +113,15 @@ def test_urls_point_at_nexon_cdn():
     )
 
 
+def test_matches_column_labeled_경기수_not_표본():
+    html = render.build_html(_PAYLOAD)
+    # 경기수 컬럼 라벨: 메인 헤더 + 정렬버튼 + 동일선수 헤더
+    assert html.count("<th>경기수</th>") == 2       # 메인 목록 + 동일선수 표
+    assert 'data-sort="matches">경기수<' in html    # 정렬 버튼
+    assert "<th>표본</th>" not in html              # 컬럼 라벨에 표본 없음
+    assert 'data-sort="matches">표본<' not in html
+
+
 def test_main_list_and_compare_have_salary_column():
     payload = dict(_PAYLOAD)
     c = dict(payload["leaderboard"][0])

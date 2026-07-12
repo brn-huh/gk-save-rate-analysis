@@ -236,12 +236,12 @@ _TEMPLATE = r"""<!doctype html>
     <button class="sort active" data-sort="save_pct">선방률</button>
     <button class="sort" data-sort="gsax_per_shot">GSAx</button>
     <button class="sort" data-sort="gsax_ex_short_per_shot">GSAx(초근제외)</button>
-    <button class="sort" data-sort="matches">표본</button>
+    <button class="sort" data-sort="matches">경기수</button>
   </div>
   <p class="muted">행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
     <table id="lb">
-      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>급여</th><th>선방률</th><th id="gsaxHdr">GSAx/100</th><th>표본</th></tr></thead>
+      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>급여</th><th>선방률</th><th id="gsaxHdr">GSAx/100</th><th>경기수</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -263,7 +263,7 @@ _TEMPLATE = r"""<!doctype html>
 <div class="panel help" id="panel-help">
   <h2>이 페이지 사용법</h2>
   <ol class="usage">
-    <li><b>리더보드 탭</b>에서 선방률·GSAx·표본으로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
+    <li><b>리더보드 탭</b>에서 선방률·GSAx·경기수로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
     <li>표의 <b>행을 클릭</b>하면 그 카드의 거리 구간별·슛 타입별 선방률과 세부 스탯이 펼쳐집니다.</li>
     <li><b>동일 선수 비교 탭</b>에서 같은 선수의 시즌·강화별 성적을 나란히 봅니다.</li>
   </ol>
@@ -276,8 +276,8 @@ _TEMPLATE = r"""<!doctype html>
     <dd>Goals Saved Above Expected — <b>슛 난이도를 보정</b>한 지표입니다. 거리·각도로 계산한 '기대 실점'보다 실제로 얼마나 더(또는 덜) 막았는지를 유효슛 100개 기준으로 환산합니다. <b>+면 기대보다 선방, −면 기대보다 실점</b>. 유저 실력 교란을 줄인, 선방률보다 공정한 비교값입니다.</dd>
     <dt>GSAx(초근제외)</dt>
     <dd>초근거리(5m 미만) 슛을 뺀 GSAx. 골문 앞 난사처럼 GK가 어쩔 수 없는 상황을 제외해, 포지셔닝·반응 능력을 더 잘 드러냅니다.</dd>
-    <dt>표본 · 게이트</dt>
-    <dd>표본 = 그 카드가 집계된 경기 수. 표본이 적으면 우연(뽀록)일 수 있어 신뢰도가 낮습니다. 그래서 최소 <b id="gateN"></b>경기 이상(게이트)인 카드만 순위에 올립니다. 순위를 볼 때 표본 수를 꼭 함께 보세요.</dd>
+    <dt>경기수 · 게이트</dt>
+    <dd>경기수 = 그 카드로 수집·집계된 경기 수(= 통계 표본). 경기수가 적으면 우연(뽀록)일 수 있어 신뢰도가 낮습니다. 그래서 최소 <b id="gateN"></b>경기 이상(게이트)인 카드만 순위에 올립니다. 순위를 볼 때 경기수를 꼭 함께 보세요.</dd>
   </dl>
 
   <h2>세부 지표 (행 클릭 시 펼쳐지는 값)</h2>
@@ -380,7 +380,7 @@ function detailHtml(c){
     `<div class="hero">${heroImg(c.gk_sp_id,c.player_name)}<div class="hero-meta">`+
     `<h3>${esc(c.player_name||('spId '+c.gk_sp_id))}</h3>`+
     `<p class="sub">${esc(c.season_name||'')} · ${c.grade}강</p>`+
-    `<div class="big">${pct(c.save_pct)}<small>선방률 · 표본 ${c.matches}경기</small></div>`+
+    `<div class="big">${pct(c.save_pct)}<small>선방률 · 경기수 ${c.matches}</small></div>`+
     (infoRow?`<div class="chips">${infoRow}</div>`:'')+
     `</div></div>`;
   return hero+
@@ -479,7 +479,7 @@ document.getElementById('sp').innerHTML=(D.same_player||[]).map(g=>{
   const sp=(g.cards[0]||{}).gk_sp_id;
   return `<details data-name="${escAttr(g.player_name)}"><summary><span class="pcell">${thumbImg(sp,g.player_name)}`+
     `<span class="pn">${esc(g.player_name)}</span></span></summary><table class="mini">`+
-    `<thead><tr><th>시즌</th><th>강화</th><th>급여</th><th>선방률</th><th>GSAx/100</th><th>표본</th></tr></thead>`+
+    `<thead><tr><th>시즌</th><th>강화</th><th>급여</th><th>선방률</th><th>GSAx/100</th><th>경기수</th></tr></thead>`+
     `<tbody>${rows}</tbody></table></details>`;
 }).join('') || '<span class="muted">비교할 동일선수 데이터가 아직 없습니다.</span>';
 
