@@ -241,7 +241,7 @@ _TEMPLATE = r"""<!doctype html>
   <p class="muted">행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
     <table id="lb">
-      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>선방률</th><th id="gsaxHdr">GSAx/100</th><th>표본</th></tr></thead>
+      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>급여</th><th>선방률</th><th id="gsaxHdr">GSAx/100</th><th>표본</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -392,7 +392,7 @@ function toggle(tr,c){
   const nx=tr.nextElementSibling;
   if(nx&&nx.classList.contains('detail')){nx.remove();return;}
   const d=document.createElement('tr'); d.className='detail';
-  d.innerHTML=`<td colspan="7">${detailHtml(c)}</td>`; tr.after(d);
+  d.innerHTML=`<td colspan="8">${detailHtml(c)}</td>`; tr.after(d);
 }
 function render(){
   const tb=document.querySelector('#lb tbody'); tb.innerHTML='';
@@ -402,7 +402,7 @@ function render(){
     const av=a[sortKey], bv=b[sortKey];
     if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1; return bv-av;
   });
-  if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">해당하는 카드가 없습니다.</td></tr>';return;}
+  if(!rows.length){tb.innerHTML='<tr><td colspan="8" class="empty">해당하는 카드가 없습니다.</td></tr>';return;}
   const gf = sortKey.indexOf('gsax')===0 ? sortKey : 'gsax_per_shot';  // GSAx 컬럼은 활성 모드 값
   document.getElementById('gsaxHdr').textContent =
     gf==='gsax_ex_short_per_shot' ? 'GSAx/100(초근×)' : 'GSAx/100';
@@ -414,6 +414,7 @@ function render(){
       `<td><div class="pcell">${thumbImg(c.gk_sp_id,c.player_name)}`+
       `<span class="pn">${esc(c.player_name||('spId '+c.gk_sp_id))}</span></div></td>`+
       `<td class="season">${esc(c.season_name||'')}</td><td class="num">${c.grade}강</td>`+
+      `<td class="num">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
       `<td class="pct">${pct(c.save_pct)}</td><td class="num">${gps(c[gf])}</td>`+
       `<td class="num">${c.matches}</td>`;
     tr.onclick=()=>toggle(tr,c); tb.appendChild(tr);
@@ -471,13 +472,14 @@ document.getElementById('geDetail').innerHTML = geLong;
 document.getElementById('sp').innerHTML=(D.same_player||[]).map(g=>{
   const rows=g.cards.map(c=>
     `<tr><td>${esc(c.season_name||'')}</td><td class="num">${c.grade}강</td>`+
+    `<td class="num">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
     `<td class="pct">${pct(c.save_pct)}</td><td class="num">${gps(c.gsax_per_shot)}</td>`+
     `<td class="num">${c.matches}</td></tr>`).join('');
   // 그룹 내 카드는 시즌만 다르고 pid 는 같다(182그룹 전수 확인) → 첫 카드로 썸네일을 만든다.
   const sp=(g.cards[0]||{}).gk_sp_id;
   return `<details data-name="${escAttr(g.player_name)}"><summary><span class="pcell">${thumbImg(sp,g.player_name)}`+
     `<span class="pn">${esc(g.player_name)}</span></span></summary><table class="mini">`+
-    `<thead><tr><th>시즌</th><th>강화</th><th>선방률</th><th>GSAx/100</th><th>표본</th></tr></thead>`+
+    `<thead><tr><th>시즌</th><th>강화</th><th>급여</th><th>선방률</th><th>GSAx/100</th><th>표본</th></tr></thead>`+
     `<tbody>${rows}</tbody></table></details>`;
 }).join('') || '<span class="muted">비교할 동일선수 데이터가 아직 없습니다.</span>';
 

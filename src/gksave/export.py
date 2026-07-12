@@ -91,6 +91,9 @@ def build_payload(
         meta.enrich(con, leaderboard)
         meta.enrich(con, gsax)
         payload["same_player"] = meta.same_player_view(leaderboard)
+        # 동일선수 비교 표에도 급여를 붙인다(각 그룹의 시즌별 카드 단위)
+        for group in payload["same_player"]:
+            playerinfo.attach_info(con, group.get("cards", []))
     return payload
 
 

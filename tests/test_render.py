@@ -113,6 +113,24 @@ def test_urls_point_at_nexon_cdn():
     )
 
 
+def test_main_list_and_compare_have_salary_column():
+    payload = dict(_PAYLOAD)
+    c = dict(payload["leaderboard"][0])
+    c["info"] = {"salary": 24}
+    payload["leaderboard"] = [c]
+    payload["same_player"] = [{"player_name": "야신", "cards": [
+        {"season_name": "ICON", "grade": 10, "save_pct": 0.7, "gsax_per_shot": 0.05,
+         "matches": 60, "info": {"salary": 24}},
+    ]}]
+    html = render.build_html(payload)
+    # 메인 목록 헤더에 급여, 행에 c.info.salary
+    assert html.count("<th>급여</th>") == 2      # 메인 목록 + 동일선수 mini 표
+    assert "c.info" in html                       # 메인 행이 급여를 그림
+    # 상세 행 colspan 은 컬럼 수(8)와 맞아야
+    assert 'colspan="8"' in html
+    assert 'colspan="7"' not in html
+
+
 def test_hero_shows_player_info_chips_when_present():
     payload = dict(_PAYLOAD)
     c = dict(payload["leaderboard"][0])
