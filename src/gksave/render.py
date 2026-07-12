@@ -189,7 +189,10 @@ _TEMPLATE = r"""<!doctype html>
   /* min-width:0 이 없으면 flex 아이템이 콘텐츠 폭 아래로 못 줄어 말줄임이 안 걸린다.
      한글은 공백이 없어 줄바꿈을 허용하면 글자 단위로 쪼개진다 → 반드시 nowrap + 말줄임. */
   .pcell .pn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  summary .pcell{display:inline-flex;vertical-align:middle}
+  summary .pcell{display:inline-flex;vertical-align:middle;align-items:center}
+  .sp-total{margin-left:9px;font-size:.78rem;font-weight:600;color:var(--gold2);
+        background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px 8px;
+        font-variant-numeric:tabular-nums;white-space:nowrap}
   /* 상세 히어로 — 원본이 128px 이라 112px 를 넘겨 키우지 않는다 */
   .hero{display:flex;align-items:center;gap:16px;padding-bottom:14px;margin-bottom:14px;
         border-bottom:1px solid var(--line)}
@@ -477,8 +480,11 @@ document.getElementById('sp').innerHTML=(D.same_player||[]).map(g=>{
     `<td class="num">${c.matches}</td></tr>`).join('');
   // 그룹 내 카드는 시즌만 다르고 pid 는 같다(182그룹 전수 확인) → 첫 카드로 썸네일을 만든다.
   const sp=(g.cards[0]||{}).gk_sp_id;
+  // 시즌·강화 상관없이 이 선수로 수집·비교된 총 경기수
+  const totalGames=g.cards.reduce((s,c)=>s+(c.matches||0),0);
   return `<details data-name="${escAttr(g.player_name)}"><summary><span class="pcell">${thumbImg(sp,g.player_name)}`+
-    `<span class="pn">${esc(g.player_name)}</span></span></summary><table class="mini">`+
+    `<span class="pn">${esc(g.player_name)}</span>`+
+    `<span class="sp-total">총 ${totalGames.toLocaleString('ko-KR')}경기 · ${g.cards.length}장</span></span></summary><table class="mini">`+
     `<thead><tr><th>시즌</th><th>강화</th><th>급여</th><th>선방률</th><th>GSAx/100</th><th>경기수</th></tr></thead>`+
     `<tbody>${rows}</tbody></table></details>`;
 }).join('') || '<span class="muted">비교할 동일선수 데이터가 아직 없습니다.</span>';

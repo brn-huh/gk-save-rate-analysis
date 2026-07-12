@@ -113,6 +113,18 @@ def test_urls_point_at_nexon_cdn():
     )
 
 
+def test_same_player_summary_shows_total_games():
+    payload = dict(_PAYLOAD)
+    payload["same_player"] = [{"player_name": "노이어", "cards": [
+        {"season_name": "CAP", "grade": 11, "save_pct": 0.53, "gsax_per_shot": 0.04, "matches": 80},
+        {"season_name": "TOTS", "grade": 8, "save_pct": 0.6, "gsax_per_shot": 0.05, "matches": 72},
+    ]}]
+    html = render.build_html(payload)
+    # 시즌 합산 총 경기수(80+72=152)를 summary 에서 계산해 보여줘야
+    assert "sp-total" in html
+    assert "reduce" in html or "totalGames" in html   # 카드 matches 합산 로직
+
+
 def test_matches_column_labeled_경기수_not_표본():
     html = render.build_html(_PAYLOAD)
     # 경기수 컬럼 라벨: 메인 헤더 + 정렬버튼 + 동일선수 헤더
