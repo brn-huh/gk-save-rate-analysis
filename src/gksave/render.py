@@ -242,8 +242,11 @@ _TEMPLATE = r"""<!doctype html>
     .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
     .hero{flex-direction:column;align-items:flex-start;gap:12px}
     .thumb{width:28px;height:28px}
-    /* 선수 컬럼 폭을 묶어 긴 이름을 말줄임한다(줄바꿈 금지 — 세로로 쪼개진다) */
-    .pcell{gap:7px;max-width:118px}
+    .pcell{gap:7px}
+    /* 리더보드 표의 선수 컬럼만 폭을 묶어 긴 이름을 말줄임(줄바꿈 금지 — 세로로 쪼개짐).
+       동일선수 summary 의 .pcell 은 총경기 배지까지 들어가 118px 로 묶으면 이름이 0px 로
+       잘린다 → 표 셀(td) 안의 .pcell 로만 한정한다. */
+    td .pcell{max-width:118px}
     th,td{padding:9px 8px}
   }
 </style></head><body>

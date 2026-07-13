@@ -194,6 +194,14 @@ def test_season_name_shows_emblem_icon_when_present():
     assert "c.season_img" in html                          # 메인 목록이 시즌 이미지를 그림
 
 
+def test_mobile_width_cap_scoped_to_table_not_same_player_summary():
+    # .pcell 폭 제한(118px)이 전역이면 동일선수 summary 에서 총경기 배지가 폭을 다 먹어
+    # 선수 이름이 0px 로 잘린다 → td 안의 .pcell 로만 한정돼야 한다.
+    html = render.build_html(_PAYLOAD)
+    assert "td .pcell{max-width:118px}" in html
+    assert ".pcell{gap:7px;max-width:118px}" not in html   # 전역 제한이면 회귀
+
+
 def test_same_player_summary_shows_total_games():
     payload = dict(_PAYLOAD)
     payload["same_player"] = [{"player_name": "노이어", "cards": [

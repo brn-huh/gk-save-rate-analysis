@@ -7,14 +7,17 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 ./scripts/collect.sh
 ```
 
-- 수집이 끝나면 프롬프트가 뜸:
-  - `수집 완료. update.sh를 지금 실행할까요? [y/N]`
-- `y` 입력: `update.sh` 실행 (증분 빌드 + export)
+- 수집이 끝나면 **묻지 않고 자동으로** `update.sh`(증분 빌드 + export)까지 실행된다.
+  (수집만 하려면 `--no-update`)
 - 완료 후 결과 화면 확인:
 
 ```bash
 open out/index.html
 ```
+
+> **선수 부가정보(급여·OVR·체격·시즌엠블럼)는 `update.sh` 에 없다.** 새 GK 카드가
+> 생겼을 때만 별도로 `gksave playerinfo` 를 한 번 돌려 `player_info`·`season_img` 를 채운다.
+> (fc-info 에서 우리 GK 중 캐시에 없는 것만 받고, 이미 받은 건 다시 안 받는다.)
 
 ---
 
@@ -170,9 +173,8 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
            ↓
        (Ctrl+C 로 언제든 중단 가능, 데이터 보존·재개 가능)
            ↓
-2. collect 종료 후 프롬프트에서 y 입력(또는 ./scripts/update.sh 직접 실행)
-   ← 증분 빌드 + export
+2. collect 종료 → update.sh 자동 실행 (증분 빌드 + export)
 
-※ 파싱 로직이 바뀐 경우에만:
-   ./scripts/build.sh --full  ← 전체 재파싱 후 update.sh
+※ 새 GK 카드가 생겼을 때만:  gksave playerinfo  ← 급여·체격·시즌엠블럼 채우고 export 재실행
+※ 파싱 로직이 바뀐 경우에만:  ./scripts/build.sh --full  ← 전체 재파싱 후 update.sh
 ```
