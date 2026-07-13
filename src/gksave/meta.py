@@ -107,6 +107,8 @@ def same_player_view(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
                         "save_pct": c["save_pct"],
                         "gsax_per_shot": c.get("gsax_per_shot"),
                         "matches": c["matches"],
+                        "saves": c.get("saves"),   # 선방률 신뢰구간 계산용
+                        "goals": c.get("goals"),
                     }
                     for c in rows
                 ],

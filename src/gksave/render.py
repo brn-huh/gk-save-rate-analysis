@@ -523,7 +523,7 @@ document.getElementById('sp').innerHTML=(D.same_player||[]).map(g=>{
   const rows=g.cards.map(c=>
     `<tr><td><span class="scell">${seasonCell(c.season_img,c.season_name)}</span></td><td class="num">${c.grade}강</td>`+
     `<td class="num">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
-    `<td class="pct">${pct(c.save_pct)}</td><td class="num">${gps(c.gsax_per_shot)}</td>`+
+    `<td class="pct">${pct(c.save_pct)}<span class="ci">${ciText(c.saves,c.goals)}</span></td><td class="num">${gps(c.gsax_per_shot)}</td>`+
     `<td class="num">${c.matches}</td></tr>`).join('');
   // 그룹 내 카드는 시즌만 다르고 pid 는 같다(182그룹 전수 확인) → 첫 카드로 썸네일을 만든다.
   const sp=(g.cards[0]||{}).gk_sp_id;

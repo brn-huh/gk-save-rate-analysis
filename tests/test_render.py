@@ -147,6 +147,20 @@ def test_ci_shown_in_list_and_hero():
     assert "ciText" in html or "ciLabel" in html
 
 
+def test_same_player_table_shows_ci():
+    payload = dict(_PAYLOAD)
+    payload["same_player"] = [{"player_name": "야신", "cards": [
+        {"season_name": "ICON", "grade": 10, "save_pct": 0.7, "gsax_per_shot": 0.05,
+         "matches": 60, "saves": 200, "goals": 86},
+        {"season_name": "TOTS", "grade": 8, "save_pct": 0.6, "gsax_per_shot": 0.04,
+         "matches": 50, "saves": 150, "goals": 100},
+    ]}]
+    html = render.build_html(payload)
+    # 동일선수 표 rows 조립부(gsax_per_shot 을 쓰는 줄)에 CI 가 함께 있어야
+    sp_rows = html.split("g.cards.map")[1].split("join('')")[0]
+    assert "ciText(c.saves,c.goals)" in sp_rows.replace(" ", "")
+
+
 def test_list_uses_icon_only_season_cell_with_title():
     html = render.build_html(_PAYLOAD)
     # 목록은 seasonCell(아이콘 우선, 시즌명은 title 로만) 을 쓴다
