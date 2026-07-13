@@ -44,6 +44,26 @@ FILTER_JS = r"""
 const matchName=(name,q)=>!q||String(name==null?'':name).toLowerCase().includes(q);
 """
 
+# 선방률 신뢰구간. 비율이라 Wilson 95% 구간(작은 표본·극단 비율에서 Wald 보다 정확).
+# 시행 수 = 유효슛(선방+실점). tests/test_render.py 가 node 로 직접 검증한다.
+# 주의(문구로 노출): 슛이 완전 독립은 아니라(같은 경기·유저 군집) 실제 구간은 이보다 약간 넓다.
+STATS_JS = r"""
+const Z=1.96;
+// 선방 s, 실점 g → [lo, hi] 95% Wilson 구간. 유효슛 0이면 null.
+function wilson(s,g){
+  const n=s+g; if(n<=0) return null;
+  const p=s/n, z2=Z*Z, d=1+z2/n;
+  const c=(p+z2/(2*n))/d;
+  const h=(Z*Math.sqrt(p*(1-p)/n+z2/(4*n*n)))/d;
+  return [Math.max(0,c-h), Math.min(1,c+h)];
+}
+// 반폭(±%p) 문자열. 순위 신뢰도 표기용.
+function ciText(s,g){
+  const w=wilson(s,g); if(!w) return '';
+  return '±'+(((w[1]-w[0])/2)*100).toFixed(1)+'%p';
+}
+"""
+
 
 def build_html(payload: dict[str, Any]) -> str:
     page = {
@@ -62,6 +82,7 @@ def build_html(payload: dict[str, Any]) -> str:
     return (
         _TEMPLATE.replace("__IMAGE_JS__", IMAGE_JS)
         .replace("__FILTER_JS__", FILTER_JS)
+        .replace("__STATS_JS__", STATS_JS)
         .replace("__DATA__", data_json)
     )
 
@@ -125,6 +146,12 @@ _TEMPLATE = r"""<!doctype html>
         font-weight:700;letter-spacing:.02em;z-index:2}
   td.rank{color:var(--gold2);width:2.4rem;font-weight:700;font-variant-numeric:tabular-nums}
   td.pct{font-variant-numeric:tabular-nums;font-weight:700;color:var(--gold)}
+  td.pct .ci{display:block;font-size:.7rem;font-weight:500;color:var(--mut)}
+  button.gate{padding:6px 11px;border:1px solid var(--line);background:var(--panel);color:var(--mut);
+        border-radius:9px;cursor:pointer;font-size:.82rem;font-family:inherit;transition:.15s}
+  button.gate:hover{border-color:var(--gold2);color:var(--text)}
+  button.gate.active{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#1a1405;
+        border-color:var(--gold);font-weight:700}
   td.num,td.season{color:var(--mut);font-variant-numeric:tabular-nums}
   .scell{display:inline-flex;align-items:center;gap:6px}
   .season-ico{flex:0 0 auto;object-fit:contain;vertical-align:middle}
@@ -242,8 +269,12 @@ _TEMPLATE = r"""<!doctype html>
     <button class="sort" data-sort="gsax_per_shot">GSAx</button>
     <button class="sort" data-sort="gsax_ex_short_per_shot">GSAx(초근제외)</button>
     <button class="sort" data-sort="matches">경기수</button>
+    <span class="lab">경기수↑</span>
+    <button class="gate active" data-gate="50">50</button>
+    <button class="gate" data-gate="100">100</button>
+    <button class="gate" data-gate="200">200</button>
   </div>
-  <p class="muted">행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
+  <p class="muted">행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간(경기수가 많을수록 좁아짐). 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
     <table id="lb">
       <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>급여</th><th>선방률</th><th id="gsaxHdr">GSAx/100</th><th>경기수</th></tr></thead>
@@ -282,7 +313,9 @@ _TEMPLATE = r"""<!doctype html>
     <dt>GSAx(초근제외)</dt>
     <dd>초근거리(5m 미만) 슛을 뺀 GSAx. 골문 앞 난사처럼 GK가 어쩔 수 없는 상황을 제외해, 포지셔닝·반응 능력을 더 잘 드러냅니다.</dd>
     <dt>경기수 · 게이트</dt>
-    <dd>경기수 = 그 카드로 수집·집계된 경기 수(= 통계 표본). 경기수가 적으면 우연(뽀록)일 수 있어 신뢰도가 낮습니다. 그래서 최소 <b id="gateN"></b>경기 이상(게이트)인 카드만 순위에 올립니다. 순위를 볼 때 경기수를 꼭 함께 보세요.</dd>
+    <dd>경기수 = 그 카드로 수집·집계된 경기 수(= 통계 표본). 경기수가 적으면 우연(뽀록)일 수 있어 신뢰도가 낮습니다. 그래서 최소 <b id="gateN"></b>경기 이상(게이트)인 카드만 순위에 올립니다. 리더보드 위 <b>경기수↑ 50/100/200</b> 버튼으로 기준을 올려 <b>뽀록 상위권을 걸러</b> 볼 수 있습니다.</dd>
+    <dt>신뢰구간 (±%p)</dt>
+    <dd>선방률 옆 <b>±N%p</b>는 그 표본에서 나온 <b>95% 신뢰구간</b>(Wilson)입니다. 실제 선방률이 이 범위 안에 있을 가능성이 높다는 뜻으로, 유효슛(≈경기수×5)이 많을수록 좁아집니다. 예: 50경기 ±6%p, 200경기 ±3%p. 두 카드의 구간이 크게 겹치면 순위 차이를 단정할 수 없습니다. 단, 이는 <b>정밀도</b>지 정확도가 아니며(유저 실력 등 교란은 별개 — GSAx 참고), 슛이 완전 독립은 아니라 실제 구간은 이보다 약간 넓습니다.</dd>
   </dl>
 
   <h2>세부 지표 (행 클릭 시 펼쳐지는 값)</h2>
@@ -322,7 +355,7 @@ _TEMPLATE = r"""<!doctype html>
 <script>
 const D = JSON.parse(document.getElementById('gk-data').textContent);
 const PAGE=100;
-let sortKey='save_pct', q='', limit=PAGE;
+let sortKey='save_pct', q='', limit=PAGE, minGate=50;
 const pct=v=>v==null?'N/A':(v*100).toFixed(1)+'%';
 const gps=v=>v==null?'':(v*100>=0?'+':'')+(v*100).toFixed(1);
 const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;};
@@ -330,6 +363,7 @@ const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':s;r
 const escAttr=s=>esc(s).replace(/"/g,'&quot;');
 __IMAGE_JS__
 __FILTER_JS__
+__STATS_JS__
 // 썸네일은 얼굴 → 플레이스홀더 2단. 히어로는 액션샷 → 얼굴 → 플레이스홀더 3단(data-fb).
 const thumbImg=(spid,name)=>spid==null?'':
   `<img class="thumb" src="${thumbUrl(spid)}" alt="${escAttr(name||'')}" width="36" height="36" `+
@@ -389,7 +423,7 @@ function detailHtml(c){
     `<div class="hero">${heroImg(c.gk_sp_id,c.player_name)}<div class="hero-meta">`+
     `<h3>${esc(c.player_name||('spId '+c.gk_sp_id))}</h3>`+
     `<p class="sub"><span class="scell">${seasonIcon(c.season_img)}${esc(c.season_name||'')}</span> · ${c.grade}강</p>`+
-    `<div class="big">${pct(c.save_pct)}<small>선방률 · 경기수 ${c.matches}</small></div>`+
+    `<div class="big">${pct(c.save_pct)}<small>선방률 ${ciText(c.saves,c.goals)} · 경기수 ${c.matches}</small></div>`+
     (infoRow?`<div class="chips">${infoRow}</div>`:'')+
     `</div></div>`;
   return hero+
@@ -406,7 +440,7 @@ function toggle(tr,c){
 function render(){
   const tb=document.querySelector('#lb tbody'); tb.innerHTML='';
   const more=document.getElementById('more'); more.innerHTML='';
-  let rows=D.leaderboard.filter(c=>matchName(c.player_name,q));
+  let rows=D.leaderboard.filter(c=>matchName(c.player_name,q) && c.matches>=minGate);
   rows=rows.slice().sort((a,b)=>{
     const av=a[sortKey], bv=b[sortKey];
     if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1; return bv-av;
@@ -424,7 +458,7 @@ function render(){
       `<span class="pn">${esc(c.player_name||('spId '+c.gk_sp_id))}</span></div></td>`+
       `<td class="season"><span class="scell">${seasonIcon(c.season_img)}${esc(c.season_name||'')}</span></td><td class="num">${c.grade}강</td>`+
       `<td class="num">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
-      `<td class="pct">${pct(c.save_pct)}</td><td class="num">${gps(c[gf])}</td>`+
+      `<td class="pct">${pct(c.save_pct)}<span class="ci">${ciText(c.saves,c.goals)}</span></td><td class="num">${gps(c[gf])}</td>`+
       `<td class="num">${c.matches}</td>`;
     tr.onclick=()=>toggle(tr,c); tb.appendChild(tr);
   });
@@ -448,6 +482,11 @@ document.getElementById('search').oninput=e=>{q=e.target.value.trim().toLowerCas
 document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('[data-sort]').forEach(x=>x.classList.remove('active'));
   b.classList.add('active'); sortKey=b.dataset.sort; limit=PAGE; render();
+});
+// 경기수 게이트 필터 (50/100/200) — 데이터 재요청 없이 화면에서만 거른다
+document.querySelectorAll('[data-gate]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-gate]').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); minGate=+b.dataset.gate; limit=PAGE; render();
 });
 // 탭 전환
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{

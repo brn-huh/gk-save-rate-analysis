@@ -113,6 +113,40 @@ def test_urls_point_at_nexon_cdn():
     )
 
 
+@requires_node
+def test_wilson_ci_center_and_width():
+    f = render.STATS_JS
+    # 선방 60 / 실점 40 = 유효슛 100, p=0.6
+    lo = float(_eval_js("wilson(60,40)[0]", f))
+    hi = float(_eval_js("wilson(60,40)[1]", f))
+    assert lo < 0.6 < hi                      # 점추정을 감싼다
+    assert 0.49 < lo < 0.52 and 0.68 < hi < 0.71   # 알려진 Wilson 95% 값 근처
+    # 표본이 크면 좁아진다
+    lo2 = float(_eval_js("wilson(600,400)[0]", f))
+    hi2 = float(_eval_js("wilson(600,400)[1]", f))
+    assert (hi2 - lo2) < (hi - lo)            # 유효슛 10배 → 구간 좁아짐
+
+
+@requires_node
+def test_wilson_handles_zero_shots():
+    f = render.STATS_JS
+    assert _eval_js("wilson(0,0)===null", f) == "true"   # 유효슛 0이면 계산 불가
+
+
+def test_gate_toggle_buttons_present():
+    html = render.build_html(_PAYLOAD)
+    # 경기수 게이트 필터 토글 50/100/200
+    for g in ("50", "100", "200"):
+        assert f'data-gate="{g}"' in html
+    assert "minGate" in html                  # 필터 상태 변수
+
+
+def test_ci_shown_in_list_and_hero():
+    html = render.build_html(_PAYLOAD)
+    assert "wilson" in html                    # 카드 선방률 CI 계산 사용
+    assert "ciText" in html or "ciLabel" in html
+
+
 def test_season_name_shows_emblem_icon_when_present():
     payload = dict(_PAYLOAD)
     c = dict(payload["leaderboard"][0])
