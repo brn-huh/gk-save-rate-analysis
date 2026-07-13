@@ -165,7 +165,8 @@ def sync_season_img(
             data = resp.json()
             for item in data.get("items", []):
                 _record_season_img(con, item)
-                need.discard(season_of(item["id"])) if item.get("id") else None
+                if item.get("id"):
+                    need.discard(season_of(item["id"]))
             if not need:
                 break
             cursor = data.get("nextCursor")

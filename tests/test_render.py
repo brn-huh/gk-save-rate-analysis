@@ -133,6 +133,15 @@ def test_wilson_handles_zero_shots():
     assert _eval_js("wilson(0,0)===null", f) == "true"   # 유효슛 0이면 계산 불가
 
 
+@requires_node
+def test_wilson_handles_missing_counts_no_nan():
+    # saves/goals 키가 없는 카드(undefined) → '±NaN%p' 가 아니라 빈 문자열이어야
+    f = render.STATS_JS
+    assert _eval_js("wilson(undefined,undefined)===null", f) == "true"
+    assert _eval_js("ciText(undefined,undefined)", f) == ""
+    assert _eval_js("ciText(undefined,5)", f) == ""       # 한쪽 키만 없어도 안전(NaN 차단)
+
+
 def test_gate_toggle_buttons_present():
     html = render.build_html(_PAYLOAD)
     # 경기수 게이트 필터 토글 50/100/200

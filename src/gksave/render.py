@@ -51,7 +51,7 @@ STATS_JS = r"""
 const Z=1.96;
 // 선방 s, 실점 g → [lo, hi] 95% Wilson 구간. 유효슛 0이면 null.
 function wilson(s,g){
-  const n=s+g; if(n<=0) return null;
+  const n=s+g; if(!(n>0)) return null;   // NaN(undefined 합)·0·음수 모두 차단
   const p=s/n, z2=Z*Z, d=1+z2/n;
   const c=(p+z2/(2*n))/d;
   const h=(Z*Math.sqrt(p*(1-p)/n+z2/(4*n*n)))/d;

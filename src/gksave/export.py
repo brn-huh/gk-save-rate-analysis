@@ -92,10 +92,11 @@ def build_payload(
         meta.enrich(con, leaderboard)
         meta.enrich(con, gsax)
         payload["same_player"] = meta.same_player_view(leaderboard)
-        # 동일선수 비교 표에도 급여·시즌 엠블럼을 붙인다(각 그룹의 시즌별 카드 단위)
-        for group in payload["same_player"]:
-            playerinfo.attach_info(con, group.get("cards", []))
-            playerinfo.attach_season_img(con, group.get("cards", []))
+        # 동일선수 비교 표에도 급여·시즌 엠블럼을 붙인다. 모든 그룹 카드를 한 번에 모아
+        # attach 를 1회만 호출한다(그룹마다 부르면 player_info 전체 스캔이 그룹수만큼 반복).
+        sp_cards = [c for g in payload["same_player"] for c in g.get("cards", [])]
+        playerinfo.attach_info(con, sp_cards)
+        playerinfo.attach_season_img(con, sp_cards)
     return payload
 
 
