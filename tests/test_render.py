@@ -147,6 +147,16 @@ def test_ci_shown_in_list_and_hero():
     assert "ciText" in html or "ciLabel" in html
 
 
+def test_list_uses_icon_only_season_cell_with_title():
+    html = render.build_html(_PAYLOAD)
+    # 목록은 seasonCell(아이콘 우선, 시즌명은 title 로만) 을 쓴다
+    assert "const seasonCell=" in html
+    assert "title=" in html                        # hover 로 시즌명 확인
+    # 목록 행·동일선수 표가 seasonCell 을 호출(원시 season_name 직접 출력 아님)
+    assert html.count("seasonCell(c.season_img") >= 1
+    assert "seasonCell(c.season_img,c.season_name)" in html.replace(" ", "")
+
+
 def test_season_name_shows_emblem_icon_when_present():
     payload = dict(_PAYLOAD)
     c = dict(payload["leaderboard"][0])
