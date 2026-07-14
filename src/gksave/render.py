@@ -173,16 +173,14 @@ _TEMPLATE = r"""<!doctype html>
   /* 급여 숫자 입력은 검색창처럼 늘어나지 않게 고정 폭 */
   .controls input.numf{flex:0 0 auto;width:74px;min-width:0;padding:9px 10px;text-align:center}
   .controls .lab{color:var(--mut);font-size:.82rem}
-  /* 입력 옆 물음표 도움말 — hover 시 설명 말풍선 */
-  .controls .tip{flex:0 0 auto;width:18px;height:18px;border-radius:50%;border:1px solid var(--line);
-        color:var(--mut);font-size:.72rem;font-weight:700;display:inline-flex;align-items:center;
-        justify-content:center;cursor:help;position:relative;user-select:none}
-  .controls .tip:hover{color:#1a1405;background:var(--gold);border-color:var(--gold)}
-  .controls .tip:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 7px);left:50%;
-        transform:translateX(-50%);width:max-content;max-width:230px;white-space:normal;text-align:left;
+  /* 검색 입력창 hover 시 설명 말풍선 (input 은 ::after 가 안 붙어 .field 로 감싼다) */
+  .controls .field{position:relative;flex:1;min-width:170px;display:flex}
+  .controls .field input{flex:1;min-width:0}
+  .controls .field:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 7px);left:0;
+        width:max-content;max-width:260px;white-space:normal;text-align:left;
         background:var(--panel2);border:1px solid var(--line);color:var(--text);font-size:.78rem;
-        font-weight:400;line-height:1.4;padding:7px 10px;border-radius:8px;z-index:30;
-        box-shadow:0 8px 24px rgba(0,0,0,.5)}
+        line-height:1.4;padding:7px 10px;border-radius:8px;z-index:30;
+        box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none}
   .controls select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;font-size:.85rem;
         background:var(--panel);color:var(--text);font-family:inherit;cursor:pointer}
   button.sort{padding:7px 13px;border:1px solid var(--line);background:var(--panel);color:var(--mut);
@@ -325,10 +323,8 @@ _TEMPLATE = r"""<!doctype html>
 <!-- 탭 1: 리더보드 -->
 <div class="panel active" id="panel-lb">
   <div class="controls">
-    <input id="search" placeholder="이름 검색">
-    <span class="tip" data-tip="여러 명은 쉼표로 구분해서 검색해요. 예: 노이어, 칸">?</span>
-    <input id="natClubSearch" placeholder="국가·클럽 검색">
-    <span class="tip" data-tip="국가명 또는 클럽명으로 검색해요. 예: 이탈리아 / 유벤투스">?</span>
+    <span class="field" data-tip="여러 명은 쉼표로 구분해서 검색해요. 예: 노이어, 칸"><input id="search" placeholder="이름 검색"></span>
+    <span class="field" data-tip="국가명 또는 클럽명으로 검색해요. 예: 이탈리아 / 유벤투스"><input id="natClubSearch" placeholder="국가·클럽 검색"></span>
     <select id="gradeFilter"><option value="">강화 전체</option></select>
     <span class="lab">급여</span>
     <input id="salMin" class="numf" type="number" inputmode="numeric" min="0" placeholder="이상">
