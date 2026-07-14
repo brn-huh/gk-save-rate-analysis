@@ -269,10 +269,19 @@ def test_analytics_is_the_only_external_dependency():
     """자기완결형 HTML 기조: 애널리틱스 말고 외부에서 끌어오는 리소스가 늘면 안 된다.
 
     선수 이미지는 <img src> 라 여기 걸리지 않는다(렌더 차단 아님, 폴백 있음).
+    파비콘은 data URI 라 https 리소스가 아니므로 여기 걸리지 않는다.
     """
     html = render.build_html(_PAYLOAD)
     srcs = re.findall(r'<(?:script|link)[^>]*(?:src|href)="(https?://[^"]+)"', html)
     assert srcs == ["https://openapi.nexon.com/js/analytics.js?app_id=307467"]
+
+
+def test_favicon_is_embedded_data_uri():
+    """브라우저 탭 아이콘: 자기완결 유지를 위해 data URI 로 임베드(외부 파일 아님)."""
+    html = render.build_html(_PAYLOAD)
+    assert '<link rel="icon" type="image/png" href="data:image/png;base64,' in html
+    assert 'rel="apple-touch-icon"' in html
+    assert render.FAVICON.startswith("data:image/png;base64,")
 
 
 def test_meta_line_does_not_leak_raw_since_timestamp():

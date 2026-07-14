@@ -11,9 +11,14 @@ export 페이로드를 자기완결형 HTML 한 장으로 렌더. CSS/JS 는 전
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 IMAGE_CDN = "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common"
+
+# 브라우저 탭 아이콘(파비콘). 자기완결형 유지를 위해 64px PNG 를 data URI 로 임베드한다.
+# 원본은 assets/gk-icon.png, 이 파일은 `sips -Z 64` 축소본의 base64 (favicon.txt 로 커밋).
+FAVICON = (Path(__file__).parent / "favicon.txt").read_text().strip()
 
 # 페이지에 그대로 실려 나가는 이미지 JS. tests/test_render.py 가 node 로 이 문자열을
 # 직접 실행해 pid 파생과 폴백 체인을 검증하므로, DOM 에 의존하는 코드를 넣지 말 것.
@@ -107,7 +112,8 @@ def build_html(payload: dict[str, Any]) -> str:
     # <script> 탈출 방지: '<' → <
     data_json = json.dumps(page, ensure_ascii=False).replace("<", "\\u003c")
     return (
-        _TEMPLATE.replace("__IMAGE_JS__", IMAGE_JS)
+        _TEMPLATE.replace("__FAVICON__", FAVICON)
+        .replace("__IMAGE_JS__", IMAGE_JS)
         .replace("__FILTER_JS__", FILTER_JS)
         .replace("__STATS_JS__", STATS_JS)
         .replace("__DATA__", data_json)
@@ -118,6 +124,8 @@ _TEMPLATE = r"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FC온라인 GK 선방률 리더보드</title>
+<link rel="icon" type="image/png" href="__FAVICON__">
+<link rel="apple-touch-icon" href="__FAVICON__">
 <!-- 넥슨 Open API 애널리틱스(페이지뷰 집계). app_id 는 스크립트가 자기 src 에서 읽으므로
      공개가 정상 설계다. async 없으면 외부 요청이 첫 렌더를 막는다. -->
 <script type="text/javascript" src="https://openapi.nexon.com/js/analytics.js?app_id=307467" async></script>
