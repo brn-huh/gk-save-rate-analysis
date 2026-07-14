@@ -346,6 +346,36 @@ def test_match_name_treats_empty_query_as_match_all():
     assert _eval_js("matchName(null,'x')", f) == "false"      # 질의가 있으면 탈락
 
 
+# ── 리더보드 탭 강화단계 검색 ───────────────────────────────────────────────
+
+
+@requires_node
+def test_match_name_matches_grade_query():
+    f = render.FILTER_JS
+    assert _eval_js("matchName('아무개','9강',9)", f) == "true"
+    assert _eval_js("matchName('아무개','9강',10)", f) == "false"
+    assert _eval_js("matchName('아무개','10강',10)", f) == "true"
+    assert _eval_js("matchName('아무개','11강',11)", f) == "true"
+
+
+@requires_node
+def test_match_name_grade_query_is_anchored_not_substring():
+    f = render.FILTER_JS
+    # "1강" 이 "10강"·"11강" 카드까지 잡으면 안 된다(부분일치 아닌 정확 일치).
+    assert _eval_js("matchName('아무개','1강',10)", f) == "false"
+    assert _eval_js("matchName('아무개','1강',11)", f) == "false"
+    assert _eval_js("matchName('아무개','1강',1)", f) == "true"
+
+
+@requires_node
+def test_match_name_grade_query_without_grade_arg_is_never_a_name_match():
+    f = render.FILTER_JS
+    # 동일 선수 비교 탭처럼 grade 인자를 안 주면(undefined) "N강" 질의는 이름과 우연히
+    # 같은 문자열이어도 매치하지 않는다 — 강화 질의 판별이 이름 매칭보다 우선이라 회귀는 아니다.
+    assert _eval_js("matchName('9강','9강')", f) == "false"
+    assert _eval_js("matchName('아무개','9강')", f) == "false"
+
+
 def test_compare_tab_has_search_input():
     html = render.build_html(_PAYLOAD)
     assert 'id="spSearch"' in html
