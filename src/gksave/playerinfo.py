@@ -18,6 +18,8 @@ from typing import Any, Callable
 import duckdb
 import httpx
 
+from .config import NEW_TRAIT_CODES
+
 FCINFO_BASE = "https://fc-info.com"
 _SEARCH_PATH = "/local-api/v2/players/search"
 _GK_POSITION = 20
@@ -28,6 +30,13 @@ _GK_POSITION = 20
 _NAT_CODE = re.compile(r"countries/smallflags/(\d+)\.png")
 _NAT_NAME = re.compile(r'alt="nationality"/><span>([^<]+)</span>')
 _CLUB = re.compile(r'PlayerClubHistory_year__\w+">[^<]*</div><div>([^<]+)</div>')
+# 특성(트레잇): 상세페이지에만 있고 카드(spid)별로 다르다. 아이콘 URL 의 코드 + alt 의 이름.
+_TRAIT = re.compile(r'traits/trait_icon_(\d+)\.png" alt="([^"]+)"')
+
+
+def parse_traits(html: str) -> list[tuple[int, str]]:
+    """상세페이지 HTML → [(trait_code, trait_name), ...] 표기순."""
+    return [(int(code), name) for code, name in _TRAIT.findall(html)]
 
 
 def parse_bio(html: str) -> tuple[int | None, str | None, list[str]]:
@@ -346,3 +355,76 @@ def attach_bio(con: duckdb.DuckDBPyConnection, leaderboard: list[dict[str, Any]]
             "nation_name": nat[1] if nat else None,
             "clubs": clubs_by_pid.get(pid, []),
         }
+
+
+def sync_player_trait(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    client: httpx.Client | None = None,
+    delay: float = 1.0,
+    limit: int | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    log: Callable[[str], None] = print,
+) -> dict[str, int]:
+    """우리 GK 카드(spid)의 특성을 fc-info 상세페이지에서 채운다.
+
+    특성은 시즌(카드)마다 달라 **spid 당 1회**씩 받는다. player_trait 에 없는 spid 만(증분),
+    요청 사이 delay 로 예의. spid 별 커밋이라 중단해도 안전. is_new 는 NEW_TRAIT_CODES 로 결정.
+    limit 지정 시 그만큼만(소량 시험용). 반환: {'spids','already','need','new','failed'}.
+    """
+    ours = [r[0] for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()]
+    have = {r[0] for r in con.execute("SELECT DISTINCT spid FROM player_trait").fetchall()}
+    need = [spid for spid in ours if spid not in have]
+    if limit is not None:
+        need = need[:limit]
+    if not need:
+        log(f"player_trait: 우리 카드 {len(ours):,} 전부 캐시됨 — fc-info 호출 없음")
+        return {"spids": len(ours), "already": len(have & set(ours)), "need": 0, "new": 0, "failed": 0}
+
+    owns = client is None
+    client = client or _new_client()
+    new = failed = 0
+    try:
+        for i, spid in enumerate(need):
+            if i > 0:
+                sleep(delay)
+            try:
+                resp = client.get(f"/player/{spid}?grade=1")
+                resp.raise_for_status()
+                traits = parse_traits(resp.text)
+            except Exception as e:   # 개별 실패는 건너뛰고 다음 실행에서 재시도(증분)
+                failed += 1
+                log(f"  spid {spid} 실패: {type(e).__name__}: {e}")
+                continue
+            con.execute("DELETE FROM player_trait WHERE spid = ?", [spid])   # 재수집 시 갱신
+            for ord_, (code, name) in enumerate(traits):
+                con.execute(
+                    "INSERT INTO player_trait (spid, ord, trait_code, trait_name, is_new) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    [spid, ord_, code, name, code in NEW_TRAIT_CODES],
+                )
+            new += 1
+    finally:
+        if owns:
+            client.close()
+    remaining = len(ours) - len(have) - new   # 아직 특성 없는 spid(실패 + limit 밖 포함)
+    log(f"player_trait: 우리 카드 {len(ours):,} · 이미 {len(have):,} · "
+        f"신규 {new:,} · 실패 {failed:,} · 미확보 {remaining:,}")
+    return {"spids": len(ours), "already": len(have & set(ours)),
+            "need": len(need), "new": new, "failed": failed}
+
+
+def attach_trait(con: duckdb.DuckDBPyConnection, cards: list[dict[str, Any]]) -> None:
+    """각 카드에 c['traits'] = [{code, name, is_new}, ...] 를 붙인다(spid 정확 매칭).
+
+    특성은 카드(spid)별 → 시즌·강화 다르면 특성도 다르다. 없으면 c['traits'] = [].
+    """
+    by_spid: dict[int, list[dict[str, Any]]] = {}
+    for spid, code, name, is_new in con.execute(
+        "SELECT spid, trait_code, trait_name, is_new FROM player_trait ORDER BY spid, ord"
+    ).fetchall():
+        by_spid.setdefault(spid, []).append(
+            {"code": code, "name": name, "is_new": bool(is_new)}
+        )
+    for c in cards:
+        c["traits"] = by_spid.get(c["gk_sp_id"], [])

@@ -276,6 +276,22 @@ def test_analytics_is_the_only_external_dependency():
     assert srcs == ["https://openapi.nexon.com/js/analytics.js?app_id=307467"]
 
 
+def test_drilldown_shows_traits_with_new_badge():
+    payload = dict(_PAYLOAD)
+    c = dict(payload["leaderboard"][0])
+    c["traits"] = [
+        {"code": 60, "name": "GK 공중볼 장악", "is_new": True},
+        {"code": 43, "name": "스위퍼 키퍼", "is_new": False},
+    ]
+    payload["leaderboard"] = [c]
+    html = render.build_html(payload)
+    assert "const traitUrl=" in html                      # 특성 아이콘 URL(넥슨 CDN)
+    assert "traits/trait_icon_" in html                    # 아이콘 경로
+    assert "c.traits" in html.replace(" ", "")             # 드릴다운이 특성을 그림
+    assert "trait-new" in html                             # 신규 배지 클래스
+    assert "신규" in html                                   # 신규 배지 라벨
+
+
 def test_favicon_is_embedded_data_uri():
     """브라우저 탭 아이콘: 자기완결 유지를 위해 data URI 로 임베드(외부 파일 아님)."""
     html = render.build_html(_PAYLOAD)

@@ -12,12 +12,15 @@ from gksave.playerinfo import (
     FCINFO_BASE,
     PlayerInfo,
     attach_bio,
+    attach_trait,
     parse_bio,
     parse_player,
+    parse_traits,
     season_of,
     season_img_url,
     sync_player_bio,
     sync_player_info,
+    sync_player_trait,
 )
 
 _ITEM = {
@@ -377,3 +380,107 @@ def test_attach_bio_none_when_absent():
     cards = [{"gk_sp_id": 846193080}]
     attach_bio(con, cards)          # player_bio·player_club 비어있음
     assert cards[0]["bio"] is None
+
+
+# ── 특성(트레잇): 파싱 · is_new · per-spid 수집 · attach ─────────────────────
+
+def _trait_html(traits):
+    """fc-info 상세페이지 특성 마크업 최소 재현. traits = [(code, name), ...]."""
+    items = ''.join(
+        f'<div class="PlayerSkills_tooltip__VemEh">'
+        f'<img class="PlayerSkills_skillImg___uM3S" src="https://fco.dn.nexoncdn.co.kr/'
+        f'live/externalAssets/common/traits/trait_icon_{code:02d}.png" alt="{name}" '
+        f'width="100" height="100"/>'
+        f'<div class="PlayerSkills_tooltipText__TsiLA">{name}</div></div>' for code, name in traits)
+    return f'<div><span>특성</span></div><div class="PlayerSkills_skillList__X">{items}</div>'
+
+
+def test_parse_traits_extracts_code_and_name_in_order():
+    html = _trait_html([(60, "GK 공중볼 장악"), (20, "GK 능숙한 펀칭"), (23, "GK 침착한 1:1 수비")])
+    assert parse_traits(html) == [(60, "GK 공중볼 장악"), (20, "GK 능숙한 펀칭"), (23, "GK 침착한 1:1 수비")]
+
+
+def test_parse_traits_empty_when_none():
+    assert parse_traits("<div>특성 없음</div>") == []
+
+
+def _mock_trait(by_spid):
+    """{spid: [(code,name),...]} → /player/{spid} 에 특성 HTML 을 돌려주는 목."""
+    calls = {"paths": []}
+
+    def handler(request):
+        calls["paths"].append(request.url.path)
+        spid = int(request.url.path.rsplit("/", 1)[-1])
+        return httpx.Response(200, text=_trait_html(by_spid.get(spid, [])))
+
+    client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
+    client._calls = calls
+    return client
+
+
+def test_sync_trait_per_spid_with_is_new_flag():
+    con = connect_memory()
+    _seed_gk(con, 100238380, "야신")
+    _seed_gk(con, 100000488, "칸")
+    client = _mock_trait({
+        100238380: [(60, "GK 공중볼 장악"), (20, "GK 능숙한 펀칭")],   # 60=신규
+        100000488: [(43, "스위퍼 키퍼")],                            # 43=일반
+    })
+    r = sync_player_trait(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert r["new"] == 2 and r["failed"] == 0
+    rows = con.execute(
+        "SELECT spid, ord, trait_code, trait_name, is_new FROM player_trait ORDER BY spid, ord"
+    ).fetchall()
+    assert rows == [
+        (100000488, 0, 43, "스위퍼 키퍼", False),
+        (100238380, 0, 60, "GK 공중볼 장악", True),    # 코드 60 → 신규
+        (100238380, 1, 20, "GK 능숙한 펀칭", False),
+    ]
+
+
+def test_sync_trait_is_per_spid_not_per_pid():
+    # 같은 실선수(pid)의 두 시즌 카드는 특성이 달라 각각 저장된다(spid별).
+    con = connect_memory()
+    _seed_gk(con, 848167495, "노이어A")
+    _seed_gk(con, 272167495, "노이어B")   # 같은 pid 167495, 다른 시즌
+    client = _mock_trait({
+        848167495: [(57, "GK 빠른 반응"), (15, "긴 패스 선호")],
+        272167495: [(21, "GK 멀리 던지기")],
+    })
+    sync_player_trait(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert len(client._calls["paths"]) == 2                 # 카드별 요청
+    n1 = con.execute("SELECT count(*) FROM player_trait WHERE spid=848167495").fetchone()[0]
+    n2 = con.execute("SELECT count(*) FROM player_trait WHERE spid=272167495").fetchone()[0]
+    assert n1 == 2 and n2 == 1
+
+
+def test_sync_trait_incremental_skips_cached():
+    con = connect_memory()
+    _seed_gk(con, 100238380, "야신")
+    con.execute("INSERT INTO player_trait (spid, ord, trait_code, trait_name, is_new) "
+                "VALUES (100238380, 0, 60, 'X', TRUE)")
+    client = _mock_trait({100238380: [(99, "바뀜")]})
+    r = sync_player_trait(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert client._calls["paths"] == [] and r["new"] == 0
+
+
+def test_sync_trait_limit_caps_requests():
+    con = connect_memory()
+    for i in range(5):
+        _seed_gk(con, 100000000 + i, f"p{i}")
+    client = _mock_trait({100000000 + i: [(20, "t")] for i in range(5)})
+    r = sync_player_trait(con, client=client, limit=2, sleep=lambda _x: None, log=lambda _m: None)
+    assert r["new"] == 2 and len(client._calls["paths"]) == 2
+
+
+def test_attach_trait_by_spid():
+    con = connect_memory()
+    con.execute("INSERT INTO player_trait (spid, ord, trait_code, trait_name, is_new) VALUES "
+                "(500, 0, 60, 'GK 공중볼 장악', TRUE), (500, 1, 43, '스위퍼 키퍼', FALSE)")
+    cards = [{"gk_sp_id": 500}, {"gk_sp_id": 999}]
+    attach_trait(con, cards)
+    assert cards[0]["traits"] == [
+        {"code": 60, "name": "GK 공중볼 장악", "is_new": True},
+        {"code": 43, "name": "스위퍼 키퍼", "is_new": False},
+    ]
+    assert cards[1]["traits"] == []      # 특성 없는 카드

@@ -31,6 +31,8 @@ const portraitUrl=spid=>CDN+'/players/p'+pidOf(spid)+'.png';
 const actionUrl=spid=>CDN+'/playersAction/p'+spid+'.png';
 // 국기: 넥슨 CDN 국가 코드별 작은 국기.
 const flagUrl=code=>CDN+'/countries/smallflags/'+code+'.png';
+// 특성 아이콘: 넥슨 CDN, 코드 2자리 0채움(trait_icon_05.png).
+const traitUrl=code=>CDN+'/traits/trait_icon_'+String(code).padStart(2,'0')+'.png';
 // 목록 썸네일은 커버리지 100% 인 얼굴만 쓴다. 액션샷은 38% 가 없어 403 이 쏟아진다.
 const thumbUrl=portraitUrl;
 const PLACEHOLDER='data:image/svg+xml;utf8,'+encodeURIComponent(
@@ -292,6 +294,15 @@ _TEMPLATE = r"""<!doctype html>
   .chips .chip.nat .flag{border-radius:2px;object-fit:cover;vertical-align:middle}
   .hero-meta .clubs{margin-top:8px;font-size:.8rem;color:var(--mut);line-height:1.5}
   .hero-meta .clubs b{color:var(--gold2);font-weight:700;margin-right:4px}
+  /* 특성(트레잇) — 아이콘+이름, 신규특성은 금색 테두리+배지 */
+  .traits{display:flex;flex-wrap:wrap;gap:8px}
+  .trait{display:inline-flex;align-items:center;gap:7px;padding:4px 9px 4px 5px;border-radius:9px;
+        background:var(--panel2);border:1px solid var(--line);font-size:.82rem}
+  .trait .trait-ico{width:26px;height:26px;flex:0 0 auto;object-fit:contain}
+  .trait .trait-nm{color:var(--text)}
+  .trait.new{border-color:var(--gold2);background:rgba(240,209,122,.08)}
+  .trait .trait-new{font-size:.66rem;font-weight:700;color:#1a1405;background:var(--gold);
+        border-radius:5px;padding:1px 5px;margin-left:2px}
   /* 표는 375px 에서 606px 다. 본문이 아니라 표만 가로로 스크롤시킨다.
      overflow-x 를 상시로 걸면 overflow-y 가 auto 로 승격돼 sticky thead 가 깨진다.
      데스크톱은 표가 안 넘치므로 모바일에서만 감싼다. */
@@ -507,7 +518,15 @@ function detailHtml(c){
     (infoRow?`<div class="chips">${infoRow}</div>`:'')+
     clubsRow+
     `</div></div>`;
+  // 특성: 카드별 트레잇 아이콘+이름. 신규특성(금색)엔 '신규' 배지. 없으면 섹션 생략.
+  const traits=c.traits||[];
+  const traitsHtml = traits.length ? `<div class="traits">`+traits.map(t=>
+    `<span class="trait${t.is_new?' new':''}">`+
+    `<img class="trait-ico" src="${traitUrl(t.code)}" alt="${escAttr(t.name)}" width="34" height="34" loading="lazy" onerror="this.style.display='none'">`+
+    `<span class="trait-nm">${esc(t.name)}</span>`+
+    (t.is_new?`<span class="trait-new">신규</span>`:'')+`</span>`).join('')+`</div>` : '';
   return hero+
+         (traitsHtml?`<h4 style="margin-top:12px">특성</h4>${traitsHtml}`:'')+
          `<div class="detail-grid"><div><h4>거리 구간별 (근사 미터)</h4>${zones}</div>`+
          `<div><h4>슛 타입별</h4><table class="mini"><tbody>${types}</tbody></table></div></div>`+
          `<h4 style="margin-top:14px">상황 · 수비 맥락 · GK 스탯</h4><div class="stats">${statsHtml}</div>`;

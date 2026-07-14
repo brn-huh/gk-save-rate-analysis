@@ -56,3 +56,15 @@ def test_player_bio_and_club_tables_exist():
     club_cols = [r[0] for r in con.execute(
         "SELECT column_name FROM duckdb_columns() WHERE table_name='player_club'").fetchall()]
     assert set(["pid", "ord", "club_name"]).issubset(club_cols)
+
+
+def test_player_trait_table_exists():
+    """특성(트레잇) 캐시 테이블(spid 키, is_new 포함)이 스키마에 있어야 한다."""
+    con = db.connect_memory()
+    cols = {r[0]: r[1] for r in con.execute(
+        "SELECT column_name, data_type FROM duckdb_columns() "
+        "WHERE table_name='player_trait'").fetchall()}
+    assert cols.get("spid") == "BIGINT"
+    for c in ("ord", "trait_code", "trait_name", "is_new"):
+        assert c in cols
+    assert cols["is_new"] == "BOOLEAN"

@@ -92,6 +92,14 @@ def _cmd_playerbio(args) -> None:
         con.close()
 
 
+def _cmd_playertrait(args) -> None:
+    con = connect(DEFAULT)
+    try:
+        playerinfo.sync_player_trait(con, delay=args.delay, limit=args.limit)
+    finally:
+        con.close()
+
+
 def _cmd_export(args) -> None:
     con = connect(DEFAULT, read_only=True)
     try:
@@ -213,6 +221,13 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--delay", type=float, default=1.0, help="상세요청 사이 지연(초)")
     pb.add_argument("--limit", type=int, help="이번에 받을 선수 수 상한(소량 시험용)")
     pb.set_defaults(func=_cmd_playerbio)
+
+    pt = sub.add_parser(
+        "playertrait", help="선수 특성(트레잇) 캐시 (fc-info 상세, 우리 GK 카드당·1회)"
+    )
+    pt.add_argument("--delay", type=float, default=1.0, help="상세요청 사이 지연(초)")
+    pt.add_argument("--limit", type=int, help="이번에 받을 카드 수 상한(소량 시험용)")
+    pt.set_defaults(func=_cmd_playertrait)
 
     e = sub.add_parser("export", help="JSON/CSV/HTML 산출")
     e.add_argument("--gate", type=int, default=MIN_MATCHES_GATE)

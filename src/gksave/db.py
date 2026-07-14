@@ -80,6 +80,17 @@ CREATE TABLE IF NOT EXISTS player_club (
     PRIMARY KEY (pid, ord)
 );
 
+-- 선수 특성(트레잇) (spid → 특성들, 표기 순서 ord). 특성은 시즌(카드)마다 달라 spid 키.
+-- trait_code 로 넥슨 CDN 아이콘(traits/trait_icon_{code}.png) 생성. is_new=신규특성(금색 배경).
+CREATE TABLE IF NOT EXISTS player_trait (
+    spid       BIGINT,
+    ord        INTEGER,
+    trait_code INTEGER,
+    trait_name VARCHAR,
+    is_new     BOOLEAN,
+    PRIMARY KEY (spid, ord)
+);
+
 -- GK 출전: 카드가 GK로 뛴 경기 1건 = 1행 (슛 0개 경기도 표본 게이트에 반영)
 CREATE TABLE IF NOT EXISTS gk_match (
     match_id       VARCHAR,

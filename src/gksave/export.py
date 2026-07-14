@@ -87,6 +87,7 @@ def build_payload(
     playerinfo.attach_info(con, leaderboard)
     playerinfo.attach_season_img(con, leaderboard)
     playerinfo.attach_bio(con, leaderboard)   # 국가·클럽 (pid 매칭)
+    playerinfo.attach_trait(con, leaderboard)   # 특성 (spid 매칭)
 
     # 메타 캐시가 있으면 선수명·시즌 붙이고 동일선수 시즌 비교표 추가
     if meta.has_meta(con):
@@ -99,6 +100,7 @@ def build_payload(
         playerinfo.attach_info(con, sp_cards)
         playerinfo.attach_season_img(con, sp_cards)
         playerinfo.attach_bio(con, sp_cards)
+        playerinfo.attach_trait(con, sp_cards)
     return payload
 
 
