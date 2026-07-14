@@ -175,6 +175,11 @@ _TEMPLATE = r"""<!doctype html>
   th,td{padding:10px 11px;border-bottom:1px solid var(--line);text-align:left}
   thead th{position:sticky;top:0;background:#070b1c;color:var(--gold2);font-size:.78rem;
         font-weight:700;letter-spacing:.02em;z-index:2}
+  thead th.sortable{cursor:pointer;white-space:nowrap;user-select:none}
+  thead th.sortable:hover{color:var(--gold)}
+  thead th.sortable.active{color:var(--gold)}
+  thead th .arr{font-size:.72rem;opacity:.4;margin-left:1px}
+  thead th.sortable.active .arr{opacity:1}
   td.rank{color:var(--gold2);width:2.4rem;font-weight:700;font-variant-numeric:tabular-nums}
   td.pct{font-variant-numeric:tabular-nums;font-weight:700;color:var(--gold)}
   td.pct .ci{display:block;font-size:.7rem;font-weight:500;color:var(--mut)}
@@ -308,19 +313,16 @@ _TEMPLATE = r"""<!doctype html>
     <input id="salMin" class="numf" type="number" inputmode="numeric" min="0" placeholder="이상">
     <span class="lab">~</span>
     <input id="salMax" class="numf" type="number" inputmode="numeric" min="0" placeholder="이하">
-    <span class="lab">정렬</span>
-    <button class="sort active" data-sort="save_pct">선방률</button>
-    <button class="sort" data-sort="gsax_per_shot">GSAx</button>
-    <button class="sort" data-sort="gsax_ex_short_per_shot">GSAx(초근제외)</button>
+    <button id="exShort" class="sort" title="GSAx 열에서 초근거리(&lt;5m) 뽀록성 슛 제외">GSAx 초근제외</button>
     <span class="lab">경기수↑</span>
-    <button class="gate active" data-gate="50">50</button>
-    <button class="gate" data-gate="100">100</button>
-    <button class="gate" data-gate="200">200</button>
+    <button class="gate active" data-gate="200">200</button>
+    <button class="gate" data-gate="300">300</button>
+    <button class="gate" data-gate="500">500</button>
   </div>
-  <p class="muted">행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간(경기수가 많을수록 좁아짐). 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
+  <p class="muted"><b>컬럼 제목</b>을 클릭하면 그 항목으로 정렬됩니다(다시 누르면 오름/내림 전환). 행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
     <table id="lb">
-      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th>강화</th><th>급여</th><th>선방률</th><th id="gsaxHdr">GSAx/100</th><th>경기수</th></tr></thead>
+      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th class="sortable" data-col="grade">강화 <span class="arr"></span></th><th class="sortable" data-col="salary">급여 <span class="arr"></span></th><th class="sortable" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable" data-col="save_pct">선방률 <span class="arr"></span></th><th class="sortable" data-col="gsax" id="gsaxHdr">GSAx/100 <span class="arr"></span></th><th class="sortable" data-col="matches">경기수 <span class="arr"></span></th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -356,7 +358,7 @@ _TEMPLATE = r"""<!doctype html>
     <dt>GSAx(초근제외)</dt>
     <dd>초근거리(5m 미만) 슛을 뺀 GSAx. 골문 앞 난사처럼 GK가 어쩔 수 없는 상황을 제외해, 포지셔닝·반응 능력을 더 잘 드러냅니다.</dd>
     <dt>경기수 · 게이트</dt>
-    <dd>경기수 = 그 카드로 수집·집계된 경기 수(= 통계 표본). 경기수가 적으면 우연(뽀록)일 수 있어 신뢰도가 낮습니다. 그래서 최소 <b id="gateN"></b>경기 이상(게이트)인 카드만 순위에 올립니다. 리더보드 위 <b>경기수↑ 50/100/200</b> 버튼으로 기준을 올려 <b>뽀록 상위권을 걸러</b> 볼 수 있습니다.</dd>
+    <dd>경기수 = 그 카드로 수집·집계된 경기 수(= 통계 표본). 경기수가 적으면 우연(뽀록)일 수 있어 신뢰도가 낮습니다. 그래서 최소 <b id="gateN"></b>경기 이상(게이트)인 카드만 순위에 올립니다. 리더보드 위 <b>경기수↑ 200/300/500</b> 버튼으로 기준을 올려 <b>뽀록 상위권을 걸러</b> 볼 수 있습니다.</dd>
     <dt>신뢰구간 (±%p)</dt>
     <dd>선방률 옆 <b>±N%p</b>는 그 표본에서 나온 <b>95% 신뢰구간</b>(Wilson)입니다. 실제 선방률이 이 범위 안에 있을 가능성이 높다는 뜻으로, 유효슛(≈경기수×5)이 많을수록 좁아집니다. 예: 50경기 ±6%p, 200경기 ±3%p. 두 카드의 구간이 크게 겹치면 순위 차이를 단정할 수 없습니다. 단, 이는 <b>정밀도</b>지 정확도가 아니며(유저 실력 등 교란은 별개 — GSAx 참고), 슛이 완전 독립은 아니라 실제 구간은 이보다 약간 넓습니다.</dd>
   </dl>
@@ -398,7 +400,15 @@ _TEMPLATE = r"""<!doctype html>
 <script>
 const D = JSON.parse(document.getElementById('gk-data').textContent);
 const PAGE=100;
-let sortKey='save_pct', q='', limit=PAGE, minGate=50, gradeFilter='', natClubQ='', salMin=null, salMax=null;
+let sortCol='save_pct', sortDir='desc', gsaxMode='gsax_per_shot';
+let q='', limit=PAGE, minGate=200, gradeFilter='', natClubQ='', salMin=null, salMax=null;
+// 컬럼 id → 정렬/표시 값. 급여·OVR 은 c.info 중첩, GSAx 는 초근제외 토글에 따라 값이 바뀐다.
+function sortVal(c,col){
+  if(col==='salary') return c.info&&c.info.salary;
+  if(col==='ovr') return c.info&&c.info.ovr;
+  if(col==='gsax') return c[gsaxMode];
+  return c[col];   // grade, save_pct, matches
+}
 const pct=v=>v==null?'N/A':(v*100).toFixed(1)+'%';
 const gps=v=>v==null?'':(v*100>=0?'+':'')+(v*100).toFixed(1);
 const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;};
@@ -489,7 +499,7 @@ function toggle(tr,c){
   const nx=tr.nextElementSibling;
   if(nx&&nx.classList.contains('detail')){nx.remove();return;}
   const d=document.createElement('tr'); d.className='detail';
-  d.innerHTML=`<td colspan="8">${detailHtml(c)}</td>`; tr.after(d);
+  d.innerHTML=`<td colspan="9">${detailHtml(c)}</td>`; tr.after(d);
 }
 function render(){
   const tb=document.querySelector('#lb tbody'); tb.innerHTML='';
@@ -497,14 +507,17 @@ function render(){
   let rows=D.leaderboard.filter(c=>matchNames(c.player_name,q) && c.matches>=minGate &&
     (!gradeFilter || c.grade===+gradeFilter) && matchNatClub(c.bio,natClubQ) &&
     matchSalary(c.info&&c.info.salary,salMin,salMax));
+  // 정렬은 필터 뒤에 적용된다 → 검색·필터 결과 안에서만 순서가 매겨진다. null 은 항상 뒤로.
   rows=rows.slice().sort((a,b)=>{
-    const av=a[sortKey], bv=b[sortKey];
-    if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1; return bv-av;
+    const av=sortVal(a,sortCol), bv=sortVal(b,sortCol);
+    if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1;
+    return sortDir==='asc' ? av-bv : bv-av;
   });
-  if(!rows.length){tb.innerHTML='<tr><td colspan="8" class="empty">해당하는 카드가 없습니다.</td></tr>';return;}
-  const gf = sortKey.indexOf('gsax')===0 ? sortKey : 'gsax_per_shot';  // GSAx 컬럼은 활성 모드 값
-  document.getElementById('gsaxHdr').textContent =
-    gf==='gsax_ex_short_per_shot' ? 'GSAx/100(초근×)' : 'GSAx/100';
+  if(!rows.length){tb.innerHTML='<tr><td colspan="9" class="empty">해당하는 카드가 없습니다.</td></tr>';updateHeaders();return;}
+  const gf = gsaxMode;   // GSAx 열 표시값(초근제외 토글에 따라)
+  document.getElementById('gsaxHdr').firstChild.textContent =
+    (gsaxMode==='gsax_ex_short_per_shot' ? 'GSAx/100(초근×) ' : 'GSAx/100 ');
+  updateHeaders();
   // 검색 중(이름 또는 국가/클럽)이면 전체에서 찾도록 캡 무시, 아니면 상위 limit 장만(경량화)
   const searching = q || natClubQ;
   const vis = searching ? rows : rows.slice(0, limit);
@@ -515,6 +528,7 @@ function render(){
       `<span class="pn">${esc(c.player_name||('spId '+c.gk_sp_id))}</span></div></td>`+
       `<td class="season"><span class="scell">${seasonCell(c.season_img,c.season_name)}</span></td><td class="num">${c.grade}강</td>`+
       `<td class="num">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
+      `<td class="num">${(c.info&&c.info.ovr!=null)?c.info.ovr:''}</td>`+
       `<td class="pct">${pct(c.save_pct)}<span class="ci">${ciText(c.saves,c.goals)}</span></td><td class="num">${gps(c[gf])}</td>`+
       `<td class="num">${c.matches}</td>`;
     tr.onclick=()=>toggle(tr,c); tb.appendChild(tr);
@@ -547,11 +561,27 @@ const gSel=document.getElementById('gradeFilter');
   const o=document.createElement('option'); o.value=g; o.textContent=g+'강'; gSel.appendChild(o);
 });
 gSel.onchange=e=>{gradeFilter=e.target.value;limit=PAGE;render();};
-document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('[data-sort]').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active'); sortKey=b.dataset.sort; limit=PAGE; render();
+// 컬럼 헤더 클릭 정렬 — 활성 컬럼엔 ▼/▲, 정렬 가능하나 비활성인 컬럼엔 옅은 ⇅.
+function updateHeaders(){
+  document.querySelectorAll('#lb thead th.sortable').forEach(th=>{
+    const on = th.dataset.col===sortCol;
+    th.classList.toggle('active', on);
+    th.querySelector('.arr').textContent = on ? (sortDir==='asc'?'▲':'▼') : '⇅';
+  });
+}
+document.querySelectorAll('#lb thead th.sortable').forEach(th=>th.onclick=()=>{
+  const col=th.dataset.col;
+  if(sortCol===col) sortDir = sortDir==='asc' ? 'desc' : 'asc';  // 같은 컬럼 재클릭 → 방향 토글
+  else { sortCol=col; sortDir='desc'; }                          // 새 컬럼 → 내림차순부터
+  limit=PAGE; render();
 });
-// 경기수 게이트 필터 (50/100/200) — 데이터 재요청 없이 화면에서만 거른다
+// GSAx 초근제외 토글 — GSAx 열의 값·정렬 대상을 초근거리 제외 버전으로 전환.
+document.getElementById('exShort').onclick=()=>{
+  gsaxMode = gsaxMode==='gsax_per_shot' ? 'gsax_ex_short_per_shot' : 'gsax_per_shot';
+  document.getElementById('exShort').classList.toggle('active', gsaxMode==='gsax_ex_short_per_shot');
+  limit=PAGE; render();
+};
+// 경기수 게이트 필터 (200/300/500) — 데이터 재요청 없이 화면에서만 거른다
 document.querySelectorAll('[data-gate]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('[data-gate]').forEach(x=>x.classList.remove('active'));
   b.classList.add('active'); minGate=+b.dataset.gate; limit=PAGE; render();

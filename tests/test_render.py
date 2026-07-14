@@ -144,10 +144,11 @@ def test_wilson_handles_missing_counts_no_nan():
 
 def test_gate_toggle_buttons_present():
     html = render.build_html(_PAYLOAD)
-    # 경기수 게이트 필터 토글 50/100/200
-    for g in ("50", "100", "200"):
+    # 경기수 게이트 필터 토글 200/300/500 (기본 200)
+    for g in ("200", "300", "500"):
         assert f'data-gate="{g}"' in html
-    assert "minGate" in html                  # 필터 상태 변수
+    assert 'data-gate="50"' not in html and 'data-gate="100"' not in html
+    assert "minGate=200" in html.replace(" ", "")   # 기본 게이트 200
 
 
 def test_ci_shown_in_list_and_hero():
@@ -216,9 +217,9 @@ def test_same_player_summary_shows_total_games():
 
 def test_matches_column_labeled_경기수_not_표본():
     html = render.build_html(_PAYLOAD)
-    # 경기수 컬럼 라벨: 메인 헤더 + 동일선수 헤더. 정렬 버튼은 사용자 요청으로 제거됨(강화 필터가
-    # 드랍박스로 분리되며 함께 정리) → test_matches_sort_button_removed 가 그 부재를 검증.
-    assert html.count("<th>경기수</th>") == 2       # 메인 목록 + 동일선수 표
+    # 메인 목록 경기수는 정렬 가능한 헤더, 동일선수 표는 일반 헤더.
+    assert 'data-col="matches">경기수' in html      # 메인 목록(정렬 헤더)
+    assert "<th>경기수</th>" in html                # 동일선수 표(일반 헤더)
     assert "<th>표본</th>" not in html              # 컬럼 라벨에 표본 없음
 
 
@@ -232,12 +233,13 @@ def test_main_list_and_compare_have_salary_column():
          "matches": 60, "info": {"salary": 24}},
     ]}]
     html = render.build_html(payload)
-    # 메인 목록 헤더에 급여, 행에 c.info.salary
-    assert html.count("<th>급여</th>") == 2      # 메인 목록 + 동일선수 mini 표
+    # 메인 목록 헤더에 급여(정렬 헤더), 동일선수 표에 일반 급여 헤더, 행에 c.info.salary
+    assert 'data-col="salary">급여' in html       # 메인 목록(정렬 헤더)
+    assert "<th>급여</th>" in html                # 동일선수 mini 표
     assert "c.info" in html                       # 메인 행이 급여를 그림
-    # 상세 행 colspan 은 컬럼 수(8)와 맞아야
-    assert 'colspan="8"' in html
-    assert 'colspan="7"' not in html
+    # 상세 행 colspan 은 컬럼 수(OVR 추가로 9)와 맞아야
+    assert 'colspan="9"' in html
+    assert 'colspan="8"' not in html
 
 
 def test_hero_shows_player_info_chips_when_present():
@@ -437,6 +439,56 @@ def test_leaderboard_has_salary_filter_inputs():
     html = render.build_html(_PAYLOAD)
     assert 'id="salMin"' in html and 'id="salMax"' in html
     assert "matchSalary(c.info&&c.info.salary,salMin,salMax)" in html.replace(" ", "")
+
+
+# ── 리더보드 OVR 컬럼 + 헤더 클릭 정렬 ───────────────────────────────────────
+
+
+def test_leaderboard_has_ovr_column():
+    payload = dict(_PAYLOAD)
+    c = dict(payload["leaderboard"][0]); c["info"] = {"ovr": 113}
+    payload["leaderboard"] = [c]
+    html = render.build_html(payload)
+    assert 'data-col="ovr">OVR' in html               # OVR 정렬 헤더
+    assert "c.info&&c.info.ovr" in html.replace(" ", "")   # 행이 OVR 을 그림
+
+
+def test_headers_are_clickable_sort_with_arrows():
+    html = render.build_html(_PAYLOAD)
+    # 숫자 컬럼이 정렬 가능 헤더(data-col)로, 화살표 표기 로직·방향 토글이 있어야
+    for col in ("grade", "salary", "ovr", "save_pct", "gsax", "matches"):
+        assert f'data-col="{col}"' in html
+    assert "function updateHeaders(" in html
+    assert "sortDir==='asc'?'▲':'▼'" in html.replace(" ", "").replace('"', "'")
+    assert "sortDir==='asc'?'desc':'asc'" in html.replace(" ", "").replace('"', "'")
+    # 옛 정렬 버튼(data-sort)은 없어야
+    assert "data-sort=" not in html
+
+
+@requires_node
+def test_sort_val_reads_nested_info_and_gsax_mode():
+    # sortVal 은 급여·OVR 을 c.info 에서, GSAx 는 활성 모드에서 읽는다.
+    js = render.FILTER_JS + render.STATS_JS + """
+let gsaxMode='gsax_per_shot';
+function sortVal(c,col){
+  if(col==='salary') return c.info&&c.info.salary;
+  if(col==='ovr') return c.info&&c.info.ovr;
+  if(col==='gsax') return c[gsaxMode];
+  return c[col];
+}
+const c={grade:9,save_pct:0.7,matches:120,gsax_per_shot:0.05,gsax_ex_short_per_shot:0.04,info:{salary:24,ovr:113}};
+"""
+    assert _eval_js("sortVal(c,'salary')", js) == "24"
+    assert _eval_js("sortVal(c,'ovr')", js) == "113"
+    assert _eval_js("sortVal(c,'matches')", js) == "120"
+    assert _eval_js("sortVal(c,'gsax')", js) == "0.05"        # 기본 모드
+    assert _eval_js("(gsaxMode='gsax_ex_short_per_shot',sortVal(c,'gsax'))", js) == "0.04"
+
+
+def test_gsax_ex_short_toggle_present():
+    html = render.build_html(_PAYLOAD)
+    assert 'id="exShort"' in html                     # 초근제외 토글
+    assert "gsax_ex_short_per_shot" in html           # 토글이 초근제외 모드로 전환
 
 
 # ── 리더보드 탭 강화단계 필터(드랍박스) ─────────────────────────────────────
