@@ -313,7 +313,7 @@ _TEMPLATE = r"""<!doctype html>
   <h2>핵심 지표</h2>
   <dl class="lead">
     <dt>선방률</dt>
-    <dd>상대의 유효슛 중 막아낸 비율. <b>선방 ÷ (선방 + 실점)</b>으로 계산합니다. 값이 높을수록 잘 막은 것. 단, 이 순위의 선방률은 <b>보정하지 않은 값</b>이라 카드 성능뿐 아니라 <b>그 카드를 쓴 유저의 실력·수비 라인·상대 슛 난이도</b>가 섞여 있어 '카드 추천'이 아닙니다.</dd>
+    <dd>상대의 유효슛 중 막아낸 비율. <b>선방 ÷ (선방 + 실점)</b>으로 계산합니다. 값이 높을수록 잘 막은 것. 단, 이 순위의 선방률은 <b>보정하지 않은 값</b>이라 카드 성능뿐 아니라 <b>그 카드를 쓴 유저의 실력·수비 라인·상대 슛 난이도</b>가 섞여 있으니 카드 순위가 아니라 <b>참고용</b>으로 봐주세요.</dd>
     <dt>GSAx / 100</dt>
     <dd>Goals Saved Above Expected — <b>슛 난이도를 보정</b>한 지표입니다. 거리·각도로 계산한 '기대 실점'보다 실제로 얼마나 더(또는 덜) 막았는지를 유효슛 100개 기준으로 환산합니다. <b>+면 기대보다 선방, −면 기대보다 실점</b>. 유저 실력 교란을 줄인, 선방률보다 공정한 비교값입니다.</dd>
     <dt>GSAx(초근제외)</dt>
@@ -392,7 +392,7 @@ const totalMatches = Number(D.total_collected_matches || 0).toLocaleString('ko-K
 document.getElementById('meta').textContent =
   `${period}총 수집 경기 ${totalMatches}건 · ${D.leaderboard.length}장`;
 document.getElementById('warn').innerHTML =
-  '<b>⚠️ 읽는 법:</b> 이 순위는 보정하지 않은 선방률이라 카드 성능에 <b>유저 실력</b>이 섞여 있어 \'카드 추천\'이 아닙니다. 용어·자세한 설명은 <b>지표 설명</b> 탭.';
+  '<b>⚠️ 읽는 법:</b> 이 순위는 보정하지 않은 선방률이라 카드 성능뿐 아니라 <b>유저 실력</b>도 섞여 있어요. 카드 순위가 아니라 <b>참고용</b>으로만 봐주세요. 용어·자세한 설명은 <b>지표 설명</b> 탭.';
 document.getElementById('warnFull').innerHTML = esc(D.warning);
 var gEl=document.getElementById('gateN'); if(gEl) gEl.textContent=D.gate;
 
