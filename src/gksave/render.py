@@ -41,8 +41,15 @@ function imgFallback(el){
 # 리더보드·비교탭이 공유하는 이름 검색 규칙. tests/test_render.py 가 node 로 직접 실행한다.
 # 강화단계 필터는 별도 드랍박스(gradeFilter)로 분리되어 있어 이 함수는 이름만 본다.
 FILTER_JS = r"""
-// 빈 질의는 전부 통과, 대소문자 무시 부분일치.
+// 빈 질의는 전부 통과, 대소문자 무시 부분일치. (동일 선수 비교 탭은 한 명 검색이라 이걸 그대로 씀)
 const matchName=(name,q)=>!q||String(name==null?'':name).toLowerCase().includes(q);
+// 리더보드 전용: 쉼표로 구분한 여러 이름 중 하나라도 일치(OR). "노이어, 칸" → 두 선수 카드 모두.
+// 한글 이름엔 공백이 있어(예: "마누엘 노이어") 공백이 아니라 쉼표로만 나눈다.
+const matchNames=(name,q)=>{
+  if(!q) return true;
+  const terms=q.split(',').map(s=>s.trim()).filter(Boolean);
+  return !terms.length || terms.some(t=>matchName(name,t));
+};
 """
 
 # 선방률 신뢰구간. 비율이라 Wilson 95% 구간(작은 표본·극단 비율에서 Wald 보다 정확).
@@ -269,7 +276,7 @@ _TEMPLATE = r"""<!doctype html>
 <!-- 탭 1: 리더보드 -->
 <div class="panel active" id="panel-lb">
   <div class="controls">
-    <input id="search" placeholder="선수 이름 검색…">
+    <input id="search" placeholder="선수 이름 검색 (여러 명은 쉼표로: 노이어, 칸)…">
     <select id="gradeFilter"><option value="">강화 전체</option></select>
     <span class="lab">정렬</span>
     <button class="sort active" data-sort="save_pct">선방률</button>
@@ -305,7 +312,7 @@ _TEMPLATE = r"""<!doctype html>
 <div class="panel help" id="panel-help">
   <h2>이 페이지 사용법</h2>
   <ol class="usage">
-    <li><b>리더보드 탭</b>에서 선방률·GSAx로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. 옆의 <b>강화 드랍박스</b>로 특정 강화단계만 골라볼 수도 있습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
+    <li><b>리더보드 탭</b>에서 선방률·GSAx로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. <b>여러 명을 한꺼번에</b> 보려면 쉼표로 구분해 넣으세요(예: <b>노이어, 칸</b>). 옆의 <b>강화 드랍박스</b>로 특정 강화단계만 골라볼 수도 있습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
     <li>표의 <b>행을 클릭</b>하면 그 카드의 거리 구간별·슛 타입별 선방률과 세부 스탯이 펼쳐집니다.</li>
     <li><b>동일 선수 비교 탭</b>에서 같은 선수의 시즌·강화별 성적을 나란히 봅니다.</li>
   </ol>
@@ -448,7 +455,7 @@ function toggle(tr,c){
 function render(){
   const tb=document.querySelector('#lb tbody'); tb.innerHTML='';
   const more=document.getElementById('more'); more.innerHTML='';
-  let rows=D.leaderboard.filter(c=>matchName(c.player_name,q) && c.matches>=minGate &&
+  let rows=D.leaderboard.filter(c=>matchNames(c.player_name,q) && c.matches>=minGate &&
     (!gradeFilter || c.grade===+gradeFilter));
   rows=rows.slice().sort((a,b)=>{
     const av=a[sortKey], bv=b[sortKey];

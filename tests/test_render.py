@@ -345,6 +345,41 @@ def test_match_name_treats_empty_query_as_match_all():
     assert _eval_js("matchName(null,'x')", f) == "false"      # 질의가 있으면 탈락
 
 
+# ── 리더보드 탭 여러 이름 검색(쉼표 OR) ──────────────────────────────────────
+
+
+@requires_node
+def test_match_names_ors_comma_separated_terms():
+    f = render.FILTER_JS
+    # "노이어, 칸" → 두 선수 중 하나라도 이름에 들어가면 통과
+    assert _eval_js("matchNames('마누엘 노이어','노이어, 칸')", f) == "true"
+    assert _eval_js("matchNames('올리버 칸','노이어, 칸')", f) == "true"
+    assert _eval_js("matchNames('부폰','노이어, 칸')", f) == "false"
+
+
+@requires_node
+def test_match_names_single_term_and_empty():
+    f = render.FILTER_JS
+    assert _eval_js("matchNames('노이어','노이')", f) == "true"    # 쉼표 없으면 단일 부분일치
+    assert _eval_js("matchNames('아무개','')", f) == "true"        # 빈 질의는 전부 통과
+    assert _eval_js("matchNames('아무개',' , ')", f) == "true"     # 쉼표만/공백만도 전부 통과
+
+
+@requires_node
+def test_match_names_ignores_whitespace_around_commas():
+    f = render.FILTER_JS
+    # 쉼표 주변 공백은 무시하되, 이름 내부 공백(마누엘 노이어)은 보존한다.
+    assert _eval_js("matchNames('마누엘 노이어','  노이어  ,  칸  ')", f) == "true"
+    assert _eval_js("matchNames('마누엘 노이어','마누엘 노이어')", f) == "true"
+
+
+def test_leaderboard_uses_multi_name_matcher():
+    html = render.build_html(_PAYLOAD)
+    # 리더보드 필터는 여러 이름 매처를, 동일 선수 비교 탭은 단일 matchName 을 쓴다.
+    assert "matchNames(c.player_name,q)" in html.replace(" ", "")
+    assert "쉼표로" in html                        # 검색창 placeholder 힌트
+
+
 # ── 리더보드 탭 강화단계 필터(드랍박스) ─────────────────────────────────────
 
 
