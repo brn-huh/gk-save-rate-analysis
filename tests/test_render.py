@@ -216,11 +216,10 @@ def test_same_player_summary_shows_total_games():
 
 def test_matches_column_labeled_경기수_not_표본():
     html = render.build_html(_PAYLOAD)
-    # 경기수 컬럼 라벨: 메인 헤더 + 정렬버튼 + 동일선수 헤더
+    # 경기수 컬럼 라벨: 메인 헤더 + 동일선수 헤더. 정렬 버튼은 사용자 요청으로 제거됨(강화 필터가
+    # 드랍박스로 분리되며 함께 정리) → test_matches_sort_button_removed 가 그 부재를 검증.
     assert html.count("<th>경기수</th>") == 2       # 메인 목록 + 동일선수 표
-    assert 'data-sort="matches">경기수<' in html    # 정렬 버튼
     assert "<th>표본</th>" not in html              # 컬럼 라벨에 표본 없음
-    assert 'data-sort="matches">표본<' not in html
 
 
 def test_main_list_and_compare_have_salary_column():
@@ -346,34 +345,20 @@ def test_match_name_treats_empty_query_as_match_all():
     assert _eval_js("matchName(null,'x')", f) == "false"      # 질의가 있으면 탈락
 
 
-# ── 리더보드 탭 강화단계 검색 ───────────────────────────────────────────────
+# ── 리더보드 탭 강화단계 필터(드랍박스) ─────────────────────────────────────
 
 
-@requires_node
-def test_match_name_matches_grade_query():
-    f = render.FILTER_JS
-    assert _eval_js("matchName('아무개','9강',9)", f) == "true"
-    assert _eval_js("matchName('아무개','9강',10)", f) == "false"
-    assert _eval_js("matchName('아무개','10강',10)", f) == "true"
-    assert _eval_js("matchName('아무개','11강',11)", f) == "true"
+def test_grade_filter_dropdown_present():
+    html = render.build_html(_PAYLOAD)
+    assert 'id="gradeFilter"' in html
+    assert "강화 전체" in html                 # 기본 옵션(필터 없음)
+    assert "gradeFilter" in html                # 필터 상태 변수·onchange 핸들러
 
 
-@requires_node
-def test_match_name_grade_query_is_anchored_not_substring():
-    f = render.FILTER_JS
-    # "1강" 이 "10강"·"11강" 카드까지 잡으면 안 된다(부분일치 아닌 정확 일치).
-    assert _eval_js("matchName('아무개','1강',10)", f) == "false"
-    assert _eval_js("matchName('아무개','1강',11)", f) == "false"
-    assert _eval_js("matchName('아무개','1강',1)", f) == "true"
-
-
-@requires_node
-def test_match_name_grade_query_without_grade_arg_is_never_a_name_match():
-    f = render.FILTER_JS
-    # 동일 선수 비교 탭처럼 grade 인자를 안 주면(undefined) "N강" 질의는 이름과 우연히
-    # 같은 문자열이어도 매치하지 않는다 — 강화 질의 판별이 이름 매칭보다 우선이라 회귀는 아니다.
-    assert _eval_js("matchName('9강','9강')", f) == "false"
-    assert _eval_js("matchName('아무개','9강')", f) == "false"
+def test_matches_sort_button_removed():
+    html = render.build_html(_PAYLOAD)
+    # 강화 필터가 드랍박스로 분리되면서 "경기수" 정렬 버튼은 제거한다(사용자 요청).
+    assert 'data-sort="matches"' not in html
 
 
 def test_compare_tab_has_search_input():

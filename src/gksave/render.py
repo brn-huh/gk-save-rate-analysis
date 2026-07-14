@@ -38,17 +38,11 @@ function imgFallback(el){
 }
 """
 
-# 리더보드·비교탭이 공유하는 검색 규칙. tests/test_render.py 가 node 로 직접 실행한다.
+# 리더보드·비교탭이 공유하는 이름 검색 규칙. tests/test_render.py 가 node 로 직접 실행한다.
+# 강화단계 필터는 별도 드랍박스(gradeFilter)로 분리되어 있어 이 함수는 이름만 본다.
 FILTER_JS = r"""
-// 질의가 "9강"처럼 정확히 숫자+강 형태면 강화단계 매칭, 그 외엔 이름 부분일치(대소문자 무시).
-// grade 인자를 안 주는 호출(동일 선수 비교 탭)은 강화 매칭이 항상 실패해 이름 검색만 하던 기존 동작 그대로.
-const GRADE_RE=/^(\d{1,2})강$/;
-const matchName=(name,q,grade)=>{
-  if(!q) return true;
-  const m=q.match(GRADE_RE);
-  if(m) return grade===+m[1];
-  return String(name==null?'':name).toLowerCase().includes(q);
-};
+// 빈 질의는 전부 통과, 대소문자 무시 부분일치.
+const matchName=(name,q)=>!q||String(name==null?'':name).toLowerCase().includes(q);
 """
 
 # 선방률 신뢰구간. 비율이라 Wilson 95% 구간(작은 표본·극단 비율에서 Wald 보다 정확).
@@ -142,6 +136,8 @@ _TEMPLATE = r"""<!doctype html>
         flex:1;min-width:170px;background:var(--panel);color:var(--text);font-family:inherit}
   .controls input::placeholder{color:#5a6483}
   .controls .lab{color:var(--mut);font-size:.82rem}
+  .controls select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;font-size:.85rem;
+        background:var(--panel);color:var(--text);font-family:inherit;cursor:pointer}
   button.sort{padding:7px 13px;border:1px solid var(--line);background:var(--panel);color:var(--mut);
         border-radius:9px;cursor:pointer;font-size:.85rem;font-family:inherit;transition:.15s}
   button.sort:hover{border-color:var(--gold2);color:var(--text)}
@@ -273,12 +269,12 @@ _TEMPLATE = r"""<!doctype html>
 <!-- 탭 1: 리더보드 -->
 <div class="panel active" id="panel-lb">
   <div class="controls">
-    <input id="search" placeholder="선수 이름 또는 강화 검색 (예: 9강)…">
+    <input id="search" placeholder="선수 이름 검색…">
+    <select id="gradeFilter"><option value="">강화 전체</option></select>
     <span class="lab">정렬</span>
     <button class="sort active" data-sort="save_pct">선방률</button>
     <button class="sort" data-sort="gsax_per_shot">GSAx</button>
     <button class="sort" data-sort="gsax_ex_short_per_shot">GSAx(초근제외)</button>
-    <button class="sort" data-sort="matches">경기수</button>
     <span class="lab">경기수↑</span>
     <button class="gate active" data-gate="50">50</button>
     <button class="gate" data-gate="100">100</button>
@@ -300,7 +296,7 @@ _TEMPLATE = r"""<!doctype html>
     <input id="spSearch" placeholder="선수 이름 검색…">
     <span class="lab" id="spCount"></span>
   </div>
-  <p class="muted">같은 선수의 시즌·강화별 선방률(raw)과 GSAx. (여전히 raw 는 유저 교란 포함)</p>
+  <p class="muted">같은 선수의 시즌·강화별 선방률(보정 전)과 GSAx. (여전히 유저 실력 교란 포함)</p>
   <div id="sp"></div>
   <p class="empty" id="spEmpty" style="display:none">해당하는 선수가 없습니다.</p>
 </div>
@@ -309,7 +305,7 @@ _TEMPLATE = r"""<!doctype html>
 <div class="panel help" id="panel-help">
   <h2>이 페이지 사용법</h2>
   <ol class="usage">
-    <li><b>리더보드 탭</b>에서 선방률·GSAx·경기수로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. <b>"9강"처럼 강화단계로도 검색</b>할 수 있습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
+    <li><b>리더보드 탭</b>에서 선방률·GSAx로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. 옆의 <b>강화 드랍박스</b>로 특정 강화단계만 골라볼 수도 있습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
     <li>표의 <b>행을 클릭</b>하면 그 카드의 거리 구간별·슛 타입별 선방률과 세부 스탯이 펼쳐집니다.</li>
     <li><b>동일 선수 비교 탭</b>에서 같은 선수의 시즌·강화별 성적을 나란히 봅니다.</li>
   </ol>
@@ -317,7 +313,7 @@ _TEMPLATE = r"""<!doctype html>
   <h2>핵심 지표</h2>
   <dl class="lead">
     <dt>선방률</dt>
-    <dd>상대의 유효슛 중 막아낸 비율. <b>선방 ÷ (선방 + 실점)</b>으로 계산합니다. 값이 높을수록 잘 막은 것. 단, 이 순위의 raw 선방률에는 카드 성능뿐 아니라 <b>그 카드를 쓴 유저의 실력·수비 라인·상대 슛 난이도</b>가 섞여 있어 '카드 추천'이 아닙니다.</dd>
+    <dd>상대의 유효슛 중 막아낸 비율. <b>선방 ÷ (선방 + 실점)</b>으로 계산합니다. 값이 높을수록 잘 막은 것. 단, 이 순위의 선방률은 <b>보정하지 않은 값</b>이라 카드 성능뿐 아니라 <b>그 카드를 쓴 유저의 실력·수비 라인·상대 슛 난이도</b>가 섞여 있어 '카드 추천'이 아닙니다.</dd>
     <dt>GSAx / 100</dt>
     <dd>Goals Saved Above Expected — <b>슛 난이도를 보정</b>한 지표입니다. 거리·각도로 계산한 '기대 실점'보다 실제로 얼마나 더(또는 덜) 막았는지를 유효슛 100개 기준으로 환산합니다. <b>+면 기대보다 선방, −면 기대보다 실점</b>. 유저 실력 교란을 줄인, 선방률보다 공정한 비교값입니다.</dd>
     <dt>GSAx(초근제외)</dt>
@@ -365,7 +361,7 @@ _TEMPLATE = r"""<!doctype html>
 <script>
 const D = JSON.parse(document.getElementById('gk-data').textContent);
 const PAGE=100;
-let sortKey='save_pct', q='', limit=PAGE, minGate=50;
+let sortKey='save_pct', q='', limit=PAGE, minGate=50, gradeFilter='';
 const pct=v=>v==null?'N/A':(v*100).toFixed(1)+'%';
 const gps=v=>v==null?'':(v*100>=0?'+':'')+(v*100).toFixed(1);
 const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;};
@@ -394,9 +390,9 @@ const dr=D.date_range||{};
 const period=(dr.min&&dr.max)?`데이터 기간 ${dr.min} ~ ${dr.max} · `:'';
 const totalMatches = Number(D.total_collected_matches || 0).toLocaleString('ko-KR');
 document.getElementById('meta').textContent =
-  `${period}총 수집 경기 ${totalMatches}건 · 게이트 ${D.gate}경기↑ · ${D.leaderboard.length}장`;
+  `${period}총 수집 경기 ${totalMatches}건 · ${D.leaderboard.length}장`;
 document.getElementById('warn').innerHTML =
-  '<b>⚠️ 읽는 법:</b> 이 순위는 raw 선방률이라 카드 성능에 <b>유저 실력</b>이 섞여 있어 \'카드 추천\'이 아닙니다. 용어·자세한 설명은 <b>지표 설명</b> 탭.';
+  '<b>⚠️ 읽는 법:</b> 이 순위는 보정하지 않은 선방률이라 카드 성능에 <b>유저 실력</b>이 섞여 있어 \'카드 추천\'이 아닙니다. 용어·자세한 설명은 <b>지표 설명</b> 탭.';
 document.getElementById('warnFull').innerHTML = esc(D.warning);
 var gEl=document.getElementById('gateN'); if(gEl) gEl.textContent=D.gate;
 
@@ -452,7 +448,8 @@ function toggle(tr,c){
 function render(){
   const tb=document.querySelector('#lb tbody'); tb.innerHTML='';
   const more=document.getElementById('more'); more.innerHTML='';
-  let rows=D.leaderboard.filter(c=>matchName(c.player_name,q,c.grade) && c.matches>=minGate);
+  let rows=D.leaderboard.filter(c=>matchName(c.player_name,q) && c.matches>=minGate &&
+    (!gradeFilter || c.grade===+gradeFilter));
   rows=rows.slice().sort((a,b)=>{
     const av=a[sortKey], bv=b[sortKey];
     if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1; return bv-av;
@@ -491,6 +488,12 @@ function render(){
   }
 }
 document.getElementById('search').oninput=e=>{q=e.target.value.trim().toLowerCase();limit=PAGE;render();};
+// 강화 드랍박스 — 실제 데이터에 있는 강화단계로 옵션을 만들어, 새 강화가 추가돼도 코드 수정 없이 반영된다.
+const gSel=document.getElementById('gradeFilter');
+[...new Set(D.leaderboard.map(c=>c.grade))].sort((a,b)=>a-b).forEach(g=>{
+  const o=document.createElement('option'); o.value=g; o.textContent=g+'강'; gSel.appendChild(o);
+});
+gSel.onchange=e=>{gradeFilter=e.target.value;limit=PAGE;render();};
 document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('[data-sort]').forEach(x=>x.classList.remove('active'));
   b.classList.add('active'); sortKey=b.dataset.sort; limit=PAGE; render();
