@@ -86,6 +86,7 @@ def build_payload(
     # 선수 부가정보(급여·기본OVR·키·몸무게·체형)와 시즌 엠블럼 붙이기 — 있는 카드만
     playerinfo.attach_info(con, leaderboard)
     playerinfo.attach_season_img(con, leaderboard)
+    playerinfo.attach_bio(con, leaderboard)   # 국가·클럽 (pid 매칭)
 
     # 메타 캐시가 있으면 선수명·시즌 붙이고 동일선수 시즌 비교표 추가
     if meta.has_meta(con):
@@ -97,6 +98,7 @@ def build_payload(
         sp_cards = [c for g in payload["same_player"] for c in g.get("cards", [])]
         playerinfo.attach_info(con, sp_cards)
         playerinfo.attach_season_img(con, sp_cards)
+        playerinfo.attach_bio(con, sp_cards)
     return payload
 
 

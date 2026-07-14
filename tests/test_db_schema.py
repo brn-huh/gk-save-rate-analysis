@@ -43,3 +43,16 @@ def test_read_only_connect_does_not_apply_schema(tmp_path):
     con = db.connect(settings, read_only=True)
     tables = [r[0] for r in con.execute("SHOW TABLES").fetchall()]
     assert "raw_match" not in tables  # SCHEMA 가 적용되지 않았다
+
+
+def test_player_bio_and_club_tables_exist():
+    """국가·클럽 캐시 테이블(pid 키)이 스키마에 있어야 한다."""
+    con = db.connect_memory()
+    cols = {r[0]: r[1] for r in con.execute(
+        "SELECT column_name, data_type FROM duckdb_columns() "
+        "WHERE table_name='player_bio'").fetchall()}
+    assert cols.get("pid") == "BIGINT"
+    assert "nation_code" in cols and "nation_name" in cols
+    club_cols = [r[0] for r in con.execute(
+        "SELECT column_name FROM duckdb_columns() WHERE table_name='player_club'").fetchall()]
+    assert set(["pid", "ord", "club_name"]).issubset(club_cols)

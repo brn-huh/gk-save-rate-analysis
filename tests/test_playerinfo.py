@@ -11,9 +11,12 @@ from gksave.db import connect_memory
 from gksave.playerinfo import (
     FCINFO_BASE,
     PlayerInfo,
+    attach_bio,
+    parse_bio,
     parse_player,
     season_of,
     season_img_url,
+    sync_player_bio,
     sync_player_info,
 )
 
@@ -243,3 +246,134 @@ def test_salary_and_all_fields_persisted():
         "SELECT salary, ovr, height, weight, body_type FROM player_info WHERE spid=825192448"
     ).fetchone()
     assert row == (24, 113, 187, 85, "보통")     # 급여 포함 전부 저장
+
+
+# ── 국가·클럽 파싱 (fc-info 상세페이지 HTML) ─────────────────────────────────
+
+def _detail_html(nation_code, nation_name, clubs):
+    """실제 fc-info 상세페이지의 국가·클럽 마크업을 최소 재현한 HTML."""
+    flag = (f'<img src="https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/'
+            f'countries/smallflags/{nation_code}.png" alt="nationality"/>'
+            f'<span>{nation_name}</span>') if nation_code is not None else ''
+    items = ''.join(
+        f'<div class="PlayerClubHistory_clubItem__n146_">'
+        f'<div class="PlayerClubHistory_year__SKkzV">1900 ~ 1901</div>'
+        f'<div>{c}</div></div>' for c in clubs)
+    return f'<div>{flag}</div><div><span>클럽 경력</span></div><div>{items}</div>'
+
+
+def test_parse_bio_single_club():
+    code, name, clubs = parse_bio(_detail_html(40, "러시아", ["디나모 모스크바"]))
+    assert code == 40 and name == "러시아" and clubs == ["디나모 모스크바"]
+
+
+def test_parse_bio_multiple_clubs_in_order():
+    _, _, clubs = parse_bio(_detail_html(27, "이탈리아", ["파르마", "유벤투스", "파리 생제르맹"]))
+    assert clubs == ["파르마", "유벤투스", "파리 생제르맹"]
+
+
+def test_parse_bio_dedupes_repeated_club():
+    # 임대 복귀 등으로 같은 클럽이 두 번 표기되면 첫 등장만 남긴다.
+    _, _, clubs = parse_bio(_detail_html(45, "스페인", ["아스널", "브렌트퍼드", "아스널"]))
+    assert clubs == ["아스널", "브렌트퍼드"]
+
+
+def test_parse_bio_missing_nation_keeps_code_none_but_clubs():
+    code, name, clubs = parse_bio(_detail_html(None, None, ["FC 포르투"]))
+    assert code is None and name is None and clubs == ["FC 포르투"]
+
+
+# ── sync_player_bio: pid당 1회 · 증분 · 중복제거 ─────────────────────────────
+
+def _mock_detail(by_spid):
+    """{spid: (code, name, [clubs])} → /player/{spid}?grade=1 에 상세 HTML 을 돌려주는 목."""
+    calls = {"paths": []}
+
+    def handler(request):
+        calls["paths"].append(request.url.path)
+        spid = int(request.url.path.rsplit("/", 1)[-1])
+        code, name, clubs = by_spid.get(spid, (None, None, []))
+        return httpx.Response(200, text=_detail_html(code, name, clubs))
+
+    client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
+    client._calls = calls
+    return client
+
+
+def test_sync_bio_fetches_per_pid_and_stores():
+    con = connect_memory()
+    _seed_gk(con, 100238380, "야신")     # pid 238380
+    _seed_gk(con, 100001179, "부폰")     # pid 1179
+    client = _mock_detail({
+        100238380: (40, "러시아", ["디나모 모스크바"]),
+        100001179: (27, "이탈리아", ["파르마", "유벤투스"]),
+    })
+    r = sync_player_bio(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert r["new"] == 2 and r["failed"] == 0
+    bios = con.execute("SELECT pid, nation_code, nation_name FROM player_bio ORDER BY pid").fetchall()
+    assert bios == [(1179, 27, "이탈리아"), (238380, 40, "러시아")]
+    clubs = con.execute("SELECT pid, ord, club_name FROM player_club ORDER BY pid, ord").fetchall()
+    assert clubs == [(1179, 0, "파르마"), (1179, 1, "유벤투스"), (238380, 0, "디나모 모스크바")]
+
+
+def test_sync_bio_one_request_per_pid_across_seasons():
+    con = connect_memory()
+    # 같은 실선수(pid 1179)의 두 시즌 카드 → pid당 1요청만
+    _seed_gk(con, 100001179, "부폰")
+    _seed_gk(con, 300001179, "부폰(다른 시즌)")
+    client = _mock_detail({100001179: (27, "이탈리아", ["유벤투스"]),
+                           300001179: (27, "이탈리아", ["유벤투스"])})
+    sync_player_bio(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert len(client._calls["paths"]) == 1                # pid 1179 하나만 요청
+    assert con.execute("SELECT count(*) FROM player_bio").fetchone()[0] == 1
+
+
+def test_sync_bio_incremental_skips_cached():
+    con = connect_memory()
+    _seed_gk(con, 100238380, "야신")
+    con.execute("INSERT INTO player_bio (pid, nation_code, nation_name) VALUES (238380, 40, '러시아')")
+    client = _mock_detail({100238380: (99, "바뀜", ["X"])})
+    r = sync_player_bio(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert client._calls["paths"] == []                    # 이미 있으니 호출 0
+    assert r["new"] == 0
+
+
+def test_sync_bio_limit_caps_requests():
+    con = connect_memory()
+    for i in range(5):
+        _seed_gk(con, 100000000 + i, f"p{i}")
+    client = _mock_detail({100000000 + i: (i, f"N{i}", [f"C{i}"]) for i in range(5)})
+    r = sync_player_bio(con, client=client, limit=2, sleep=lambda _x: None, log=lambda _m: None)
+    assert r["new"] == 2 and len(client._calls["paths"]) == 2
+
+
+def test_export_attaches_bio_by_pid():
+    from gksave import agg, export
+    from gksave.codec import encode_payload
+
+    con = connect_memory()
+    # 카드 spid 846193080 (pid 193080). bio 는 pid 193080 로 저장.
+    detail = {
+        "matchId": "b1", "matchType": 50, "matchDate": "2026-06-20T00:00:00",
+        "matchInfo": [
+            {"ouid": "U", "player": [{"spId": 846193080, "spPosition": 0, "spGrade": 10}], "shootDetail": []},
+            {"ouid": "O", "player": [{"spId": 600, "spPosition": 0, "spGrade": 10}],
+             "shootDetail": [{"result": 1, "type": 1, "x": 0.9, "y": 0.5}]},
+        ],
+    }
+    con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)", ["b1", encode_payload(detail)])
+    agg.rebuild(con)
+    con.execute("INSERT INTO player_bio (pid, nation_code, nation_name) VALUES (193080, 21, '독일')")
+    con.execute("INSERT INTO player_club (pid, ord, club_name) VALUES (193080, 0, '바이에른 뮌헨')")
+
+    c = export.build_payload(con, gate=1)["leaderboard"][0]
+    assert c["bio"]["nation_code"] == 21
+    assert c["bio"]["nation_name"] == "독일"
+    assert c["bio"]["clubs"] == ["바이에른 뮌헨"]
+
+
+def test_attach_bio_none_when_absent():
+    con = connect_memory()
+    cards = [{"gk_sp_id": 846193080}]
+    attach_bio(con, cards)          # player_bio·player_club 비어있음
+    assert cards[0]["bio"] is None

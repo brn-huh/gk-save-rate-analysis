@@ -62,6 +62,24 @@ CREATE TABLE IF NOT EXISTS season_img (
     img       VARCHAR
 );
 
+-- 선수 국적 (pid → 국가). fc-info 상세페이지에서 pid당 1회 수집. 국가는 시즌 무관 선수 속성이라
+-- spid(카드) 아닌 pid(실선수) 키. nation_code 로 넥슨 CDN 국기(countries/smallflags/{code}.png) 로드.
+CREATE TABLE IF NOT EXISTS player_bio (
+    pid         BIGINT PRIMARY KEY,
+    nation_code INTEGER,
+    nation_name VARCHAR,
+    fetched_at  TIMESTAMP DEFAULT now()
+);
+
+-- 선수 클럽 이력 (pid → 클럽명들, 표기 순서 ord). 한 선수에 여러 클럽 = 여러 행.
+-- 클럽으로 선수를 역검색하기 위한 구조. 중복 클럽명은 수집 단계에서 제거.
+CREATE TABLE IF NOT EXISTS player_club (
+    pid       BIGINT,
+    ord       INTEGER,
+    club_name VARCHAR,
+    PRIMARY KEY (pid, ord)
+);
+
 -- GK 출전: 카드가 GK로 뛴 경기 1건 = 1행 (슛 0개 경기도 표본 게이트에 반영)
 CREATE TABLE IF NOT EXISTS gk_match (
     match_id       VARCHAR,

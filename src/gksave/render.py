@@ -23,6 +23,8 @@ const CDN='https://fco.dn.nexoncdn.co.kr/live/externalAssets/common';
 const pidOf=spid=>String(spid).slice(-6).replace(/^0+/,'');
 const portraitUrl=spid=>CDN+'/players/p'+pidOf(spid)+'.png';
 const actionUrl=spid=>CDN+'/playersAction/p'+spid+'.png';
+// 국기: 넥슨 CDN 국가 코드별 작은 국기.
+const flagUrl=code=>CDN+'/countries/smallflags/'+code+'.png';
 // 목록 썸네일은 커버리지 100% 인 얼굴만 쓴다. 액션샷은 38% 가 없어 403 이 쏟아진다.
 const thumbUrl=portraitUrl;
 const PLACEHOLDER='data:image/svg+xml;utf8,'+encodeURIComponent(
@@ -49,6 +51,14 @@ const matchNames=(name,q)=>{
   if(!q) return true;
   const terms=q.split(',').map(s=>s.trim()).filter(Boolean);
   return !terms.length || terms.some(t=>matchName(name,t));
+};
+// 리더보드 전용: 카드의 국가명 또는 클럽명에 부분일치(OR). 이름 검색과는 별개 입력이며,
+// 국가·클럽을 서로 AND 로 조합하지 않는다(한 입력이 국가든 클럽이든 걸리면 통과).
+const matchNatClub=(bio,q)=>{
+  if(!q) return true;
+  if(!bio) return false;
+  if(matchName(bio.nation_name,q)) return true;
+  return (bio.clubs||[]).some(c=>matchName(c,q));
 };
 """
 
@@ -245,6 +255,10 @@ _TEMPLATE = r"""<!doctype html>
   .chips .chip{font-size:.78rem;color:var(--text);background:var(--panel2);border:1px solid var(--line);
         border-radius:7px;padding:3px 8px;font-variant-numeric:tabular-nums}
   .chips .chip b{color:var(--gold2);font-weight:700}
+  .chips .chip.nat{display:inline-flex;align-items:center;gap:5px}
+  .chips .chip.nat .flag{border-radius:2px;object-fit:cover;vertical-align:middle}
+  .hero-meta .clubs{margin-top:8px;font-size:.8rem;color:var(--mut);line-height:1.5}
+  .hero-meta .clubs b{color:var(--gold2);font-weight:700;margin-right:4px}
   /* 표는 375px 에서 606px 다. 본문이 아니라 표만 가로로 스크롤시킨다.
      overflow-x 를 상시로 걸면 overflow-y 가 auto 로 승격돼 sticky thead 가 깨진다.
      데스크톱은 표가 안 넘치므로 모바일에서만 감싼다. */
@@ -277,6 +291,7 @@ _TEMPLATE = r"""<!doctype html>
 <div class="panel active" id="panel-lb">
   <div class="controls">
     <input id="search" placeholder="선수 이름 검색 (여러 명은 쉼표로: 노이어, 칸)…">
+    <input id="natClubSearch" placeholder="국가·클럽 검색 (예: 이탈리아 / 유벤투스)…">
     <select id="gradeFilter"><option value="">강화 전체</option></select>
     <span class="lab">정렬</span>
     <button class="sort active" data-sort="save_pct">선방률</button>
@@ -312,7 +327,7 @@ _TEMPLATE = r"""<!doctype html>
 <div class="panel help" id="panel-help">
   <h2>이 페이지 사용법</h2>
   <ol class="usage">
-    <li><b>리더보드 탭</b>에서 선방률·GSAx로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. <b>여러 명을 한꺼번에</b> 보려면 쉼표로 구분해 넣으세요(예: <b>노이어, 칸</b>). 옆의 <b>강화 드랍박스</b>로 특정 강화단계만 골라볼 수도 있습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
+    <li><b>리더보드 탭</b>에서 선방률·GSAx로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. <b>여러 명을 한꺼번에</b> 보려면 쉼표로 구분해 넣으세요(예: <b>노이어, 칸</b>). <b>국가·클럽 검색</b>으로 특정 국가(예: <b>이탈리아</b>)나 클럽(예: <b>유벤투스</b>) 출신만 볼 수도 있습니다. 옆의 <b>강화 드랍박스</b>로 특정 강화단계만 골라볼 수도 있습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
     <li>표의 <b>행을 클릭</b>하면 그 카드의 거리 구간별·슛 타입별 선방률과 세부 스탯이 펼쳐집니다.</li>
     <li><b>동일 선수 비교 탭</b>에서 같은 선수의 시즌·강화별 성적을 나란히 봅니다.</li>
   </ol>
@@ -368,7 +383,7 @@ _TEMPLATE = r"""<!doctype html>
 <script>
 const D = JSON.parse(document.getElementById('gk-data').textContent);
 const PAGE=100;
-let sortKey='save_pct', q='', limit=PAGE, minGate=50, gradeFilter='';
+let sortKey='save_pct', q='', limit=PAGE, minGate=50, gradeFilter='', natClubQ='';
 const pct=v=>v==null?'N/A':(v*100).toFixed(1)+'%';
 const gps=v=>v==null?'':(v*100>=0?'+':'')+(v*100).toFixed(1);
 const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;};
@@ -425,21 +440,30 @@ function detailHtml(c){
     stat('경기당 평균 평점', e.gk_rating==null?'-':e.gk_rating)+
     stat('패스 성공률', pct(e.pass_pct));
     // 공중볼(aerial)은 게임상 GK에 거의 안 잡혀(중앙값 1) 노이즈 → 화면 미표시. 데이터는 DB 유지.
-  const info=c.info||{};
+  const info=c.info||{}, bio=c.bio||{};
   const chip=(label,val)=>val==null?'':`<span class="chip"><b>${label}</b>${esc(val)}</span>`;
+  // 국가 칩: 넥슨 CDN 국기 + 국가명. code 만 있으면 국기라도 표시(국가명 파싱 실패 대비).
+  const natChip = bio.nation_code==null ? '' :
+    `<span class="chip nat"><img class="flag" src="${flagUrl(bio.nation_code)}" alt="" `+
+    `width="20" height="14" loading="lazy" onerror="this.style.display='none'">${esc(bio.nation_name||'')}</span>`;
   const infoRow=[
+    natChip,
     chip('급여 ', info.salary),
     chip('기본 OVR ', info.ovr),
     chip('키 ', info.height==null?null:info.height+'cm'),
     chip('몸무게 ', info.weight==null?null:info.weight+'kg'),
     chip('체형 ', info.body_type),
   ].join('');
+  // 클럽 이력: 표기순 나열. 없으면 생략.
+  const clubsRow = (bio.clubs&&bio.clubs.length)
+    ? `<div class="clubs"><b>클럽</b> ${bio.clubs.map(esc).join(' · ')}</div>` : '';
   const hero=
     `<div class="hero">${heroImg(c.gk_sp_id,c.player_name)}<div class="hero-meta">`+
     `<h3>${esc(c.player_name||('spId '+c.gk_sp_id))}</h3>`+
     `<p class="sub"><span class="scell">${seasonIcon(c.season_img,c.season_name)}${esc(c.season_name||'')}</span> · ${c.grade}강</p>`+
     `<div class="big">${pct(c.save_pct)}<small>선방률 ${ciText(c.saves,c.goals)} · 경기수 ${c.matches}</small></div>`+
     (infoRow?`<div class="chips">${infoRow}</div>`:'')+
+    clubsRow+
     `</div></div>`;
   return hero+
          `<div class="detail-grid"><div><h4>거리 구간별 (근사 미터)</h4>${zones}</div>`+
@@ -456,7 +480,7 @@ function render(){
   const tb=document.querySelector('#lb tbody'); tb.innerHTML='';
   const more=document.getElementById('more'); more.innerHTML='';
   let rows=D.leaderboard.filter(c=>matchNames(c.player_name,q) && c.matches>=minGate &&
-    (!gradeFilter || c.grade===+gradeFilter));
+    (!gradeFilter || c.grade===+gradeFilter) && matchNatClub(c.bio,natClubQ));
   rows=rows.slice().sort((a,b)=>{
     const av=a[sortKey], bv=b[sortKey];
     if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1; return bv-av;
@@ -465,8 +489,9 @@ function render(){
   const gf = sortKey.indexOf('gsax')===0 ? sortKey : 'gsax_per_shot';  // GSAx 컬럼은 활성 모드 값
   document.getElementById('gsaxHdr').textContent =
     gf==='gsax_ex_short_per_shot' ? 'GSAx/100(초근×)' : 'GSAx/100';
-  // 검색 중이면 전체에서 찾도록 캡 무시, 아니면 상위 limit 장만 그린다(초기 로드 경량화)
-  const vis = q ? rows : rows.slice(0, limit);
+  // 검색 중(이름 또는 국가/클럽)이면 전체에서 찾도록 캡 무시, 아니면 상위 limit 장만(경량화)
+  const searching = q || natClubQ;
+  const vis = searching ? rows : rows.slice(0, limit);
   vis.forEach((c,i)=>{
     const tr=document.createElement('tr'); tr.className='row';
     tr.innerHTML=`<td class="rank">${i+1}</td>`+
@@ -478,7 +503,7 @@ function render(){
       `<td class="num">${c.matches}</td>`;
     tr.onclick=()=>toggle(tr,c); tb.appendChild(tr);
   });
-  if(q) return;  // 검색 중엔 더보기/접기 없음
+  if(searching) return;  // 검색 중엔 더보기/접기 없음
   if(rows.length>limit){
     const b1=document.createElement('button');
     b1.textContent=`더 보기 (${vis.length}/${rows.length})`;
@@ -495,6 +520,7 @@ function render(){
   }
 }
 document.getElementById('search').oninput=e=>{q=e.target.value.trim().toLowerCase();limit=PAGE;render();};
+document.getElementById('natClubSearch').oninput=e=>{natClubQ=e.target.value.trim().toLowerCase();limit=PAGE;render();};
 // 강화 드랍박스 — 실제 데이터에 있는 강화단계로 옵션을 만들어, 새 강화가 추가돼도 코드 수정 없이 반영된다.
 const gSel=document.getElementById('gradeFilter');
 [...new Set(D.leaderboard.map(c=>c.grade))].sort((a,b)=>a-b).forEach(g=>{

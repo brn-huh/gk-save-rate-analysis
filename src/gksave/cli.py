@@ -84,6 +84,14 @@ def _cmd_playerinfo(_args) -> None:
         con.close()
 
 
+def _cmd_playerbio(args) -> None:
+    con = connect(DEFAULT)
+    try:
+        playerinfo.sync_player_bio(con, delay=args.delay, limit=args.limit)
+    finally:
+        con.close()
+
+
 def _cmd_export(args) -> None:
     con = connect(DEFAULT, read_only=True)
     try:
@@ -198,6 +206,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser(
         "playerinfo", help="선수 급여·기본OVR·키·몸무게·체형 캐시 (fc-info, 우리 GK만·1회)"
     ).set_defaults(func=_cmd_playerinfo)
+
+    pb = sub.add_parser(
+        "playerbio", help="선수 국가·클럽이력 캐시 (fc-info 상세, 우리 GK 선수당·1회)"
+    )
+    pb.add_argument("--delay", type=float, default=1.0, help="상세요청 사이 지연(초)")
+    pb.add_argument("--limit", type=int, help="이번에 받을 선수 수 상한(소량 시험용)")
+    pb.set_defaults(func=_cmd_playerbio)
 
     e = sub.add_parser("export", help="JSON/CSV/HTML 산출")
     e.add_argument("--gate", type=int, default=MIN_MATCHES_GATE)
