@@ -17,7 +17,8 @@ from typing import Any
 IMAGE_CDN = "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common"
 
 # 브라우저 탭 아이콘(파비콘). 자기완결형 유지를 위해 64px PNG 를 data URI 로 임베드한다.
-# 원본은 assets/gk-icon.png, 이 파일은 `sips -Z 64` 축소본의 base64 (favicon.txt 로 커밋).
+# 원본은 assets/gk-icon.png. 흰 캔버스는 네 모서리 flood-fill 로 투명화(공·장갑 흰색은 검은
+# 라운드 사각형에 둘러싸여 안전) 후 사각형으로 크롭·64px 축소 → base64 를 favicon.txt 로 커밋.
 FAVICON = (Path(__file__).parent / "favicon.txt").read_text().strip()
 
 # 페이지에 그대로 실려 나가는 이미지 JS. tests/test_render.py 가 node 로 이 문자열을
