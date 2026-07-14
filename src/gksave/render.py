@@ -60,6 +60,15 @@ const matchNatClub=(bio,q)=>{
   if(matchName(bio.nation_name,q)) return true;
   return (bio.clubs||[]).some(c=>matchName(c,q));
 };
+// 리더보드 전용: 급여 범위 필터. lo/hi 는 숫자 또는 null(미지정). 급여 미상(null)은
+// 범위가 하나라도 지정되면 제외한다(검증 불가한 값을 통과시키지 않음).
+const matchSalary=(salary,lo,hi)=>{
+  if(lo==null && hi==null) return true;
+  if(salary==null) return false;
+  if(lo!=null && salary<lo) return false;
+  if(hi!=null && salary>hi) return false;
+  return true;
+};
 """
 
 # 선방률 신뢰구간. 비율이라 Wilson 95% 구간(작은 표본·극단 비율에서 Wald 보다 정확).
@@ -152,6 +161,8 @@ _TEMPLATE = r"""<!doctype html>
   .controls input{padding:9px 12px;border:1px solid var(--line);border-radius:9px;font-size:.9rem;
         flex:1;min-width:170px;background:var(--panel);color:var(--text);font-family:inherit}
   .controls input::placeholder{color:#5a6483}
+  /* 급여 숫자 입력은 검색창처럼 늘어나지 않게 고정 폭 */
+  .controls input.numf{flex:0 0 auto;width:74px;min-width:0;padding:9px 10px;text-align:center}
   .controls .lab{color:var(--mut);font-size:.82rem}
   .controls select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;font-size:.85rem;
         background:var(--panel);color:var(--text);font-family:inherit;cursor:pointer}
@@ -293,6 +304,10 @@ _TEMPLATE = r"""<!doctype html>
     <input id="search" placeholder="선수 이름 검색 (여러 명은 쉼표로: 노이어, 칸)…">
     <input id="natClubSearch" placeholder="국가·클럽 검색 (예: 이탈리아 / 유벤투스)…">
     <select id="gradeFilter"><option value="">강화 전체</option></select>
+    <span class="lab">급여</span>
+    <input id="salMin" class="numf" type="number" inputmode="numeric" min="0" placeholder="이상">
+    <span class="lab">~</span>
+    <input id="salMax" class="numf" type="number" inputmode="numeric" min="0" placeholder="이하">
     <span class="lab">정렬</span>
     <button class="sort active" data-sort="save_pct">선방률</button>
     <button class="sort" data-sort="gsax_per_shot">GSAx</button>
@@ -383,7 +398,7 @@ _TEMPLATE = r"""<!doctype html>
 <script>
 const D = JSON.parse(document.getElementById('gk-data').textContent);
 const PAGE=100;
-let sortKey='save_pct', q='', limit=PAGE, minGate=50, gradeFilter='', natClubQ='';
+let sortKey='save_pct', q='', limit=PAGE, minGate=50, gradeFilter='', natClubQ='', salMin=null, salMax=null;
 const pct=v=>v==null?'N/A':(v*100).toFixed(1)+'%';
 const gps=v=>v==null?'':(v*100>=0?'+':'')+(v*100).toFixed(1);
 const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;};
@@ -480,7 +495,8 @@ function render(){
   const tb=document.querySelector('#lb tbody'); tb.innerHTML='';
   const more=document.getElementById('more'); more.innerHTML='';
   let rows=D.leaderboard.filter(c=>matchNames(c.player_name,q) && c.matches>=minGate &&
-    (!gradeFilter || c.grade===+gradeFilter) && matchNatClub(c.bio,natClubQ));
+    (!gradeFilter || c.grade===+gradeFilter) && matchNatClub(c.bio,natClubQ) &&
+    matchSalary(c.info&&c.info.salary,salMin,salMax));
   rows=rows.slice().sort((a,b)=>{
     const av=a[sortKey], bv=b[sortKey];
     if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1; return bv-av;
@@ -521,6 +537,10 @@ function render(){
 }
 document.getElementById('search').oninput=e=>{q=e.target.value.trim().toLowerCase();limit=PAGE;render();};
 document.getElementById('natClubSearch').oninput=e=>{natClubQ=e.target.value.trim().toLowerCase();limit=PAGE;render();};
+// 급여 범위 — 빈칸이면 null(미지정). 숫자 아니면 무시.
+const parseSal=v=>{const n=parseInt(v,10);return Number.isFinite(n)?n:null;};
+document.getElementById('salMin').oninput=e=>{salMin=parseSal(e.target.value);limit=PAGE;render();};
+document.getElementById('salMax').oninput=e=>{salMax=parseSal(e.target.value);limit=PAGE;render();};
 // 강화 드랍박스 — 실제 데이터에 있는 강화단계로 옵션을 만들어, 새 강화가 추가돼도 코드 수정 없이 반영된다.
 const gSel=document.getElementById('gradeFilter');
 [...new Set(D.leaderboard.map(c=>c.grade))].sort((a,b)=>a-b).forEach(g=>{

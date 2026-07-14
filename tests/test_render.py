@@ -406,6 +406,39 @@ def test_leaderboard_has_nat_club_search_input():
     assert "matchNatClub(c.bio,natClubQ)" in html.replace(" ", "")   # 필터에 결합
 
 
+# ── 리더보드 탭 급여 범위 필터 ──────────────────────────────────────────────
+
+
+@requires_node
+def test_match_salary_bounds():
+    f = render.FILTER_JS
+    # 이상(lo)만
+    assert _eval_js("matchSalary(20,15,null)", f) == "true"
+    assert _eval_js("matchSalary(10,15,null)", f) == "false"
+    # 이하(hi)만
+    assert _eval_js("matchSalary(10,null,15)", f) == "true"
+    assert _eval_js("matchSalary(20,null,15)", f) == "false"
+    # 범위(둘 다) — 경계 포함
+    assert _eval_js("matchSalary(15,15,20)", f) == "true"
+    assert _eval_js("matchSalary(20,15,20)", f) == "true"
+    assert _eval_js("matchSalary(21,15,20)", f) == "false"
+
+
+@requires_node
+def test_match_salary_empty_passes_and_null_salary_excluded_when_bounded():
+    f = render.FILTER_JS
+    assert _eval_js("matchSalary(5,null,null)", f) == "true"      # 범위 미지정 → 전부 통과
+    assert _eval_js("matchSalary(null,null,null)", f) == "true"   # 급여 미상도 필터 없으면 통과
+    assert _eval_js("matchSalary(null,15,null)", f) == "false"    # 범위 켜지면 미상은 제외
+    assert _eval_js("matchSalary(null,null,20)", f) == "false"
+
+
+def test_leaderboard_has_salary_filter_inputs():
+    html = render.build_html(_PAYLOAD)
+    assert 'id="salMin"' in html and 'id="salMax"' in html
+    assert "matchSalary(c.info&&c.info.salary,salMin,salMax)" in html.replace(" ", "")
+
+
 # ── 리더보드 탭 강화단계 필터(드랍박스) ─────────────────────────────────────
 
 
