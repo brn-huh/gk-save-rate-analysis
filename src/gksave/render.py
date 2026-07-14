@@ -295,7 +295,7 @@ _TEMPLATE = r"""<!doctype html>
   .hero-meta .clubs{margin-top:8px;font-size:.8rem;color:var(--mut);line-height:1.5}
   .hero-meta .clubs b{color:var(--gold2);font-weight:700;margin-right:4px}
   /* 특성(트레잇) — 아이콘+이름, 신규특성은 금색 테두리+배지 */
-  .traits{display:flex;flex-wrap:wrap;gap:8px}
+  .traits{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
   .trait{display:inline-flex;align-items:center;gap:7px;padding:4px 9px 4px 5px;border-radius:9px;
         background:var(--panel2);border:1px solid var(--line);font-size:.82rem}
   .trait .trait-ico{width:26px;height:26px;flex:0 0 auto;object-fit:contain}
