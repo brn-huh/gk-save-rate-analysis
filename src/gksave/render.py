@@ -273,6 +273,8 @@ _TEMPLATE = r"""<!doctype html>
   /* min-width:0 이 없으면 flex 아이템이 콘텐츠 폭 아래로 못 줄어 말줄임이 안 걸린다.
      한글은 공백이 없어 줄바꿈을 허용하면 글자 단위로 쪼개진다 → 반드시 nowrap + 말줄임. */
   .pcell .pn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* 목록 이름 옆 신규특성 아이콘(hover 시 title 로 이름). */
+  .pcell .lb-trait{width:20px;height:20px;flex:0 0 auto;object-fit:contain;cursor:help}
   summary .pcell{display:inline-flex;vertical-align:middle;align-items:center}
   .sp-total{margin-left:9px;font-size:.78rem;font-weight:600;color:var(--gold2);
         background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px 8px;
@@ -559,9 +561,13 @@ function render(){
   const vis = searching ? rows : rows.slice(0, limit);
   vis.forEach((c,i)=>{
     const tr=document.createElement('tr'); tr.className='row';
+    // 신규특성만 이름 옆에 아이콘으로. title 로 hover 시 특성명 노출.
+    const newIcons=(c.traits||[]).filter(t=>t.is_new).map(t=>
+      `<img class="lb-trait" src="${traitUrl(t.code)}" alt="${escAttr(t.name)}" title="${escAttr(t.name)}" `+
+      `width="20" height="20" loading="lazy" onerror="this.style.display='none'">`).join('');
     tr.innerHTML=`<td class="rank">${i+1}</td>`+
       `<td><div class="pcell">${thumbImg(c.gk_sp_id,c.player_name)}`+
-      `<span class="pn">${esc(c.player_name||('spId '+c.gk_sp_id))}</span></div></td>`+
+      `<span class="pn">${esc(c.player_name||('spId '+c.gk_sp_id))}</span>${newIcons}</div></td>`+
       `<td class="season"><span class="scell">${seasonCell(c.season_img,c.season_name)}</span></td><td class="num">${c.grade}강</td>`+
       `<td class="num">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
       `<td class="num">${(c.info&&c.info.ovr!=null)?c.info.ovr:''}</td>`+

@@ -292,6 +292,13 @@ def test_drilldown_shows_traits_with_new_badge():
     assert "신규" in html                                   # 신규 배지 라벨
 
 
+def test_list_shows_new_trait_icons_only_with_title():
+    html = render.build_html(_PAYLOAD).replace(" ", "")
+    assert "filter(t=>t.is_new)" in html          # 목록엔 신규특성만
+    assert 'class="lb-trait"' in html             # 목록 신규특성 아이콘
+    assert 'title="${escAttr(t.name)}"' in html   # hover 시 특성명(title)
+
+
 def test_favicon_is_embedded_data_uri():
     """브라우저 탭 아이콘: 자기완결 유지를 위해 data URI 로 임베드(외부 파일 아님)."""
     html = render.build_html(_PAYLOAD)
