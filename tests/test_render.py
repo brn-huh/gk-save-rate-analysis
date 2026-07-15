@@ -300,6 +300,20 @@ def test_list_shows_new_trait_icons_only_with_tooltip():
     assert ".lb-trait-w:hover::after" in html      # 툴팁 말풍선 스타일
 
 
+def test_drilldown_lazy_loads_details():
+    html = render.build_html(_PAYLOAD)
+    assert "fetch('details.json')" in html.replace('"', "'")   # 상세는 클릭 시 fetch
+    assert "function loadDetails(" in html                     # 1회 캐시 로더
+    assert "detail-loading" in html                            # 로딩/에러 표기
+    assert "c.gk_sp_id+'_'+c.grade" in html.replace(" ", "").replace('"', "'")  # spid_grade 키
+
+
+def test_has_reset_filters_button():
+    html = render.build_html(_PAYLOAD)
+    assert 'id="resetFilters"' in html                         # 필터 초기화 아이콘 버튼
+    assert "필터 초기화" in html                                # title/aria 라벨
+
+
 def test_favicon_is_embedded_data_uri():
     """브라우저 탭 아이콘: 자기완결 유지를 위해 data URI 로 임베드(외부 파일 아님)."""
     html = render.build_html(_PAYLOAD)

@@ -18,9 +18,8 @@ from gksave.playerinfo import (
     parse_traits,
     season_of,
     season_img_url,
-    sync_player_bio,
+    sync_player_detail,
     sync_player_info,
-    sync_player_trait,
 )
 
 _ITEM = {
@@ -184,6 +183,47 @@ def test_export_attaches_player_info_by_spid():
     assert c["info"]["body_type"] == "보통"
 
 
+def test_export_splits_detail_into_details_json(tmp_path):
+    """페이지 경량화: index.html 엔 상세(zones/types/extras) 없이 slim, details.json 에 분리."""
+    import json as _json
+
+    from gksave import agg, export
+    from gksave.codec import encode_payload
+
+    con = connect_memory()
+    detail = {
+        "matchId": "e1", "matchType": 50, "matchDate": "2026-06-20T00:00:00",
+        "matchInfo": [
+            {"ouid": "U", "player": [{"spId": 500, "spPosition": 0, "spGrade": 10}], "shootDetail": []},
+            {"ouid": "O", "player": [{"spId": 600, "spPosition": 0, "spGrade": 10}],
+             "shootDetail": [{"result": 1, "type": 1, "x": 0.9, "y": 0.5}]},
+        ],
+    }
+    con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)", ["e1", encode_payload(detail)])
+    agg.rebuild(con)
+
+    export.export(con, tmp_path, gate=1)
+
+    # details.json: (spid_grade) 키로 상세만
+    details = _json.loads((tmp_path / "details.json").read_text(encoding="utf-8"))
+    assert "500_10" in details
+    assert set(details["500_10"].keys()) <= {"zones", "types", "extras"}
+    assert "zones" in details["500_10"]
+
+    # index.html 임베드(slim): 리더보드 카드에 상세 필드 없음
+    html = (tmp_path / "index.html").read_text(encoding="utf-8")
+    import re as _re
+    embed = _json.loads(_re.search(
+        r'<script id="gk-data"[^>]*>(.*?)</script>', html, _re.S).group(1).replace("\\u003c", "<"))
+    card = embed["leaderboard"][0]
+    assert "zones" not in card and "types" not in card and "extras" not in card
+    assert card["gk_sp_id"] == 500                       # 목록 필드는 남아 있음
+
+    # leaderboard.json(다운로드용)은 전체 유지
+    full = _json.loads((tmp_path / "leaderboard.json").read_text(encoding="utf-8"))
+    assert "zones" in full["leaderboard"][0]
+
+
 def test_export_attaches_season_img():
     from gksave import agg, export
     from gksave.codec import encode_payload
@@ -286,67 +326,77 @@ def test_parse_bio_missing_nation_keeps_code_none_but_clubs():
     assert code is None and name is None and clubs == ["FC 포르투"]
 
 
-# ── sync_player_bio: pid당 1회 · 증분 · 중복제거 ─────────────────────────────
+# ── sync_player_detail: per-spid 단일 패스로 특성 + 국가·클럽 통합 수집 ────────
 
-def _mock_detail(by_spid):
-    """{spid: (code, name, [clubs])} → /player/{spid}?grade=1 에 상세 HTML 을 돌려주는 목."""
+def _mock_full(by_spid):
+    """{spid: (code, name, [clubs], [traits])} → /player/{spid} 에 국가·클럽+특성 HTML."""
     calls = {"paths": []}
 
     def handler(request):
         calls["paths"].append(request.url.path)
         spid = int(request.url.path.rsplit("/", 1)[-1])
-        code, name, clubs = by_spid.get(spid, (None, None, []))
-        return httpx.Response(200, text=_detail_html(code, name, clubs))
+        code, name, clubs, traits = by_spid.get(spid, (None, None, [], []))
+        return httpx.Response(200, text=_detail_html(code, name, clubs) + _trait_html(traits))
 
     client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
     client._calls = calls
     return client
 
 
-def test_sync_bio_fetches_per_pid_and_stores():
+def test_sync_detail_stores_traits_and_bio_in_one_pass():
     con = connect_memory()
     _seed_gk(con, 100238380, "야신")     # pid 238380
     _seed_gk(con, 100001179, "부폰")     # pid 1179
-    client = _mock_detail({
-        100238380: (40, "러시아", ["디나모 모스크바"]),
-        100001179: (27, "이탈리아", ["파르마", "유벤투스"]),
+    client = _mock_full({
+        100238380: (40, "러시아", ["디나모 모스크바"], [(60, "GK 공중볼 장악"), (20, "GK 능숙한 펀칭")]),
+        100001179: (27, "이탈리아", ["유벤투스"], [(43, "스위퍼 키퍼")]),
     })
-    r = sync_player_bio(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert r["new"] == 2 and r["failed"] == 0
-    bios = con.execute("SELECT pid, nation_code, nation_name FROM player_bio ORDER BY pid").fetchall()
-    assert bios == [(1179, 27, "이탈리아"), (238380, 40, "러시아")]
-    clubs = con.execute("SELECT pid, ord, club_name FROM player_club ORDER BY pid, ord").fetchall()
-    assert clubs == [(1179, 0, "파르마"), (1179, 1, "유벤투스"), (238380, 0, "디나모 모스크바")]
+    r = sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert r["new"] == 2 and r["bio_new"] == 2 and r["failed"] == 0
+    # 특성(spid별, is_new 코드 판별)
+    traits = con.execute(
+        "SELECT spid, trait_code, is_new FROM player_trait ORDER BY spid, ord").fetchall()
+    assert traits == [(100001179, 43, False), (100238380, 60, True), (100238380, 20, False)]
+    # 국가·클럽(pid별)
+    bios = con.execute("SELECT pid, nation_name FROM player_bio ORDER BY pid").fetchall()
+    assert bios == [(1179, "이탈리아"), (238380, "러시아")]
+    clubs = con.execute("SELECT pid, club_name FROM player_club ORDER BY pid").fetchall()
+    assert clubs == [(1179, "유벤투스"), (238380, "디나모 모스크바")]
 
 
-def test_sync_bio_one_request_per_pid_across_seasons():
+def test_sync_detail_traits_per_spid_bio_per_pid():
+    # 같은 선수(pid 167495) 두 시즌: 특성은 카드별 저장, 국가·클럽은 pid당 1회.
     con = connect_memory()
-    # 같은 실선수(pid 1179)의 두 시즌 카드 → pid당 1요청만
-    _seed_gk(con, 100001179, "부폰")
-    _seed_gk(con, 300001179, "부폰(다른 시즌)")
-    client = _mock_detail({100001179: (27, "이탈리아", ["유벤투스"]),
-                           300001179: (27, "이탈리아", ["유벤투스"])})
-    sync_player_bio(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert len(client._calls["paths"]) == 1                # pid 1179 하나만 요청
-    assert con.execute("SELECT count(*) FROM player_bio").fetchone()[0] == 1
+    _seed_gk(con, 848167495, "노이어A")
+    _seed_gk(con, 272167495, "노이어B")
+    client = _mock_full({
+        848167495: (21, "독일", ["바이에른 뮌헨"], [(57, "GK 빠른 반응"), (15, "긴 패스 선호")]),
+        272167495: (21, "독일", ["바이에른 뮌헨"], [(21, "GK 멀리 던지기")]),
+    })
+    sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert len(client._calls["paths"]) == 2                     # 특성은 카드(spid)별 요청
+    assert con.execute("SELECT count(*) FROM player_trait WHERE spid=848167495").fetchone()[0] == 2
+    assert con.execute("SELECT count(*) FROM player_trait WHERE spid=272167495").fetchone()[0] == 1
+    assert con.execute("SELECT count(*) FROM player_bio").fetchone()[0] == 1   # pid 167495 하나
 
 
-def test_sync_bio_incremental_skips_cached():
+def test_sync_detail_incremental_skips_trait_cached_spid():
     con = connect_memory()
     _seed_gk(con, 100238380, "야신")
+    con.execute("INSERT INTO player_trait (spid, ord, trait_code, trait_name, is_new) "
+                "VALUES (100238380, 0, 60, 'X', TRUE)")
     con.execute("INSERT INTO player_bio (pid, nation_code, nation_name) VALUES (238380, 40, '러시아')")
-    client = _mock_detail({100238380: (99, "바뀜", ["X"])})
-    r = sync_player_bio(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert client._calls["paths"] == []                    # 이미 있으니 호출 0
-    assert r["new"] == 0
+    client = _mock_full({100238380: (99, "바뀜", ["X"], [(99, "바뀜")])})
+    r = sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert client._calls["paths"] == [] and r["new"] == 0
 
 
-def test_sync_bio_limit_caps_requests():
+def test_sync_detail_limit_caps_requests():
     con = connect_memory()
     for i in range(5):
         _seed_gk(con, 100000000 + i, f"p{i}")
-    client = _mock_detail({100000000 + i: (i, f"N{i}", [f"C{i}"]) for i in range(5)})
-    r = sync_player_bio(con, client=client, limit=2, sleep=lambda _x: None, log=lambda _m: None)
+    client = _mock_full({100000000 + i: (i, f"N{i}", [f"C{i}"], [(20, "t")]) for i in range(5)})
+    r = sync_player_detail(con, client=client, limit=2, sleep=lambda _x: None, log=lambda _m: None)
     assert r["new"] == 2 and len(client._calls["paths"]) == 2
 
 
@@ -402,75 +452,6 @@ def test_parse_traits_extracts_code_and_name_in_order():
 
 def test_parse_traits_empty_when_none():
     assert parse_traits("<div>특성 없음</div>") == []
-
-
-def _mock_trait(by_spid):
-    """{spid: [(code,name),...]} → /player/{spid} 에 특성 HTML 을 돌려주는 목."""
-    calls = {"paths": []}
-
-    def handler(request):
-        calls["paths"].append(request.url.path)
-        spid = int(request.url.path.rsplit("/", 1)[-1])
-        return httpx.Response(200, text=_trait_html(by_spid.get(spid, [])))
-
-    client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
-    client._calls = calls
-    return client
-
-
-def test_sync_trait_per_spid_with_is_new_flag():
-    con = connect_memory()
-    _seed_gk(con, 100238380, "야신")
-    _seed_gk(con, 100000488, "칸")
-    client = _mock_trait({
-        100238380: [(60, "GK 공중볼 장악"), (20, "GK 능숙한 펀칭")],   # 60=신규
-        100000488: [(43, "스위퍼 키퍼")],                            # 43=일반
-    })
-    r = sync_player_trait(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert r["new"] == 2 and r["failed"] == 0
-    rows = con.execute(
-        "SELECT spid, ord, trait_code, trait_name, is_new FROM player_trait ORDER BY spid, ord"
-    ).fetchall()
-    assert rows == [
-        (100000488, 0, 43, "스위퍼 키퍼", False),
-        (100238380, 0, 60, "GK 공중볼 장악", True),    # 코드 60 → 신규
-        (100238380, 1, 20, "GK 능숙한 펀칭", False),
-    ]
-
-
-def test_sync_trait_is_per_spid_not_per_pid():
-    # 같은 실선수(pid)의 두 시즌 카드는 특성이 달라 각각 저장된다(spid별).
-    con = connect_memory()
-    _seed_gk(con, 848167495, "노이어A")
-    _seed_gk(con, 272167495, "노이어B")   # 같은 pid 167495, 다른 시즌
-    client = _mock_trait({
-        848167495: [(57, "GK 빠른 반응"), (15, "긴 패스 선호")],
-        272167495: [(21, "GK 멀리 던지기")],
-    })
-    sync_player_trait(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert len(client._calls["paths"]) == 2                 # 카드별 요청
-    n1 = con.execute("SELECT count(*) FROM player_trait WHERE spid=848167495").fetchone()[0]
-    n2 = con.execute("SELECT count(*) FROM player_trait WHERE spid=272167495").fetchone()[0]
-    assert n1 == 2 and n2 == 1
-
-
-def test_sync_trait_incremental_skips_cached():
-    con = connect_memory()
-    _seed_gk(con, 100238380, "야신")
-    con.execute("INSERT INTO player_trait (spid, ord, trait_code, trait_name, is_new) "
-                "VALUES (100238380, 0, 60, 'X', TRUE)")
-    client = _mock_trait({100238380: [(99, "바뀜")]})
-    r = sync_player_trait(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert client._calls["paths"] == [] and r["new"] == 0
-
-
-def test_sync_trait_limit_caps_requests():
-    con = connect_memory()
-    for i in range(5):
-        _seed_gk(con, 100000000 + i, f"p{i}")
-    client = _mock_trait({100000000 + i: [(20, "t")] for i in range(5)})
-    r = sync_player_trait(con, client=client, limit=2, sleep=lambda _x: None, log=lambda _m: None)
-    assert r["new"] == 2 and len(client._calls["paths"]) == 2
 
 
 def test_attach_trait_by_spid():

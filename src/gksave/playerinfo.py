@@ -265,7 +265,32 @@ def sync_player_info(
     return {"ours": len(ours), "already": len(have & ours), "need": len(need), "new": new}
 
 
-def sync_player_bio(
+def _store_bio(con: duckdb.DuckDBPyConnection, pid: int, html: str) -> None:
+    """상세 HTML 에서 국가·클럽을 파싱해 player_bio·player_club 에 저장(pid 단위)."""
+    code, name, clubs = parse_bio(html)
+    con.execute(
+        "INSERT INTO player_bio (pid, nation_code, nation_name) VALUES (?, ?, ?) "
+        "ON CONFLICT DO NOTHING",
+        [pid, code, name],
+    )
+    con.execute("DELETE FROM player_club WHERE pid = ?", [pid])   # 재수집 시 갱신
+    for ord_, club in enumerate(clubs):
+        con.execute("INSERT INTO player_club (pid, ord, club_name) VALUES (?, ?, ?)",
+                    [pid, ord_, club])
+
+
+def _store_traits(con: duckdb.DuckDBPyConnection, spid: int, html: str) -> None:
+    """상세 HTML 에서 특성을 파싱해 player_trait 에 저장(spid 단위). is_new 는 코드로 판별."""
+    con.execute("DELETE FROM player_trait WHERE spid = ?", [spid])   # 재수집 시 갱신
+    for ord_, (code, name) in enumerate(parse_traits(html)):
+        con.execute(
+            "INSERT INTO player_trait (spid, ord, trait_code, trait_name, is_new) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [spid, ord_, code, name, code in NEW_TRAIT_CODES],
+        )
+
+
+def sync_player_detail(
     con: duckdb.DuckDBPyConnection,
     *,
     client: httpx.Client | None = None,
@@ -274,61 +299,53 @@ def sync_player_bio(
     sleep: Callable[[float], None] = time.sleep,
     log: Callable[[str], None] = print,
 ) -> dict[str, int]:
-    """우리 GK 선수(pid)의 국가·클럽을 fc-info 상세페이지에서 채운다.
+    """우리 GK 카드(spid)의 상세를 fc-info 에서 한 번에 받아 특성 + 국가·클럽을 채운다.
 
-    국가·클럽은 시즌 무관 선수 속성이라 **pid 당 1회**만 받는다(대표 spid 로 상세페이지 조회).
-    player_bio 에 없는 pid 만(증분), 요청 사이 delay 로 예의. pid 별로 커밋되므로 중단해도 안전.
-    limit 지정 시 그만큼만(소량 시험용). 반환: {'pids','already','need','new','failed'}.
+    특성은 시즌(카드)별이라 spid 당 1회 받는다. 국가·클럽은 선수(pid) 불변이라 그 상세페이지에서
+    부수적으로 뽑아 pid 가 아직 없을 때만 저장한다 — 두 종류를 한 패스(per-spid)로 수집.
+    player_trait 에 없는 spid 만(증분), 요청 사이 delay 로 예의. spid 별 커밋이라 중단해도 안전.
+    limit 지정 시 그만큼만(소량 시험용). 반환: {'spids','already','need','new','failed','bio_new'}.
     """
-    # 우리 GK spid → pid, pid 당 대표 spid 하나(상세페이지 URL 용).
-    spid_by_pid: dict[int, int] = {}
-    for (spid,) in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall():
-        spid_by_pid.setdefault(_pid_of(spid), spid)
-    have = {r[0] for r in con.execute("SELECT pid FROM player_bio").fetchall()}
-    need = [pid for pid in spid_by_pid if pid not in have]
+    ours = [r[0] for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()]
+    have = {r[0] for r in con.execute("SELECT DISTINCT spid FROM player_trait").fetchall()}
+    have_bio = {r[0] for r in con.execute("SELECT pid FROM player_bio").fetchall()}
+    need = [spid for spid in ours if spid not in have]
     if limit is not None:
         need = need[:limit]
     if not need:
-        log(f"player_bio: 우리 선수 {len(spid_by_pid):,} 전부 캐시됨 — fc-info 호출 없음")
-        return {"pids": len(spid_by_pid), "already": len(have & set(spid_by_pid)),
-                "need": 0, "new": 0, "failed": 0}
+        log(f"player_detail: 우리 카드 {len(ours):,} 전부 캐시됨 — fc-info 호출 없음")
+        return {"spids": len(ours), "already": len(have & set(ours)),
+                "need": 0, "new": 0, "failed": 0, "bio_new": 0}
 
     owns = client is None
     client = client or _new_client()
-    new = failed = 0
+    new = failed = bio_new = 0
     try:
-        for i, pid in enumerate(need):
+        for i, spid in enumerate(need):
             if i > 0:
                 sleep(delay)
-            spid = spid_by_pid[pid]
             try:
                 resp = client.get(f"/player/{spid}?grade=1")
                 resp.raise_for_status()
-                code, name, clubs = parse_bio(resp.text)
+                html = resp.text
             except Exception as e:   # 개별 실패는 건너뛰고 다음 실행에서 재시도(증분)
                 failed += 1
-                log(f"  pid {pid} (spid {spid}) 실패: {type(e).__name__}: {e}")
+                log(f"  spid {spid} 실패: {type(e).__name__}: {e}")
                 continue
-            con.execute(
-                "INSERT INTO player_bio (pid, nation_code, nation_name) VALUES (?, ?, ?) "
-                "ON CONFLICT DO NOTHING",
-                [pid, code, name],
-            )
-            con.execute("DELETE FROM player_club WHERE pid = ?", [pid])   # 재수집 시 갱신
-            for ord_, club in enumerate(clubs):
-                con.execute(
-                    "INSERT INTO player_club (pid, ord, club_name) VALUES (?, ?, ?)",
-                    [pid, ord_, club],
-                )
+            _store_traits(con, spid, html)
+            pid = _pid_of(spid)
+            if pid not in have_bio:            # 국가·클럽은 pid 당 1회만
+                _store_bio(con, pid, html)
+                have_bio.add(pid); bio_new += 1
             new += 1
     finally:
         if owns:
             client.close()
-    remaining = len(spid_by_pid) - len(have) - new   # 아직 bio 없는 pid(실패 + limit 밖 포함)
-    log(f"player_bio: 우리 선수 {len(spid_by_pid):,} · 이미 {len(have):,} · "
-        f"신규 {new:,} · 실패 {failed:,} · 미확보 {remaining:,}")
-    return {"pids": len(spid_by_pid), "already": len(have & set(spid_by_pid)),
-            "need": len(need), "new": new, "failed": failed}
+    remaining = len(ours) - len(have) - new   # 아직 특성 없는 spid(실패 + limit 밖 포함)
+    log(f"player_detail: 우리 카드 {len(ours):,} · 이미 {len(have):,} · 신규 {new:,} · "
+        f"국가·클럽 신규 {bio_new:,} · 실패 {failed:,} · 미확보 {remaining:,}")
+    return {"spids": len(ours), "already": len(have & set(ours)),
+            "need": len(need), "new": new, "failed": failed, "bio_new": bio_new}
 
 
 def attach_bio(con: duckdb.DuckDBPyConnection, leaderboard: list[dict[str, Any]]) -> None:
@@ -355,63 +372,6 @@ def attach_bio(con: duckdb.DuckDBPyConnection, leaderboard: list[dict[str, Any]]
             "nation_name": nat[1] if nat else None,
             "clubs": clubs_by_pid.get(pid, []),
         }
-
-
-def sync_player_trait(
-    con: duckdb.DuckDBPyConnection,
-    *,
-    client: httpx.Client | None = None,
-    delay: float = 1.0,
-    limit: int | None = None,
-    sleep: Callable[[float], None] = time.sleep,
-    log: Callable[[str], None] = print,
-) -> dict[str, int]:
-    """우리 GK 카드(spid)의 특성을 fc-info 상세페이지에서 채운다.
-
-    특성은 시즌(카드)마다 달라 **spid 당 1회**씩 받는다. player_trait 에 없는 spid 만(증분),
-    요청 사이 delay 로 예의. spid 별 커밋이라 중단해도 안전. is_new 는 NEW_TRAIT_CODES 로 결정.
-    limit 지정 시 그만큼만(소량 시험용). 반환: {'spids','already','need','new','failed'}.
-    """
-    ours = [r[0] for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()]
-    have = {r[0] for r in con.execute("SELECT DISTINCT spid FROM player_trait").fetchall()}
-    need = [spid for spid in ours if spid not in have]
-    if limit is not None:
-        need = need[:limit]
-    if not need:
-        log(f"player_trait: 우리 카드 {len(ours):,} 전부 캐시됨 — fc-info 호출 없음")
-        return {"spids": len(ours), "already": len(have & set(ours)), "need": 0, "new": 0, "failed": 0}
-
-    owns = client is None
-    client = client or _new_client()
-    new = failed = 0
-    try:
-        for i, spid in enumerate(need):
-            if i > 0:
-                sleep(delay)
-            try:
-                resp = client.get(f"/player/{spid}?grade=1")
-                resp.raise_for_status()
-                traits = parse_traits(resp.text)
-            except Exception as e:   # 개별 실패는 건너뛰고 다음 실행에서 재시도(증분)
-                failed += 1
-                log(f"  spid {spid} 실패: {type(e).__name__}: {e}")
-                continue
-            con.execute("DELETE FROM player_trait WHERE spid = ?", [spid])   # 재수집 시 갱신
-            for ord_, (code, name) in enumerate(traits):
-                con.execute(
-                    "INSERT INTO player_trait (spid, ord, trait_code, trait_name, is_new) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    [spid, ord_, code, name, code in NEW_TRAIT_CODES],
-                )
-            new += 1
-    finally:
-        if owns:
-            client.close()
-    remaining = len(ours) - len(have) - new   # 아직 특성 없는 spid(실패 + limit 밖 포함)
-    log(f"player_trait: 우리 카드 {len(ours):,} · 이미 {len(have):,} · "
-        f"신규 {new:,} · 실패 {failed:,} · 미확보 {remaining:,}")
-    return {"spids": len(ours), "already": len(have & set(ours)),
-            "need": len(need), "new": new, "failed": failed}
 
 
 def attach_trait(con: duckdb.DuckDBPyConnection, cards: list[dict[str, Any]]) -> None:

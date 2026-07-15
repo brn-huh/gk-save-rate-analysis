@@ -175,6 +175,11 @@ _TEMPLATE = r"""<!doctype html>
   /* 급여 숫자 입력은 검색창처럼 늘어나지 않게 고정 폭 */
   .controls input.numf{flex:0 0 auto;width:74px;min-width:0;padding:9px 10px;text-align:center}
   .controls .lab{color:var(--mut);font-size:.82rem}
+  /* 필터 초기화 아이콘 버튼(텍스트 없음) */
+  .controls .icon-btn{flex:0 0 auto;width:34px;height:34px;padding:0;border:1px solid var(--line);
+        background:var(--panel);color:var(--mut);border-radius:9px;cursor:pointer;font-size:1.05rem;
+        line-height:1;font-family:inherit;transition:.15s}
+  .controls .icon-btn:hover{border-color:var(--gold2);color:var(--gold)}
   /* 검색 입력창 hover 시 설명 말풍선 (input 은 ::after 가 안 붙어 .field 로 감싼다) */
   .controls .field{position:relative;flex:1;min-width:170px;display:flex}
   .controls .field input{flex:1;min-width:0}
@@ -213,6 +218,7 @@ _TEMPLATE = r"""<!doctype html>
   tr.row{cursor:pointer;transition:background .12s}
   tr.row:hover{background:var(--panel2)}
   tr.detail>td{background:#070c1e;padding:14px 18px}
+  td.detail-loading{color:var(--mut);font-size:.88rem;text-align:center;padding:20px}
   .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
   @media(max-width:640px){.detail-grid{grid-template-columns:1fr}}
   .zbar{display:grid;grid-template-columns:130px 54px 1fr 64px;align-items:center;gap:9px;margin:4px 0;font-size:.82rem}
@@ -354,6 +360,7 @@ _TEMPLATE = r"""<!doctype html>
     <button class="gate active" data-gate="200">200</button>
     <button class="gate" data-gate="300">300</button>
     <button class="gate" data-gate="500">500</button>
+    <button id="resetFilters" class="icon-btn" title="필터 초기화" aria-label="필터 초기화">↺</button>
   </div>
   <p class="muted"><b>컬럼 제목</b>을 클릭하면 그 항목으로 정렬됩니다(다시 누르면 오름/내림 전환). 행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
@@ -539,11 +546,29 @@ function detailHtml(c){
          `<div><h4>슛 타입별</h4><table class="mini"><tbody>${types}</tbody></table></div></div>`+
          `<h4 style="margin-top:14px">상황 · 수비 맥락 · GK 스탯</h4><div class="stats">${statsHtml}</div>`;
 }
+// 드릴다운 상세(거리존·타입·스탯)는 초기 임베드에서 빼서 details.json 으로 분리했다.
+// 행 클릭 시 한 번만 fetch 해서 캐시하고, 카드에 병합(재클릭은 즉시). key = spid_grade.
+let DETAILS=null, detailsPromise=null;
+function loadDetails(){
+  if(DETAILS) return Promise.resolve(DETAILS);
+  if(!detailsPromise) detailsPromise=fetch('details.json').then(r=>{
+    if(!r.ok) throw new Error('http '+r.status); return r.json();
+  }).then(d=>{DETAILS=d; return d;});
+  return detailsPromise;
+}
 function toggle(tr,c){
   const nx=tr.nextElementSibling;
   if(nx&&nx.classList.contains('detail')){nx.remove();return;}
-  const d=document.createElement('tr'); d.className='detail';
-  d.innerHTML=`<td colspan="9">${detailHtml(c)}</td>`; tr.after(d);
+  const d=document.createElement('tr'); d.className='detail'; tr.after(d);
+  if(c.zones){ d.innerHTML=`<td colspan="9">${detailHtml(c)}</td>`; return; }  // 이미 병합됨
+  d.innerHTML='<td colspan="9" class="detail-loading">상세 불러오는 중…</td>';
+  loadDetails().then(det=>{
+    const dd=det[c.gk_sp_id+'_'+c.grade]||{};
+    c.zones=dd.zones||[]; c.types=dd.types||[]; c.extras=dd.extras||{};
+    if(d.parentNode) d.innerHTML=`<td colspan="9">${detailHtml(c)}</td>`;
+  }).catch(()=>{ if(d.parentNode)
+    d.innerHTML='<td colspan="9" class="detail-loading">상세를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.</td>';
+  });
 }
 function render(){
   const tb=document.querySelector('#lb tbody'); tb.innerHTML='';
@@ -635,6 +660,18 @@ document.querySelectorAll('[data-gate]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('[data-gate]').forEach(x=>x.classList.remove('active'));
   b.classList.add('active'); minGate=+b.dataset.gate; limit=PAGE; render();
 });
+// 필터 초기화 — 검색·필터·정렬·게이트를 전부 기본값으로.
+document.getElementById('resetFilters').onclick=()=>{
+  q=''; natClubQ=''; salMin=null; salMax=null; gradeFilter='';
+  minGate=200; sortCol='save_pct'; sortDir='desc'; gsaxMode='gsax_per_shot'; limit=PAGE;
+  document.getElementById('search').value='';
+  document.getElementById('natClubSearch').value='';
+  document.getElementById('salMin').value=''; document.getElementById('salMax').value='';
+  gSel.value='';
+  document.getElementById('exShort').classList.remove('active');
+  document.querySelectorAll('[data-gate]').forEach(x=>x.classList.toggle('active', x.dataset.gate==='200'));
+  render();
+};
 // 탭 전환
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
@@ -695,6 +732,8 @@ document.getElementById('spSearch').oninput=spFilter;
 spFilter();
 
 render();
+// 첫 화면 렌더 후 유휴시간에 상세를 미리 받아둔다 → 대부분 드릴다운이 즉시 열린다.
+(window.requestIdleCallback||(f=>setTimeout(f,1500)))(()=>loadDetails().catch(()=>{}));
 </script>
 </body></html>
 """

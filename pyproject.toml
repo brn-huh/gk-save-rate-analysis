@@ -12,6 +12,11 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
+# 1회성 도구 전용(런타임/배포엔 불필요). 파비콘 가공·트레잇 아이콘 분류에 씀.
+# scripts/classify_new_traits.py 가 이 그룹을 필요로 한다.
+tools = [
+    "Pillow>=10",
+]
 
 [project.scripts]
 gksave = "gksave.cli:main"

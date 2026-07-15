@@ -11,11 +11,32 @@ import csv
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import duckdb
 
 from . import agg, meta, playerinfo, render
 from .config import MIN_MATCHES_GATE, ZONE_CUTS_M
+
+# 드릴다운 전용(행 클릭 시에만 쓰는) 카드 상세 필드. index.html 초기 임베드에서 빼고
+# details.json 으로 분리해 첫 화면 전송량을 줄인다(render 가 클릭 때 fetch).
+_DETAIL_FIELDS = ("zones", "types", "extras")
+
+
+def _card_key(c: dict[str, Any]) -> str:
+    """카드 유일 키 — (spid, grade). 같은 spid 다른 강화가 공존하므로 spid 만으론 부족."""
+    return f"{c['gk_sp_id']}_{c['grade']}"
+
+
+def _round(o: Any) -> Any:
+    """부동소수를 4자리로 반올림(표시엔 무영향, 전송량만 절감). 중첩 dict/list 재귀."""
+    if isinstance(o, float):
+        return round(o, 4)
+    if isinstance(o, dict):
+        return {k: _round(v) for k, v in o.items()}
+    if isinstance(o, list):
+        return [_round(x) for x in o]
+    return o
 
 WARNING = (
     "이 순위는 보정하지 않은 종합선방률이다. matchtype=50은 사람이 키핑하므로 이 값에는 "
@@ -114,9 +135,24 @@ def export(
     out_dir.mkdir(parents=True, exist_ok=True)
     payload = build_payload(con, gate=gate, since=since)
 
+    # 데이터 export(전체, 다운로드용) — 페이지가 로드하는 파일은 아니다.
     (out_dir / "leaderboard.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+
+    # 페이지 경량화: 드릴다운 상세를 details.json 으로 분리하고 index.html 엔 slim 만 임베드.
+    details = {
+        _card_key(c): _round({f: c.get(f) for f in _DETAIL_FIELDS})
+        for c in payload["leaderboard"]
+    }
+    (out_dir / "details.json").write_text(
+        json.dumps(details, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
+    )
+    slim = dict(payload)
+    slim["leaderboard"] = _round(
+        [{k: v for k, v in c.items() if k not in _DETAIL_FIELDS} for c in payload["leaderboard"]]
+    )
+    slim["same_player"] = _round(payload.get("same_player", []))
 
     # CSV (평면). 빈 리더보드도 헤더는 남긴다.
     with (out_dir / "leaderboard.csv").open("w", newline="", encoding="utf-8") as f:
@@ -131,7 +167,8 @@ def export(
                 c.get("grade", ""), c["matches"], c["saves"], c["goals"], pct,
             ])
 
-    # 공개용 정적 HTML (자기완결형, 그대로 열거나 호스팅)
-    (out_dir / "index.html").write_text(render.build_html(payload), encoding="utf-8")
+    # 공개용 정적 HTML — slim(상세 제외) 임베드. 드릴다운 상세는 details.json 을 클릭 시 fetch.
+    # (file:// 직접 열기는 fetch 차단 → 로컬 확인은 `python3 -m http.server` 로.)
+    (out_dir / "index.html").write_text(render.build_html(slim), encoding="utf-8")
 
     return payload

@@ -84,18 +84,10 @@ def _cmd_playerinfo(_args) -> None:
         con.close()
 
 
-def _cmd_playerbio(args) -> None:
+def _cmd_playerdetail(args) -> None:
     con = connect(DEFAULT)
     try:
-        playerinfo.sync_player_bio(con, delay=args.delay, limit=args.limit)
-    finally:
-        con.close()
-
-
-def _cmd_playertrait(args) -> None:
-    con = connect(DEFAULT)
-    try:
-        playerinfo.sync_player_trait(con, delay=args.delay, limit=args.limit)
+        playerinfo.sync_player_detail(con, delay=args.delay, limit=args.limit)
     finally:
         con.close()
 
@@ -215,19 +207,13 @@ def build_parser() -> argparse.ArgumentParser:
         "playerinfo", help="선수 급여·기본OVR·키·몸무게·체형 캐시 (fc-info, 우리 GK만·1회)"
     ).set_defaults(func=_cmd_playerinfo)
 
-    pb = sub.add_parser(
-        "playerbio", help="선수 국가·클럽이력 캐시 (fc-info 상세, 우리 GK 선수당·1회)"
+    pd = sub.add_parser(
+        "playerdetail",
+        help="선수 특성 + 국가·클럽 캐시 (fc-info 상세, 우리 GK 카드당·1회 통합)",
     )
-    pb.add_argument("--delay", type=float, default=1.0, help="상세요청 사이 지연(초)")
-    pb.add_argument("--limit", type=int, help="이번에 받을 선수 수 상한(소량 시험용)")
-    pb.set_defaults(func=_cmd_playerbio)
-
-    pt = sub.add_parser(
-        "playertrait", help="선수 특성(트레잇) 캐시 (fc-info 상세, 우리 GK 카드당·1회)"
-    )
-    pt.add_argument("--delay", type=float, default=1.0, help="상세요청 사이 지연(초)")
-    pt.add_argument("--limit", type=int, help="이번에 받을 카드 수 상한(소량 시험용)")
-    pt.set_defaults(func=_cmd_playertrait)
+    pd.add_argument("--delay", type=float, default=1.0, help="상세요청 사이 지연(초)")
+    pd.add_argument("--limit", type=int, help="이번에 받을 카드 수 상한(소량 시험용)")
+    pd.set_defaults(func=_cmd_playerdetail)
 
     e = sub.add_parser("export", help="JSON/CSV/HTML 산출")
     e.add_argument("--gate", type=int, default=MIN_MATCHES_GATE)
