@@ -292,11 +292,12 @@ def test_drilldown_shows_traits_with_new_badge():
     assert "신규" in html                                   # 신규 배지 라벨
 
 
-def test_list_shows_new_trait_icons_only_with_title():
+def test_list_shows_new_trait_icons_only_with_tooltip():
     html = render.build_html(_PAYLOAD).replace(" ", "")
     assert "filter(t=>t.is_new)" in html          # 목록엔 신규특성만
     assert 'class="lb-trait"' in html             # 목록 신규특성 아이콘
-    assert 'title="${escAttr(t.name)}"' in html   # hover 시 특성명(title)
+    assert 'class="lb-trait-w"data-tip="${escAttr(t.name)}"' in html   # hover 툴팁(특성명)
+    assert ".lb-trait-w:hover::after" in html      # 툴팁 말풍선 스타일
 
 
 def test_favicon_is_embedded_data_uri():

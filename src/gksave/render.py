@@ -273,8 +273,14 @@ _TEMPLATE = r"""<!doctype html>
   /* min-width:0 이 없으면 flex 아이템이 콘텐츠 폭 아래로 못 줄어 말줄임이 안 걸린다.
      한글은 공백이 없어 줄바꿈을 허용하면 글자 단위로 쪼개진다 → 반드시 nowrap + 말줄임. */
   .pcell .pn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  /* 목록 이름 옆 신규특성 아이콘(hover 시 title 로 이름). */
-  .pcell .lb-trait{width:20px;height:20px;flex:0 0 auto;object-fit:contain;cursor:help}
+  /* 목록 이름 옆 신규특성 아이콘 — hover 시 특성명 툴팁 말풍선 */
+  .pcell .lb-trait-w{position:relative;display:inline-flex;flex:0 0 auto}
+  .pcell .lb-trait{width:20px;height:20px;object-fit:contain;display:block}
+  .pcell .lb-trait-w:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:50%;
+        transform:translateX(-50%);width:max-content;max-width:200px;white-space:nowrap;
+        background:var(--panel2);border:1px solid var(--line);color:var(--text);font-size:.76rem;
+        line-height:1.3;padding:5px 9px;border-radius:7px;z-index:40;
+        box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none}
   summary .pcell{display:inline-flex;vertical-align:middle;align-items:center}
   .sp-total{margin-left:9px;font-size:.78rem;font-weight:600;color:var(--gold2);
         background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px 8px;
@@ -561,10 +567,11 @@ function render(){
   const vis = searching ? rows : rows.slice(0, limit);
   vis.forEach((c,i)=>{
     const tr=document.createElement('tr'); tr.className='row';
-    // 신규특성만 이름 옆에 아이콘으로. title 로 hover 시 특성명 노출.
+    // 신규특성만 이름 옆에 아이콘으로. 아이콘을 span 으로 감싸 hover 시 특성명 툴팁을 띄운다.
     const newIcons=(c.traits||[]).filter(t=>t.is_new).map(t=>
-      `<img class="lb-trait" src="${traitUrl(t.code)}" alt="${escAttr(t.name)}" title="${escAttr(t.name)}" `+
-      `width="20" height="20" loading="lazy" onerror="this.style.display='none'">`).join('');
+      `<span class="lb-trait-w" data-tip="${escAttr(t.name)}">`+
+      `<img class="lb-trait" src="${traitUrl(t.code)}" alt="${escAttr(t.name)}" `+
+      `width="20" height="20" loading="lazy" onerror="this.style.display='none'"></span>`).join('');
     tr.innerHTML=`<td class="rank">${i+1}</td>`+
       `<td><div class="pcell">${thumbImg(c.gk_sp_id,c.player_name)}`+
       `<span class="pn">${esc(c.player_name||('spId '+c.gk_sp_id))}</span>${newIcons}</div></td>`+
