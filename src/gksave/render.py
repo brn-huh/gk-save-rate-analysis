@@ -356,6 +356,20 @@ _TEMPLATE = r"""<!doctype html>
     <span class="lab">~</span>
     <input id="salMax" class="numf" type="number" inputmode="numeric" min="0" placeholder="이하">
     <button id="exShort" class="sort" title="GSAx 열에서 초근거리(&lt;5m) 뽀록성 슛 제외">GSAx 초근제외</button>
+    <span class="lab">지표</span>
+    <select id="metricSel">
+      <option value="save_pct">선방률</option>
+      <optgroup label="거리별 선방률">
+        <option value="far">원거리</option><option value="mid">중거리</option>
+        <option value="near">근거리</option><option value="close">초근거리</option>
+      </optgroup>
+      <optgroup label="상황별 선방률">
+        <option value="oneone">1대1</option><option value="inpen">박스 안</option>
+        <option value="outpen">박스 밖</option><option value="assisted">연계·컷백</option>
+      </optgroup>
+      <option value="value">가성비</option>
+    </select>
+    <button id="valueBasis" class="sort" style="display:none">기준: GSAx</button>
     <span class="lab">경기수↑</span>
     <button class="gate active" data-gate="200">200</button>
     <button class="gate" data-gate="300">300</button>
@@ -365,7 +379,7 @@ _TEMPLATE = r"""<!doctype html>
   <p class="muted"><b>컬럼 제목</b>을 클릭하면 그 항목으로 정렬됩니다(다시 누르면 오름/내림 전환). 행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
     <table id="lb">
-      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th class="sortable" data-col="grade">강화 <span class="arr"></span></th><th class="sortable" data-col="salary">급여 <span class="arr"></span></th><th class="sortable" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable" data-col="save_pct">선방률 <span class="arr"></span></th><th class="sortable" data-col="gsax" id="gsaxHdr">GSAx/100 <span class="arr"></span></th><th class="sortable" data-col="matches">경기수 <span class="arr"></span></th></tr></thead>
+      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th class="sortable" data-col="grade">강화 <span class="arr"></span></th><th class="sortable" data-col="salary">급여 <span class="arr"></span></th><th class="sortable" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable" data-col="save_pct" id="metricHdr">선방률 <span class="arr"></span></th><th class="sortable" data-col="gsax" id="gsaxHdr">GSAx/100 <span class="arr"></span></th><th class="sortable" data-col="matches">경기수 <span class="arr"></span></th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -388,6 +402,7 @@ _TEMPLATE = r"""<!doctype html>
   <h2>이 페이지 사용법</h2>
   <ol class="usage">
     <li><b>리더보드 탭</b>에서 선방률·GSAx로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. <b>여러 명을 한꺼번에</b> 보려면 쉼표로 구분해 넣으세요(예: <b>노이어, 칸</b>). <b>국가·클럽 검색</b>으로 특정 국가(예: <b>이탈리아</b>)나 클럽(예: <b>유벤투스</b>) 출신만 볼 수도 있습니다. 옆의 <b>강화 드랍박스</b>로 특정 강화단계만 골라볼 수도 있습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
+    <li><b>지표</b> 드롭다운으로 선방률 컬럼을 <b>상황별 선방률</b>(원거리·1대1·박스 안 등)이나 <b>가성비</b>로 바꿔 그 기준으로 순위를 볼 수 있습니다. 상황별은 표본이 너무 적은 카드는 자동 제외하고, 가성비는 <b>급여 대비 GSAx</b>(토글로 선방률 기준)로 계산합니다.</li>
     <li>표의 <b>행을 클릭</b>하면 그 카드의 거리 구간별·슛 타입별 선방률과 세부 스탯이 펼쳐집니다.</li>
     <li><b>동일 선수 비교 탭</b>에서 같은 선수의 시즌·강화별 성적을 나란히 봅니다.</li>
   </ol>
@@ -445,12 +460,49 @@ const D = JSON.parse(document.getElementById('gk-data').textContent);
 const PAGE=100;
 let sortCol='save_pct', sortDir='desc', gsaxMode='gsax_per_shot';
 let q='', limit=PAGE, minGate=200, gradeFilter='', natClubQ='', salMin=null, salMax=null;
-// 컬럼 id → 정렬/표시 값. 급여·OVR 은 c.info 중첩, GSAx 는 초근제외 토글에 따라 값이 바뀐다.
+// "지표" 드롭다운 — 선방률 컬럼이 보여주고 정렬하는 값을 바꾼다. 기본 선방률.
+let metric='save_pct', valueBasis='gsax';   // valueBasis: 가성비 기준(gsax|save_pct)
+const SIT_GATE=30;   // 상황별 정렬 표본 게이트(그 상황 슛 수)
+const METRICS={
+  save_pct:{label:'선방률',kind:'pct'},
+  far:{label:'원거리 선방률',kind:'sit'}, mid:{label:'중거리 선방률',kind:'sit'},
+  near:{label:'근거리 선방률',kind:'sit'}, close:{label:'초근거리 선방률',kind:'sit'},
+  oneone:{label:'1대1 선방률',kind:'sit'}, inpen:{label:'박스 안 선방률',kind:'sit'},
+  outpen:{label:'박스 밖 선방률',kind:'sit'}, assisted:{label:'연계·컷백 선방률',kind:'sit'},
+  value:{label:'가성비',kind:'value'},
+};
+// 현재 지표의 카드 값(정렬·표시 공통). 상황 표본 미달/급여 없음은 null.
+function metricVal(c){
+  if(metric==='save_pct') return c.save_pct;
+  if(metric==='value'){
+    const sal=c.info&&c.info.salary; if(sal==null) return null;
+    const perf = valueBasis==='gsax' ? c.gsax_per_shot : c.save_pct;
+    return perf==null ? null : perf/sal;
+  }
+  const s=(c.sit||{})[metric];   // 상황
+  return (s && s.shots>=SIT_GATE) ? s.pct : null;
+}
+// 현재 지표로 순위에 낄 자격(상황 표본 게이트·급여 유무). 선방률 기본은 전부 통과.
+function metricEligible(c){
+  if(METRICS[metric].kind==='sit'){ const s=(c.sit||{})[metric]; return !!(s && s.shots>=SIT_GATE); }
+  if(metric==='value') return !!(c.info && c.info.salary!=null);
+  return true;
+}
+// 선방률 컬럼 셀 — 지표에 따라 값·부가표기가 바뀐다.
+function metricCell(c){
+  if(metric==='save_pct') return `${pct(c.save_pct)}<span class="ci">${ciText(c.saves,c.goals)}</span>`;
+  if(metric==='value'){ const v=metricVal(c);
+    return v==null ? '-' : `${(v*100).toFixed(2)}<span class="ci">${valueBasis==='gsax'?'급여당 GSAx':'급여당 선방률'}</span>`; }
+  const s=(c.sit||{})[metric]||{};
+  return `${pct(s.pct)}<span class="ci">${s.shots||0}슛</span>`;
+}
+// 컬럼 id → 정렬/표시 값. 급여·OVR 은 c.info 중첩, GSAx 는 초근제외 토글, 선방률 컬럼은 지표 전환.
 function sortVal(c,col){
   if(col==='salary') return c.info&&c.info.salary;
   if(col==='ovr') return c.info&&c.info.ovr;
   if(col==='gsax') return c[gsaxMode];
-  return c[col];   // grade, save_pct, matches
+  if(col==='save_pct') return metricVal(c);   // 지표 드롭다운이 이 컬럼을 전환
+  return c[col];   // grade, matches
 }
 const pct=v=>v==null?'N/A':(v*100).toFixed(1)+'%';
 const gps=v=>v==null?'':(v*100>=0?'+':'')+(v*100).toFixed(1);
@@ -575,7 +627,7 @@ function render(){
   const more=document.getElementById('more'); more.innerHTML='';
   let rows=D.leaderboard.filter(c=>matchNames(c.player_name,q) && c.matches>=minGate &&
     (!gradeFilter || c.grade===+gradeFilter) && matchNatClub(c.bio,natClubQ) &&
-    matchSalary(c.info&&c.info.salary,salMin,salMax));
+    matchSalary(c.info&&c.info.salary,salMin,salMax) && metricEligible(c));
   // 정렬은 필터 뒤에 적용된다 → 검색·필터 결과 안에서만 순서가 매겨진다. null 은 항상 뒤로.
   rows=rows.slice().sort((a,b)=>{
     const av=sortVal(a,sortCol), bv=sortVal(b,sortCol);
@@ -586,6 +638,7 @@ function render(){
   const gf = gsaxMode;   // GSAx 열 표시값(초근제외 토글에 따라)
   document.getElementById('gsaxHdr').firstChild.textContent =
     (gsaxMode==='gsax_ex_short_per_shot' ? 'GSAx/100(초근×) ' : 'GSAx/100 ');
+  document.getElementById('metricHdr').firstChild.textContent = METRICS[metric].label + ' ';
   updateHeaders();
   // 검색 중(이름 또는 국가/클럽)이면 전체에서 찾도록 캡 무시, 아니면 상위 limit 장만(경량화)
   const searching = q || natClubQ;
@@ -603,7 +656,7 @@ function render(){
       `<td class="season"><span class="scell">${seasonCell(c.season_img,c.season_name)}</span></td><td class="num">${c.grade}강</td>`+
       `<td class="num">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
       `<td class="num">${(c.info&&c.info.ovr!=null)?c.info.ovr:''}</td>`+
-      `<td class="pct">${pct(c.save_pct)}<span class="ci">${ciText(c.saves,c.goals)}</span></td><td class="num">${gps(c[gf])}</td>`+
+      `<td class="pct">${metricCell(c)}</td><td class="num">${gps(c[gf])}</td>`+
       `<td class="num">${c.matches}</td>`;
     tr.onclick=()=>toggle(tr,c); tb.appendChild(tr);
   });
@@ -655,6 +708,18 @@ document.getElementById('exShort').onclick=()=>{
   document.getElementById('exShort').classList.toggle('active', gsaxMode==='gsax_ex_short_per_shot');
   limit=PAGE; render();
 };
+// "지표" 드롭다운 — 선방률 컬럼을 상황별 선방률/가성비로 전환하고 그 값으로 정렬(내림).
+const vbBtn=document.getElementById('valueBasis');
+function syncValueBasisBtn(){
+  vbBtn.style.display = metric==='value' ? '' : 'none';
+  vbBtn.textContent = '기준: ' + (valueBasis==='gsax' ? 'GSAx' : '선방률');
+}
+document.getElementById('metricSel').onchange=e=>{
+  metric=e.target.value; sortCol='save_pct'; sortDir='desc'; limit=PAGE;
+  syncValueBasisBtn(); render();
+};
+vbBtn.onclick=()=>{ valueBasis = valueBasis==='gsax' ? 'save_pct' : 'gsax';
+  syncValueBasisBtn(); limit=PAGE; render(); };
 // 경기수 게이트 필터 (200/300/500) — 데이터 재요청 없이 화면에서만 거른다
 document.querySelectorAll('[data-gate]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('[data-gate]').forEach(x=>x.classList.remove('active'));
@@ -663,13 +728,15 @@ document.querySelectorAll('[data-gate]').forEach(b=>b.onclick=()=>{
 // 필터 초기화 — 검색·필터·정렬·게이트를 전부 기본값으로.
 document.getElementById('resetFilters').onclick=()=>{
   q=''; natClubQ=''; salMin=null; salMax=null; gradeFilter='';
-  minGate=200; sortCol='save_pct'; sortDir='desc'; gsaxMode='gsax_per_shot'; limit=PAGE;
+  minGate=200; sortCol='save_pct'; sortDir='desc'; gsaxMode='gsax_per_shot';
+  metric='save_pct'; valueBasis='gsax'; limit=PAGE;
   document.getElementById('search').value='';
   document.getElementById('natClubSearch').value='';
   document.getElementById('salMin').value=''; document.getElementById('salMax').value='';
-  gSel.value='';
+  gSel.value=''; document.getElementById('metricSel').value='save_pct';
   document.getElementById('exShort').classList.remove('active');
   document.querySelectorAll('[data-gate]').forEach(x=>x.classList.toggle('active', x.dataset.gate==='200'));
+  syncValueBasisBtn();
   render();
 };
 // 탭 전환

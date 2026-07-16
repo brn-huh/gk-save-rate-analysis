@@ -314,6 +314,51 @@ def test_has_reset_filters_button():
     assert "필터 초기화" in html                                # title/aria 라벨
 
 
+# ── 지표 드롭다운: 상황별 선방률 + 가성비 ────────────────────────────────────
+
+
+def test_metric_dropdown_and_value_toggle_present():
+    html = render.build_html(_PAYLOAD)
+    assert 'id="metricSel"' in html                            # 지표 드롭다운
+    for v in ('value="far"', 'value="oneone"', 'value="value"'):
+        assert v in html                                       # 거리·상황·가성비 옵션
+    assert 'id="valueBasis"' in html                           # 가성비 GSAx/선방률 토글
+    assert "SIT_GATE" in html                                  # 상황 표본 게이트
+    assert "function metricEligible(" in html
+
+
+@requires_node
+def test_metric_value_and_situational_gate_logic():
+    # metricVal/metricEligible 핵심 로직을 그대로 재현해 값·게이트·가성비 공식을 고정.
+    js = """
+let metric='save_pct', valueBasis='gsax';
+const SIT_GATE=30;
+const METRICS={save_pct:{kind:'pct'},far:{kind:'sit'},value:{kind:'value'}};
+function metricVal(c){
+  if(metric==='save_pct') return c.save_pct;
+  if(metric==='value'){ const sal=c.info&&c.info.salary; if(sal==null) return null;
+    const perf = valueBasis==='gsax' ? c.gsax_per_shot : c.save_pct;
+    return perf==null ? null : perf/sal; }
+  const s=(c.sit||{})[metric]; return (s && s.shots>=SIT_GATE) ? s.pct : null;
+}
+function metricEligible(c){
+  if(METRICS[metric].kind==='sit'){ const s=(c.sit||{})[metric]; return !!(s && s.shots>=SIT_GATE); }
+  if(metric==='value') return !!(c.info && c.info.salary!=null);
+  return true;
+}
+const big={save_pct:0.8,gsax_per_shot:0.06,info:{salary:20},sit:{far:{pct:0.9,shots:400}}};
+const few={save_pct:0.8,gsax_per_shot:0.06,info:{salary:null},sit:{far:{pct:1.0,shots:5}}};
+"""
+    # 상황: 표본 충분하면 pct, 미달이면 null+제외
+    assert _eval_js("(metric='far',metricVal(big))", js) == "0.9"
+    assert _eval_js("(metric='far',metricVal(few))", js) == "null"     # 5슛 < 30 게이트
+    assert _eval_js("(metric='far',metricEligible(few))", js) == "false"
+    # 가성비: 급여당 GSAx, 토글 시 급여당 선방률, 급여 null 제외
+    assert _eval_js("(metric='value',valueBasis='gsax',metricVal(big))", js) == "0.003"   # 0.06/20
+    assert _eval_js("(metric='value',valueBasis='save_pct',metricVal(big))", js) == "0.04"   # 0.8/20
+    assert _eval_js("(metric='value',metricEligible(few))", js) == "false"                  # 급여 null
+
+
 def test_favicon_is_embedded_data_uri():
     """브라우저 탭 아이콘: 자기완결 유지를 위해 data URI 로 임베드(외부 파일 아님)."""
     html = render.build_html(_PAYLOAD)

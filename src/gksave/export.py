@@ -28,6 +28,31 @@ def _card_key(c: dict[str, Any]) -> str:
     return f"{c['gk_sp_id']}_{c['grade']}"
 
 
+def _sit_summary(c: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """상황별 정렬용 요약 — 거리 4구간 + 상황 4종의 {pct, shots}. 슬림 카드에 넣어 정렬/게이트.
+
+    거리는 zones(슛수 있음), 상황은 extras(분모 *_shots 추가됨)에서 뽑는다. 상세 전체는
+    details.json 에 있으므로 여기선 정렬에 필요한 값만 컴팩트하게.
+    """
+    zones = {z["zone"][:2]: z for z in c.get("zones", [])}   # '원거', '중거', '근거', '초근'
+    e = c.get("extras") or {}
+
+    def z(prefix: str) -> dict[str, Any]:
+        zz = next((v for k, v in zones.items() if v["zone"].startswith(prefix)), None)
+        return {"pct": zz["save_pct"], "shots": zz["shots"]} if zz else {"pct": None, "shots": 0}
+
+    def s(pct_key: str, shots_key: str) -> dict[str, Any]:
+        return {"pct": e.get(pct_key), "shots": e.get(shots_key) or 0}
+
+    return {
+        "far": z("원거리"), "mid": z("중거리"), "near": z("근거리"), "close": z("초근거리"),
+        "oneone": s("unassisted_save", "unassisted_shots"),
+        "inpen": s("in_pen_save", "in_pen_shots"),
+        "outpen": s("out_pen_save", "out_pen_shots"),
+        "assisted": s("assisted_save", "assisted_shots"),
+    }
+
+
 def _round(o: Any) -> Any:
     """부동소수를 4자리로 반올림(표시엔 무영향, 전송량만 절감). 중첩 dict/list 재귀."""
     if isinstance(o, float):
@@ -149,9 +174,10 @@ def export(
         json.dumps(details, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
     )
     slim = dict(payload)
-    slim["leaderboard"] = _round(
-        [{k: v for k, v in c.items() if k not in _DETAIL_FIELDS} for c in payload["leaderboard"]]
-    )
+    slim["leaderboard"] = _round([
+        {**{k: v for k, v in c.items() if k not in _DETAIL_FIELDS}, "sit": _sit_summary(c)}
+        for c in payload["leaderboard"]
+    ])
     slim["same_player"] = _round(payload.get("same_player", []))
 
     # CSV (평면). 빈 리더보드도 헤더는 남긴다.

@@ -223,6 +223,15 @@ def test_export_splits_detail_into_details_json(tmp_path):
     full = _json.loads((tmp_path / "leaderboard.json").read_text(encoding="utf-8"))
     assert "zones" in full["leaderboard"][0]
 
+    # 슬림 카드엔 상황별 정렬용 sit 요약(거리·상황 {pct,shots})이 있고, 상황 분모도 채워짐
+    assert "sit" in card
+    assert set(card["sit"]) == {"far", "mid", "near", "close",
+                                "oneone", "inpen", "outpen", "assisted"}
+    assert "shots" in card["sit"]["far"] and "pct" in card["sit"]["far"]
+    # agg 가 상황 분모(*_shots)를 내보내야 sit 상황 게이트가 동작한다
+    assert "in_pen_shots" in full["leaderboard"][0]["extras"]
+    assert "unassisted_shots" in full["leaderboard"][0]["extras"]
+
 
 def test_export_attaches_season_img():
     from gksave import agg, export

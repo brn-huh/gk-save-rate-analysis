@@ -532,6 +532,9 @@ def card_extras_all(
             "shots": shots,
             "in_pen_save": _ratio(in_sv, in_n), "out_pen_save": _ratio(out_sv, out_n),
             "unassisted_save": _ratio(u_sv, u_n), "assisted_save": _ratio(a_sv, a_n),
+            # 분모(슛 수) — 상황별 정렬에서 표본 적은 카드를 거르는 게이트에 쓴다.
+            "in_pen_shots": in_n, "out_pen_shots": out_n,
+            "unassisted_shots": u_n, "assisted_shots": a_n,
             "faced_dist_m": round(faced, 1) if faced is not None else None,
             "conceded_dist_m": round(conceded, 1) if conceded is not None else None,
         }
