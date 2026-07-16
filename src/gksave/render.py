@@ -360,12 +360,10 @@ _TEMPLATE = r"""<!doctype html>
     <select id="metricSel">
       <option value="save_pct">선방률</option>
       <optgroup label="거리별 선방률">
-        <option value="far">원거리</option><option value="mid">중거리</option>
-        <option value="near">근거리</option><option value="close">초근거리</option>
+        <option value="near">근거리 (박스 안)</option><option value="mid">중거리 (박스 밖)</option>
       </optgroup>
       <optgroup label="상황별 선방률">
-        <option value="oneone">1대1</option><option value="inpen">박스 안</option>
-        <option value="outpen">박스 밖</option><option value="assisted">연계·컷백</option>
+        <option value="oneone">1대1</option><option value="assisted">연계·컷백</option>
       </optgroup>
       <option value="value">가성비</option>
     </select>
@@ -402,7 +400,7 @@ _TEMPLATE = r"""<!doctype html>
   <h2>이 페이지 사용법</h2>
   <ol class="usage">
     <li><b>리더보드 탭</b>에서 선방률·GSAx로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. <b>여러 명을 한꺼번에</b> 보려면 쉼표로 구분해 넣으세요(예: <b>노이어, 칸</b>). <b>국가·클럽 검색</b>으로 특정 국가(예: <b>이탈리아</b>)나 클럽(예: <b>유벤투스</b>) 출신만 볼 수도 있습니다. 옆의 <b>강화 드랍박스</b>로 특정 강화단계만 골라볼 수도 있습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
-    <li><b>지표</b> 드롭다운으로 선방률 컬럼을 <b>상황별 선방률</b>(원거리·1대1·박스 안 등)이나 <b>가성비</b>로 바꿔 그 기준으로 순위를 볼 수 있습니다. 상황별은 표본이 너무 적은 카드는 자동 제외하고, 가성비는 <b>급여 대비 GSAx</b>(토글로 선방률 기준)로 계산합니다.</li>
+    <li><b>지표</b> 드롭다운으로 선방률 컬럼을 <b>근·중거리 선방률</b>(게임처럼 페널티박스 안=근거리, 밖=중거리), <b>1대1·연계</b> 또는 <b>가성비</b>로 바꿔 그 기준으로 순위를 볼 수 있습니다. 상황별은 표본이 너무 적은 카드는 자동 제외하고, 가성비는 <b>급여 대비 GSAx</b>(토글로 선방률 기준)로 계산합니다.</li>
     <li>표의 <b>행을 클릭</b>하면 그 카드의 거리 구간별·슛 타입별 선방률과 세부 스탯이 펼쳐집니다.</li>
     <li><b>동일 선수 비교 탭</b>에서 같은 선수의 시즌·강화별 성적을 나란히 봅니다.</li>
   </ol>
@@ -465,10 +463,8 @@ let metric='save_pct', valueBasis='gsax';   // valueBasis: 가성비 기준(gsax
 const SIT_GATE=30;   // 상황별 정렬 표본 게이트(그 상황 슛 수)
 const METRICS={
   save_pct:{label:'선방률',kind:'pct'},
-  far:{label:'원거리 선방률',kind:'sit'}, mid:{label:'중거리 선방률',kind:'sit'},
-  near:{label:'근거리 선방률',kind:'sit'}, close:{label:'초근거리 선방률',kind:'sit'},
-  oneone:{label:'1대1 선방률',kind:'sit'}, inpen:{label:'박스 안 선방률',kind:'sit'},
-  outpen:{label:'박스 밖 선방률',kind:'sit'}, assisted:{label:'연계·컷백 선방률',kind:'sit'},
+  near:{label:'근거리(박스 안) 선방률',kind:'sit'}, mid:{label:'중거리(박스 밖) 선방률',kind:'sit'},
+  oneone:{label:'1대1 선방률',kind:'sit'}, assisted:{label:'연계·컷백 선방률',kind:'sit'},
   value:{label:'가성비',kind:'value'},
 };
 // 현재 지표의 카드 값(정렬·표시 공통). 상황 표본 미달/급여 없음은 null.

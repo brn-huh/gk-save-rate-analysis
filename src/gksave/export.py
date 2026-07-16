@@ -29,26 +29,22 @@ def _card_key(c: dict[str, Any]) -> str:
 
 
 def _sit_summary(c: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """상황별 정렬용 요약 — 거리 4구간 + 상황 4종의 {pct, shots}. 슬림 카드에 넣어 정렬/게이트.
+    """상황별 정렬용 요약 — 근/중거리(박스 안/밖) + 1대1·연계의 {pct, shots}.
 
-    거리는 zones(슛수 있음), 상황은 extras(분모 *_shots 추가됨)에서 뽑는다. 상세 전체는
-    details.json 에 있으므로 여기선 정렬에 필요한 값만 컴팩트하게.
+    게임 관례대로 근거리=페널티박스 안, 중거리=박스 밖으로 가른다. 넥슨 inPenalty
+    원본값을 쓰므로 좌표 거리 환산(91.7 근사)의 오차가 없다. 전부 extras 의
+    *_save/*_shots 에서 뽑는다. 상세 전체는 details.json 에 있으므로 여기선
+    정렬에 필요한 값만 컴팩트하게.
     """
-    zones = {z["zone"][:2]: z for z in c.get("zones", [])}   # '원거', '중거', '근거', '초근'
     e = c.get("extras") or {}
-
-    def z(prefix: str) -> dict[str, Any]:
-        zz = next((v for k, v in zones.items() if v["zone"].startswith(prefix)), None)
-        return {"pct": zz["save_pct"], "shots": zz["shots"]} if zz else {"pct": None, "shots": 0}
 
     def s(pct_key: str, shots_key: str) -> dict[str, Any]:
         return {"pct": e.get(pct_key), "shots": e.get(shots_key) or 0}
 
     return {
-        "far": z("원거리"), "mid": z("중거리"), "near": z("근거리"), "close": z("초근거리"),
+        "near": s("in_pen_save", "in_pen_shots"),    # 근거리 = 박스 안
+        "mid": s("out_pen_save", "out_pen_shots"),   # 중거리 = 박스 밖
         "oneone": s("unassisted_save", "unassisted_shots"),
-        "inpen": s("in_pen_save", "in_pen_shots"),
-        "outpen": s("out_pen_save", "out_pen_shots"),
         "assisted": s("assisted_save", "assisted_shots"),
     }
 
