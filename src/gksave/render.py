@@ -243,7 +243,7 @@ _TEMPLATE = r"""<!doctype html>
   .champ:hover{transform:translateY(-3px);border-color:var(--gold);box-shadow:0 10px 26px rgba(0,0,0,.42)}
   .champ .badge{font-size:.82rem;font-weight:800;color:var(--gold);display:flex;align-items:center;gap:5px}
   .champ .csub{font-size:.72rem;color:var(--mut);margin:2px 0 10px}
-  .champ img.hero-img{width:100%;height:118px;border-radius:10px;margin-bottom:9px}
+  .champ img.hero-img{width:112px;height:112px;border-radius:12px;margin:2px auto 10px}
   .champ .cname{font-size:1.04rem;font-weight:800;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .champ .cseason{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:.76rem;color:var(--mut);margin-top:3px;min-height:20px}
   .champ .cseason .scell{min-width:0}
