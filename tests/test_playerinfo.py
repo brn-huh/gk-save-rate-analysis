@@ -303,15 +303,20 @@ def test_salary_and_all_fields_persisted():
 # ── 국가·클럽 파싱 (fc-info 상세페이지 HTML) ─────────────────────────────────
 
 def _detail_html(nation_code, nation_name, clubs):
-    """실제 fc-info 상세페이지의 국가·클럽 마크업을 최소 재현한 HTML."""
+    """실제 fc-info 상세페이지의 국가·클럽 마크업을 최소 재현한 HTML.
+
+    클럽 경력은 실제처럼 __next_f 스트리밍 JSON(백슬래시 이스케이프)으로 재현한다.
+    startYear 를 내림차순으로 줘 clubs 입력 순서가 그대로 최신순 출력이 되게 한다.
+    league 를 중첩해 클럽명만(리그명 아님) 잡히는지도 함께 검증한다.
+    """
     flag = (f'<img src="https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/'
             f'countries/smallflags/{nation_code}.png" alt="nationality"/>'
             f'<span>{nation_name}</span>') if nation_code is not None else ''
-    items = ''.join(
-        f'<div class="PlayerClubHistory_clubItem__n146_">'
-        f'<div class="PlayerClubHistory_year__SKkzV">1900 ~ 1901</div>'
-        f'<div>{c}</div></div>' for c in clubs)
-    return f'<div>{flag}</div><div><span>클럽 경력</span></div><div>{items}</div>'
+    items = ','.join(
+        f'\\"id\\":{100 + i},\\"club\\":{{\\"id\\":{i},\\"name\\":\\"{c}\\",'
+        f'\\"league\\":{{\\"id\\":1,\\"name\\":\\"어떤리그\\"}}}},\\"startYear\\":{2020 - i}'
+        for i, c in enumerate(clubs))
+    return f'<div>{flag}</div><div>클럽 경력 [{items}]</div>'
 
 
 def test_parse_bio_single_club():
@@ -398,6 +403,26 @@ def test_sync_detail_incremental_skips_trait_cached_spid():
     client = _mock_full({100238380: (99, "바뀜", ["X"], [(99, "바뀜")])})
     r = sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
     assert client._calls["paths"] == [] and r["new"] == 0
+
+
+def test_sync_detail_revisits_for_missing_bio_only():
+    # 특성은 이미 있지만 국가·클럽(bio)이 없는 pid → 대표 spid 로 재방문해 bio 만 채운다
+    # (클럽 파싱 개선 후 bio 재수집 경로). 특성은 다시 저장하지 않는다.
+    con = connect_memory()
+    _seed_gk(con, 100238380, "야신")     # pid 238380
+    con.execute("INSERT INTO player_trait (spid, ord, trait_code, trait_name, is_new) "
+                "VALUES (100238380, 0, 60, 'X', TRUE)")
+    # player_bio 는 비어 있음 → 특성 캐시됐어도 bio 때문에 재방문해야 한다
+    client = _mock_full({100238380: (40, "러시아", ["디나모 모스크바", "스파르타크"], [(99, "무시")])})
+    r = sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert client._calls["paths"] == ["/player/100238380"]       # 재방문함
+    assert r["new"] == 0 and r["bio_new"] == 1                    # 특성 신규 아님, bio 신규
+    assert con.execute(                                          # 특성은 원래 것 유지(99 로 안 덮음)
+        "SELECT trait_code FROM player_trait WHERE spid=100238380").fetchall() == [(60,)]
+    assert con.execute("SELECT nation_name FROM player_bio WHERE pid=238380").fetchone()[0] == "러시아"
+    assert [r[0] for r in con.execute(
+        "SELECT club_name FROM player_club WHERE pid=238380 ORDER BY ord").fetchall()] \
+        == ["디나모 모스크바", "스파르타크"]
 
 
 def test_sync_detail_limit_caps_requests():

@@ -29,7 +29,12 @@ _GK_POSITION = 20
 # nation_code 는 넥슨 CDN 국기 URL 기반이라 가장 견고(1차 키), 국가명·클럽은 부가.
 _NAT_CODE = re.compile(r"countries/smallflags/(\d+)\.png")
 _NAT_NAME = re.compile(r'alt="nationality"/><span>([^<]+)</span>')
-_CLUB = re.compile(r'PlayerClubHistory_year__\w+">[^<]*</div><div>([^<]+)</div>')
+# 클럽 경력 전체는 __next_f 스트리밍 JSON 에 있다(백슬래시 이스케이프). SSR div
+# (PlayerClubHistory_year)엔 '더보기' 이전 최근 3개만 렌더되므로 JSON 을 파싱해 전부 가져온다.
+# 항목: {"id":N,"club":{"id":M,"name":"클럽","img":..,"league":{..}},"startYear":YYYY,..}
+_CLUB = re.compile(
+    r'\\"id\\":\d+,\\"club\\":\{\\"id\\":\d+,\\"name\\":\\"([^"\\]+)\\".*?\\"startYear\\":(\d+)'
+)
 # 특성(트레잇): 상세페이지에만 있고 카드(spid)별로 다르다. 아이콘 URL 의 코드 + alt 의 이름.
 _TRAIT = re.compile(r'traits/trait_icon_(\d+)\.png" alt="([^"]+)"')
 
@@ -40,15 +45,20 @@ def parse_traits(html: str) -> list[tuple[int, str]]:
 
 
 def parse_bio(html: str) -> tuple[int | None, str | None, list[str]]:
-    """상세페이지 HTML → (국가코드, 국가명, 클럽명들). 클럽은 표기순, 중복 제거."""
+    """상세페이지 HTML → (국가코드, 국가명, 클럽명들). 클럽은 최신순(startYear 내림), 중복 제거.
+
+    클럽은 __next_f JSON 에서 전부 파싱하므로 '더보기'로 감춰진 과거 클럽까지 누락 없이 담긴다.
+    """
     m_code = _NAT_CODE.search(html)
     m_name = _NAT_NAME.search(html)
     code = int(m_code.group(1)) if m_code else None
     name = m_name.group(1) if m_name else None
+    items = _CLUB.findall(html)                          # [(클럽명, startYear), ...]
+    items.sort(key=lambda t: int(t[1]), reverse=True)   # 최신 소속부터
     clubs: list[str] = []
-    for c in _CLUB.findall(html):
-        if c not in clubs:      # 임대 복귀 등으로 같은 클럽이 두 번 나올 수 있다(표기순 첫 등장만)
-            clubs.append(c)
+    for club, _year in items:
+        if club not in clubs:      # 임대 복귀 등으로 같은 클럽이 두 번 → 최신 등장만
+            clubs.append(club)
     return code, name, clubs
 
 
@@ -310,6 +320,15 @@ def sync_player_detail(
     have = {r[0] for r in con.execute("SELECT DISTINCT spid FROM player_trait").fetchall()}
     have_bio = {r[0] for r in con.execute("SELECT pid FROM player_bio").fetchall()}
     need = [spid for spid in ours if spid not in have]
+    # 특성은 있어(need 에서 빠진) 페이지를 안 받는 pid 중, 국가·클럽이 아직 없는 pid 는
+    # 대표 spid 하나를 받아 bio 만 채운다(클럽 파싱 개선 후 재수집에도 이 경로가 쓰인다).
+    need_set = set(need)
+    seen_pid: set[int] = set()
+    for spid in ours:
+        pid = _pid_of(spid)
+        if pid not in have_bio and spid not in need_set and pid not in seen_pid:
+            seen_pid.add(pid)
+            need.append(spid)
     if limit is not None:
         need = need[:limit]
     if not need:
@@ -332,12 +351,13 @@ def sync_player_detail(
                 failed += 1
                 log(f"  spid {spid} 실패: {type(e).__name__}: {e}")
                 continue
-            _store_traits(con, spid, html)
+            if spid not in have:              # 특성 미보유 카드만 저장(bio 재방문은 특성 스킵)
+                _store_traits(con, spid, html)
+                new += 1
             pid = _pid_of(spid)
             if pid not in have_bio:            # 국가·클럽은 pid 당 1회만
                 _store_bio(con, pid, html)
                 have_bio.add(pid); bio_new += 1
-            new += 1
     finally:
         if owns:
             client.close()
