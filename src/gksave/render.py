@@ -234,6 +234,31 @@ _TEMPLATE = r"""<!doctype html>
   .stat span{color:var(--mut)}
   .stat b{font-variant-numeric:tabular-nums;color:var(--text)}
   .muted{color:var(--mut);font-size:.85rem}
+  /* 명예의 전당: 분야별 챔피언 3인(리더보드 목록 위, 전체 데이터 고정) */
+  .champions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0 12px}
+  .champ{position:relative;display:flex;flex-direction:column;cursor:pointer;
+    background:linear-gradient(165deg,var(--panel2),var(--panel));
+    border:1px solid rgba(240,209,122,.30);border-radius:14px;padding:12px 12px 13px;
+    transition:transform .12s ease,border-color .12s,box-shadow .12s}
+  .champ:hover{transform:translateY(-3px);border-color:var(--gold);box-shadow:0 10px 26px rgba(0,0,0,.42)}
+  .champ .badge{font-size:.82rem;font-weight:800;color:var(--gold);display:flex;align-items:center;gap:5px}
+  .champ .csub{font-size:.72rem;color:var(--mut);margin:2px 0 10px}
+  .champ img.hero-img{width:100%;height:118px;border-radius:10px;margin-bottom:9px}
+  .champ .cname{font-size:1.04rem;font-weight:800;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .champ .cseason{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:.76rem;color:var(--mut);margin-top:3px;min-height:20px}
+  .champ .cseason .scell{min-width:0}
+  .champ .cstat{display:flex;align-items:baseline;gap:6px;margin-top:auto;padding-top:11px}
+  .champ .cval{font-size:1.5rem;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
+  .champ .cunit{font-size:.72rem;color:var(--mut)}
+  @media(max-width:640px){
+    .champions{grid-template-columns:1fr;gap:9px}
+    .champ{flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:11px}
+    .champ .badge{order:0;width:100%}
+    .champ .csub{order:1;width:100%;margin:0}
+    .champ img.hero-img{order:2;width:76px;height:76px;margin:0;flex:0 0 auto}
+    .champ .cinfo{order:3;flex:1;min-width:0}
+    .champ .cstat{order:4;width:100%;margin:0;padding-top:9px;border-top:1px solid var(--line)}
+  }
   details{margin:5px 0;border-bottom:1px solid var(--line)}
   summary{cursor:pointer;font-weight:700;padding:7px 0;color:var(--text)}
   summary:hover{color:var(--gold)}
@@ -374,6 +399,7 @@ _TEMPLATE = r"""<!doctype html>
     <button class="gate" data-gate="500">500</button>
     <button id="resetFilters" class="icon-btn" title="필터 초기화" aria-label="필터 초기화">↺</button>
   </div>
+  <div class="champions" id="champions"></div>
   <p class="muted"><b>컬럼 제목</b>을 클릭하면 그 항목으로 정렬됩니다(다시 누르면 오름/내림 전환). 행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
     <table id="lb">
@@ -794,7 +820,45 @@ function spFilter(){
 document.getElementById('spSearch').oninput=spFilter;
 spFilter();
 
+// ── 명예의 전당: 분야별 챔피언 3인 ────────────────────────────────────────
+// 리더보드 목록 위에 GSAx·가성비·1대1 각 분야 1위를 부각. 전체 데이터 기준으로
+// 고정(필터 무관)하고, 카드 클릭 시 그 지표로 리더보드를 전환해 전체 순위로 잇는다.
+// 같은 이름·강화라도 시즌이 다르면 다른 카드이므로 시즌 엠블럼·시즌명을 함께 표기한다.
+function champCard(badge, sub, c, valHtml, unit, act){
+  if(!c) return '';
+  const ovr=c.info&&c.info.ovr!=null?' · OVR '+c.info.ovr:'';
+  const sal=c.info&&c.info.salary!=null?' · 급여 '+c.info.salary:'';
+  return `<div class="champ" data-act="${act}">`+
+    `<div class="badge">👑 ${badge}</div><div class="csub">${sub}</div>`+
+    heroImg(c.gk_sp_id,c.player_name)+
+    `<div class="cinfo"><div class="cname">${esc(c.player_name||('spId '+c.gk_sp_id))}</div>`+
+    `<div class="cseason"><span class="scell">${seasonIcon(c.season_img,c.season_name)}${esc(c.season_name||'')}</span> · ${c.grade}강${ovr}${sal}</div></div>`+
+    `<div class="cstat"><span class="cval">${valHtml}</span><span class="cunit">${unit}</span></div></div>`;
+}
+function renderChampions(){
+  const el=document.getElementById('champions'); if(!el) return;
+  const L=D.leaderboard;
+  const g=L.filter(c=>c.gsax_per_shot!=null).sort((a,b)=>b.gsax_per_shot-a.gsax_per_shot)[0];
+  const v=L.filter(c=>c.gsax_per_shot!=null&&c.info&&c.info.salary)
+           .sort((a,b)=>(b.gsax_per_shot/b.info.salary)-(a.gsax_per_shot/a.info.salary))[0];
+  const o=L.filter(c=>{const s=c.sit&&c.sit.oneone; return s&&s.shots>=SIT_GATE&&s.pct!=null;})
+           .sort((a,b)=>b.sit.oneone.pct-a.sit.oneone.pct)[0];
+  el.innerHTML=
+    champCard('GSAx 킹','난이도 보정 방어 1위', g, g?gps(g.gsax_per_shot):'-', 'GSAx/100', 'gsax')+
+    champCard('가성비 킹','급여 대비 GSAx 1위', v, v?('+'+(v.gsax_per_shot/v.info.salary*100).toFixed(2)):'-', '100슛 GSAx ÷ 급여', 'value')+
+    champCard('1대1 최강','1대1(무연계) 선방률 1위', o, o?pct(o.sit.oneone.pct):'-', o?(o.sit.oneone.shots+'슛'):'', 'oneone');
+  el.querySelectorAll('.champ').forEach(card=>card.onclick=()=>applyChampMetric(card.dataset.act));
+}
+// 챔피언 클릭 → 그 분야 지표로 리더보드 전환(gsax 킹은 GSAx 컬럼 정렬) 후 목록으로 스크롤
+function applyChampMetric(act){
+  if(act==='gsax'){ metric='save_pct'; document.getElementById('metricSel').value='save_pct'; sortCol='gsax'; }
+  else { metric=act; document.getElementById('metricSel').value=act; sortCol='save_pct'; }
+  sortDir='desc'; limit=PAGE; syncValueBasisBtn(); render();
+  document.getElementById('lb').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
 render();
+renderChampions();
 // 첫 화면 렌더 후 유휴시간에 상세를 미리 받아둔다 → 대부분 드릴다운이 즉시 열린다.
 (window.requestIdleCallback||(f=>setTimeout(f,1500)))(()=>loadDetails().catch(()=>{}));
 </script>
