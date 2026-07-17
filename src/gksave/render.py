@@ -250,6 +250,9 @@ _TEMPLATE = r"""<!doctype html>
   .champ .cstat{display:flex;align-items:baseline;gap:6px;margin-top:auto;padding-top:11px}
   .champ .cval{font-size:1.5rem;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
   .champ .cunit{font-size:.72rem;color:var(--mut)}
+  .champ-empty{cursor:default;opacity:.7}
+  .champ-empty:hover{transform:none;border-color:rgba(240,209,122,.30);box-shadow:none}
+  .champ .cempty{margin:auto 0;padding:18px 0;font-size:.85rem;color:var(--mut);text-align:center}
   @media(max-width:640px){
     .champions{grid-template-columns:1fr;gap:9px}
     .champ{flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:11px}
@@ -647,9 +650,13 @@ function toggle(tr,c){
 function render(){
   const tb=document.querySelector('#lb tbody'); tb.innerHTML='';
   const more=document.getElementById('more'); more.innerHTML='';
-  let rows=D.leaderboard.filter(c=>matchNames(c.player_name,q) && c.matches>=minGate &&
+  // 지표 무관 공통 필터(검색·강화·국가/클럽·급여·경기수 게이트). 명예의 전당(챔피언)도
+  // 이 풀에서 뽑아 검색·필터·게이트 변경이 그대로 반영되게 한다.
+  const pool=D.leaderboard.filter(c=>matchNames(c.player_name,q) && c.matches>=minGate &&
     (!gradeFilter || c.grade===+gradeFilter) && matchNatClub(c.bio,natClubQ) &&
-    matchSalary(c.info&&c.info.salary,salMin,salMax) && metricEligible(c));
+    matchSalary(c.info&&c.info.salary,salMin,salMax));
+  renderChampions(pool);
+  let rows=pool.filter(c=>metricEligible(c));   // 현재 지표 자격(상황 표본·급여 유무)까지 통과분
   // 정렬은 필터 뒤에 적용된다 → 검색·필터 결과 안에서만 순서가 매겨진다. null 은 항상 뒤로.
   rows=rows.slice().sort((a,b)=>{
     const av=sortVal(a,sortCol), bv=sortVal(b,sortCol);
@@ -825,7 +832,8 @@ spFilter();
 // 고정(필터 무관)하고, 카드 클릭 시 그 지표로 리더보드를 전환해 전체 순위로 잇는다.
 // 같은 이름·강화라도 시즌이 다르면 다른 카드이므로 시즌 엠블럼·시즌명을 함께 표기한다.
 function champCard(badge, sub, c, valHtml, unit, act){
-  if(!c) return '';
+  if(!c) return `<div class="champ champ-empty"><div class="badge">👑 ${badge}</div>`+
+    `<div class="csub">${sub}</div><div class="cempty">조건에 맞는 후보가 없어요</div></div>`;
   const ovr=c.info&&c.info.ovr!=null?' · OVR '+c.info.ovr:'';
   const sal=c.info&&c.info.salary!=null?' · 급여 '+c.info.salary:'';
   return `<div class="champ" data-act="${act}">`+
@@ -835,9 +843,10 @@ function champCard(badge, sub, c, valHtml, unit, act){
     `<div class="cseason"><span class="scell">${seasonIcon(c.season_img,c.season_name)}${esc(c.season_name||'')}</span> · ${c.grade}강${ovr}${sal}</div></div>`+
     `<div class="cstat"><span class="cval">${valHtml}</span><span class="cunit">${unit}</span></div></div>`;
 }
-function renderChampions(){
+function renderChampions(L){
   const el=document.getElementById('champions'); if(!el) return;
-  const L=D.leaderboard;
+  if(!L || !L.length){ el.style.display='none'; return; }   // 필터 결과 없음 → 섹션 숨김
+  el.style.display='';
   const g=L.filter(c=>c.gsax_per_shot!=null).sort((a,b)=>b.gsax_per_shot-a.gsax_per_shot)[0];
   const v=L.filter(c=>c.gsax_per_shot!=null&&c.info&&c.info.salary)
            .sort((a,b)=>(b.gsax_per_shot/b.info.salary)-(a.gsax_per_shot/a.info.salary))[0];
@@ -847,7 +856,7 @@ function renderChampions(){
     champCard('GSAx 킹','난이도 보정 방어 1위', g, g?gps(g.gsax_per_shot):'-', 'GSAx/100', 'gsax')+
     champCard('가성비 킹','급여 대비 GSAx 1위', v, v?('+'+(v.gsax_per_shot/v.info.salary*100).toFixed(2)):'-', '100슛 GSAx ÷ 급여', 'value')+
     champCard('1대1 최강','1대1(무연계) 선방률 1위', o, o?pct(o.sit.oneone.pct):'-', o?(o.sit.oneone.shots+'슛'):'', 'oneone');
-  el.querySelectorAll('.champ').forEach(card=>card.onclick=()=>applyChampMetric(card.dataset.act));
+  el.querySelectorAll('.champ[data-act]').forEach(card=>card.onclick=()=>applyChampMetric(card.dataset.act));
 }
 // 챔피언 클릭 → 그 분야 지표로 리더보드 전환(gsax 킹은 GSAx 컬럼 정렬) 후 목록으로 스크롤
 function applyChampMetric(act){
@@ -857,8 +866,7 @@ function applyChampMetric(act){
   document.getElementById('lb').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-render();
-renderChampions();
+render();   // 최초 렌더가 renderChampions(pool) 도 호출한다(필터 반영)
 // 첫 화면 렌더 후 유휴시간에 상세를 미리 받아둔다 → 대부분 드릴다운이 즉시 열린다.
 (window.requestIdleCallback||(f=>setTimeout(f,1500)))(()=>loadDetails().catch(()=>{}));
 </script>
