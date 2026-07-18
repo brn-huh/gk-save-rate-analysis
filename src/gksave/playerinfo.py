@@ -368,6 +368,69 @@ def sync_player_detail(
             "need": len(need), "new": new, "failed": failed, "bio_new": bio_new}
 
 
+def resync_bio(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    client: httpx.Client | None = None,
+    delay: float = 1.0,
+    sleep: Callable[[float], None] = time.sleep,
+    log: Callable[[str], None] = print,
+) -> dict[str, int]:
+    """모든 우리 카드 spid 페이지를 받아 선수(pid)별 국가 다수결·최다 클럽으로 재작성.
+
+    fc-info 는 같은 선수라도 특정 시즌 카드의 국적을 잘못 등록하기도 한다(예: 멘디 HOT=프랑스).
+    pid 당 여러 시즌 카드의 국가를 모아 최빈값을 쓰면 개별 카드 오류에 휘둘리지 않는다.
+    클럽은 시즌 간 같아야 하나 카드별 렌더 편차가 있어 가장 많이 담긴 카드를 채택한다.
+    전량 조회(증분 아님) 뒤 한 번에 재작성하므로, 중간 중단 시 DB 는 이전 상태를 유지한다.
+    """
+    from collections import Counter
+    ours = [r[0] for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()]
+    votes: dict[int, Counter] = {}          # pid -> Counter({nation_code: 표수})
+    nation_name: dict[int, str | None] = {}  # nation_code -> 국가명(대표)
+    best_clubs: dict[int, list[str]] = {}    # pid -> 가장 많이 담긴 클럽 목록
+    owns = client is None
+    client = client or _new_client()
+    got = failed = 0
+    try:
+        for i, spid in enumerate(ours):
+            if i:
+                sleep(delay)
+            try:
+                resp = client.get(f"/player/{spid}?grade=1")
+                resp.raise_for_status()
+                html = resp.text
+            except Exception as e:
+                failed += 1
+                log(f"  spid {spid} 실패: {type(e).__name__}: {e}")
+                continue
+            got += 1
+            code, name, clubs = parse_bio(html)
+            pid = _pid_of(spid)
+            if code is not None:
+                votes.setdefault(pid, Counter())[code] += 1
+                nation_name[code] = name
+            if len(clubs) > len(best_clubs.get(pid, [])):
+                best_clubs[pid] = clubs
+    finally:
+        if owns:
+            client.close()
+    # 다수결 결과로 player_bio·player_club 을 전면 재작성(부분 조회로 덮어쓰지 않도록 마지막에)
+    con.execute("DELETE FROM player_bio")
+    con.execute("DELETE FROM player_club")
+    for pid, cnt in votes.items():
+        code = cnt.most_common(1)[0][0]
+        con.execute("INSERT INTO player_bio (pid, nation_code, nation_name) VALUES (?, ?, ?)",
+                    [pid, code, nation_name.get(code)])
+    for pid, clubs in best_clubs.items():
+        for ord_, club in enumerate(clubs):
+            con.execute("INSERT INTO player_club (pid, ord, club_name) VALUES (?, ?, ?)",
+                        [pid, ord_, club])
+    split = sum(1 for cnt in votes.values() if len(cnt) > 1)
+    log(f"resync_bio: spid {got:,} 조회 · 실패 {failed:,} · 선수(pid) {len(votes):,} 확정 "
+        f"(카드 간 국적 불일치 {split:,}명 다수결)")
+    return {"got": got, "failed": failed, "pids": len(votes), "split": split}
+
+
 def attach_bio(con: duckdb.DuckDBPyConnection, leaderboard: list[dict[str, Any]]) -> None:
     """리더보드 각 카드에 c['bio'] = {nation_code, nation_name, clubs} 를 붙인다(pid 매칭).
 

@@ -92,6 +92,14 @@ def _cmd_playerdetail(args) -> None:
         con.close()
 
 
+def _cmd_resyncbio(args) -> None:
+    con = connect(DEFAULT)
+    try:
+        playerinfo.resync_bio(con, delay=args.delay)
+    finally:
+        con.close()
+
+
 def _cmd_export(args) -> None:
     con = connect(DEFAULT, read_only=True)
     try:
@@ -214,6 +222,13 @@ def build_parser() -> argparse.ArgumentParser:
     pd.add_argument("--delay", type=float, default=1.0, help="상세요청 사이 지연(초)")
     pd.add_argument("--limit", type=int, help="이번에 받을 카드 수 상한(소량 시험용)")
     pd.set_defaults(func=_cmd_playerdetail)
+
+    rb = sub.add_parser(
+        "resyncbio",
+        help="국가·클럽 전면 재수집 — 선수(pid)별 여러 시즌 카드 국적 다수결로 오류 교정",
+    )
+    rb.add_argument("--delay", type=float, default=1.0, help="상세요청 사이 지연(초)")
+    rb.set_defaults(func=_cmd_resyncbio)
 
     e = sub.add_parser("export", help="JSON/CSV/HTML 산출")
     e.add_argument("--gate", type=int, default=MIN_MATCHES_GATE)

@@ -16,6 +16,7 @@ from gksave.playerinfo import (
     parse_bio,
     parse_player,
     parse_traits,
+    resync_bio,
     season_of,
     season_img_url,
     sync_player_detail,
@@ -423,6 +424,27 @@ def test_sync_detail_revisits_for_missing_bio_only():
     assert [r[0] for r in con.execute(
         "SELECT club_name FROM player_club WHERE pid=238380 ORDER BY ord").fetchall()] \
         == ["디나모 모스크바", "스파르타크"]
+
+
+def test_resync_bio_uses_majority_nation():
+    # 같은 선수(pid 234642)의 여러 시즌 카드 국적이 세네갈 3 vs 프랑스 1(fc-info 오류) →
+    # 다수결로 세네갈 채택. 클럽은 가장 많이 담긴 카드(3개)를 채택.
+    con = connect_memory()
+    for spid in (216234642, 260234642, 502234642, 845234642):
+        _seed_gk(con, spid, "멘디")
+    client = _mock_full({
+        216234642: (18, "프랑스", ["첼시"], []),                       # 오류 카드
+        260234642: (136, "세네갈", ["첼시", "스타드 렌"], []),
+        502234642: (136, "세네갈", ["첼시"], []),
+        845234642: (136, "세네갈", ["첼시", "스타드 렌", "스타드 랭스"], []),
+    })
+    r = resync_bio(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert r["got"] == 4 and r["split"] == 1                          # 1명은 카드 간 불일치
+    assert con.execute(
+        "SELECT nation_code, nation_name FROM player_bio WHERE pid=234642").fetchone() == (136, "세네갈")
+    assert [r[0] for r in con.execute(
+        "SELECT club_name FROM player_club WHERE pid=234642 ORDER BY ord").fetchall()] \
+        == ["첼시", "스타드 렌", "스타드 랭스"]
 
 
 def test_sync_detail_limit_caps_requests():
