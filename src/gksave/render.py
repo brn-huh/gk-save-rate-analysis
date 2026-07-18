@@ -843,7 +843,7 @@ function champCard(badge, sub, c, valHtml, unit, act){
     `<div class="badge">👑 ${badge}</div><div class="csub">${sub}</div>`+
     heroImg(c.gk_sp_id,c.player_name)+
     `<div class="cinfo"><div class="cname">${esc(c.player_name||('spId '+c.gk_sp_id))}</div>`+
-    `<div class="cseason"><span class="scell">${seasonIcon(c.season_img,c.season_name)}${esc(c.season_name||'')}</span> · ${c.grade}강${ovr}${sal}</div></div>`+
+    `<div class="cseason"><span class="scell">${seasonIcon(c.season_img,c.season_name)}</span> · ${c.grade}강${ovr}${sal}</div></div>`+
     `<div class="cstat"><span class="cval">${valHtml}</span><span class="cunit">${unit}</span></div></div>`;
 }
 function renderChampions(L){
