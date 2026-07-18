@@ -474,30 +474,36 @@ def test_leaderboard_uses_multi_name_matcher():
     assert "쉼표로" in html                        # 검색창 placeholder 힌트
 
 
-# ── 리더보드 탭 국가·클럽 검색 ──────────────────────────────────────────────
+# ── 리더보드 탭 팀컬러 검색(국가·클럽·시즌) ─────────────────────────────────
 
 
 @requires_node
-def test_match_nat_club_matches_nation_or_club():
+def test_match_team_color_matches_nation_club_or_season():
     f = render.FILTER_JS
-    bio = "{nation_name:'이탈리아',clubs:['파르마','유벤투스']}"
-    assert _eval_js(f"matchNatClub({bio},'이탈리아')", f) == "true"    # 국가명
-    assert _eval_js(f"matchNatClub({bio},'유벤투스')", f) == "true"    # 클럽명
-    assert _eval_js(f"matchNatClub({bio},'파르')", f) == "true"        # 클럽 부분일치
-    assert _eval_js(f"matchNatClub({bio},'브라질')", f) == "false"     # 국가·클럽 다 불일치
+    # 실제 호출부는 질의를 소문자화하므로 테스트도 소문자 q 로 넣는다.
+    c = "{bio:{nation_name:'이탈리아',clubs:['파르마','유벤투스']},season_name:'WG (Warriors of Glory)'}"
+    assert _eval_js(f"matchTeamColor({c},'이탈리아')", f) == "true"    # 국가명
+    assert _eval_js(f"matchTeamColor({c},'유벤투스')", f) == "true"    # 클럽명
+    assert _eval_js(f"matchTeamColor({c},'파르')", f) == "true"        # 클럽 부분일치
+    assert _eval_js(f"matchTeamColor({c},'wg')", f) == "true"          # 시즌 약칭(팀컬러)
+    assert _eval_js(f"matchTeamColor({c},'warriors')", f) == "true"    # 시즌 부분일치
+    assert _eval_js(f"matchTeamColor({c},'브라질')", f) == "false"     # 국가·클럽·시즌 다 불일치
 
 
 @requires_node
-def test_match_nat_club_empty_query_passes_and_missing_bio_fails():
+def test_match_team_color_empty_query_and_season_without_bio():
     f = render.FILTER_JS
-    assert _eval_js("matchNatClub(null,'')", f) == "true"       # 빈 질의는 전부 통과
-    assert _eval_js("matchNatClub(null,'이탈리아')", f) == "false"  # bio 없으면 질의 있을 때 탈락
+    assert _eval_js("matchTeamColor({bio:null,season_name:null},'')", f) == "true"       # 빈 질의 통과
+    assert _eval_js("matchTeamColor({bio:null,season_name:null},'이탈리아')", f) == "false"  # 아무것도 없으면 탈락
+    # bio 가 없어도 시즌명(팀컬러)으로 통과
+    assert _eval_js("matchTeamColor({bio:null,season_name:'LE (Legend of Europa)'},'le')", f) == "true"
 
 
-def test_leaderboard_has_nat_club_search_input():
+def test_leaderboard_has_team_color_search_input():
     html = render.build_html(_PAYLOAD)
-    assert 'id="natClubSearch"' in html               # 국가/클럽 검색 입력(이름과 별개)
-    assert "matchNatClub(c.bio,natClubQ)" in html.replace(" ", "")   # 필터에 결합
+    assert 'id="natClubSearch"' in html               # 팀컬러 검색 입력(이름과 별개)
+    assert "팀컬러 검색" in html                       # placeholder
+    assert "matchTeamColor(c,natClubQ)" in html.replace(" ", "")   # 필터에 결합
 
 
 # ── 리더보드 탭 급여 범위 필터 ──────────────────────────────────────────────

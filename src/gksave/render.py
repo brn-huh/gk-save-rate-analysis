@@ -60,13 +60,16 @@ const matchNames=(name,q)=>{
   const terms=q.split(',').map(s=>s.trim()).filter(Boolean);
   return !terms.length || terms.some(t=>matchName(name,t));
 };
-// 리더보드 전용: 카드의 국가명 또는 클럽명에 부분일치(OR). 이름 검색과는 별개 입력이며,
-// 국가·클럽을 서로 AND 로 조합하지 않는다(한 입력이 국가든 클럽이든 걸리면 통과).
-const matchNatClub=(bio,q)=>{
+// 리더보드 전용: '팀컬러' 검색 — 국가·클럽·시즌(카드) 어디든 부분일치하면 통과(OR).
+// FC온라인에선 국가/클럽/시즌을 통틀어 팀컬러라 부른다. 이름 검색과는 별개 입력.
+const matchTeamColor=(c,q)=>{
   if(!q) return true;
-  if(!bio) return false;
-  if(matchName(bio.nation_name,q)) return true;
-  return (bio.clubs||[]).some(c=>matchName(c,q));
+  const bio=c.bio;
+  if(bio){
+    if(matchName(bio.nation_name,q)) return true;
+    if((bio.clubs||[]).some(x=>matchName(x,q))) return true;
+  }
+  return matchName(c.season_name,q);   // 시즌명(팀컬러)도 검색
 };
 // 리더보드 전용: 급여 범위 필터. lo/hi 는 숫자 또는 null(미지정). 급여 미상(null)은
 // 범위가 하나라도 지정되면 제외한다(검증 불가한 값을 통과시키지 않음).
@@ -377,7 +380,7 @@ _TEMPLATE = r"""<!doctype html>
 <div class="panel active" id="panel-lb">
   <div class="controls">
     <span class="field" data-tip="여러 명은 쉼표로 구분해서 검색해요. 예: 노이어, 칸"><input id="search" placeholder="이름 검색"></span>
-    <span class="field" data-tip="국가명 또는 클럽명으로 검색해요. 예: 이탈리아 / 유벤투스"><input id="natClubSearch" placeholder="국가·클럽 검색"></span>
+    <span class="field" data-tip="국가·클럽·시즌 검색 (예: 이탈리아 / 유벤투스 / WG)"><input id="natClubSearch" placeholder="팀컬러 검색"></span>
     <select id="gradeFilter"><option value="">강화 전체</option></select>
     <span class="lab">급여</span>
     <input id="salMin" class="numf" type="number" inputmode="numeric" min="0" placeholder="이상">
@@ -428,7 +431,7 @@ _TEMPLATE = r"""<!doctype html>
 <div class="panel help" id="panel-help">
   <h2>이 페이지 사용법</h2>
   <ol class="usage">
-    <li><b>리더보드 탭</b>에서 선방률·GSAx로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. <b>여러 명을 한꺼번에</b> 보려면 쉼표로 구분해 넣으세요(예: <b>노이어, 칸</b>). <b>국가·클럽 검색</b>으로 특정 국가(예: <b>이탈리아</b>)나 클럽(예: <b>유벤투스</b>) 출신만 볼 수도 있습니다. 옆의 <b>강화 드랍박스</b>로 특정 강화단계만 골라볼 수도 있습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
+    <li><b>리더보드 탭</b>에서 선방률·GSAx로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. <b>여러 명을 한꺼번에</b> 보려면 쉼표로 구분해 넣으세요(예: <b>노이어, 칸</b>). <b>팀컬러 검색</b>으로 특정 국가(예: <b>이탈리아</b>)·클럽(예: <b>유벤투스</b>)·시즌(예: <b>WG</b>)을 볼 수도 있습니다. 옆의 <b>강화 드랍박스</b>로 특정 강화단계만 골라볼 수도 있습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
     <li><b>지표</b> 드롭다운으로 선방률 컬럼을 <b>근·중거리 선방률</b>(게임처럼 페널티박스 안=근거리, 밖=중거리), <b>1대1·연계</b> 또는 <b>가성비</b>로 바꿔 그 기준으로 순위를 볼 수 있습니다. 상황별은 표본이 너무 적은 카드는 자동 제외하고, 가성비는 <b>급여 대비 GSAx</b>(토글로 선방률 기준)로 계산합니다.</li>
     <li>표의 <b>행을 클릭</b>하면 그 카드의 거리 구간별·슛 타입별 선방률과 세부 스탯이 펼쳐집니다.</li>
     <li><b>동일 선수 비교 탭</b>에서 같은 선수의 시즌·강화별 성적을 나란히 봅니다.</li>
@@ -653,7 +656,7 @@ function render(){
   // 지표 무관 공통 필터(검색·강화·국가/클럽·급여·경기수 게이트). 명예의 전당(챔피언)도
   // 이 풀에서 뽑아 검색·필터·게이트 변경이 그대로 반영되게 한다.
   const pool=D.leaderboard.filter(c=>matchNames(c.player_name,q) && c.matches>=minGate &&
-    (!gradeFilter || c.grade===+gradeFilter) && matchNatClub(c.bio,natClubQ) &&
+    (!gradeFilter || c.grade===+gradeFilter) && matchTeamColor(c,natClubQ) &&
     matchSalary(c.info&&c.info.salary,salMin,salMax));
   renderChampions(pool);
   let rows=pool.filter(c=>metricEligible(c));   // 현재 지표 자격(상황 표본·급여 유무)까지 통과분
