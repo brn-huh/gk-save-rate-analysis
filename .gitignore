@@ -18,6 +18,11 @@ data/
 *.duckdb.wal
 
 # out/ 은 공개 배포물(민감정보 0)이라 커밋한다 → Vercel 정적 배포.
+# 단, 아래 둘은 배포 제외. 페이지가 안 쓰는 '다운로드용' 전체 export 인데
+# 링크가 없어 아무도 못 찾고, URL 만 알면 리더보드가 통째로 받아진다.
+# 로컬에는 계속 생성된다(export.py 변경 없음) — git 에만 안 올린다.
+out/leaderboard.json
+out/leaderboard.csv
 
 # macOS
 .DS_Store
