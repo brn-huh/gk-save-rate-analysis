@@ -481,7 +481,8 @@ _TEMPLATE = r"""<!doctype html>
   데이터 출처: 본 분석의 모든 경기 데이터는 <b>NEXON Open API</b>
   (<a href="https://open.api.nexon.com" target="_blank" rel="noopener">open.api.nexon.com</a>)
   의 FC 온라인 매치 데이터를 수집·가공해 제공합니다.<br>
-  넥슨 및 FC 온라인과 무관한 비공식 팬 분석이며, 지표는 공개 API 데이터에 기반한 추정치입니다.
+  넥슨 및 FC 온라인과 무관한 비공식 팬 분석이며, 지표는 공개 API 데이터에 기반한 추정치입니다.<br>
+  문의·건의·아이디어 제안: <a href="https://forms.gle/cAsUoUvSBDSrTdHw5" target="_blank" rel="noopener">여기로 남겨주세요</a>
 </footer>
 
 <script id="gk-data" type="application/json">__DATA__</script>

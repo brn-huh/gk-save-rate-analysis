@@ -10,7 +10,7 @@
       "headers": [
         {
           "key": "X-Robots-Tag",
-          "value": "noindex, nofollow, noai, noimageai"
+          "value": "noai, noimageai"
         }
       ]
     }
