@@ -4,9 +4,12 @@ fc-info.com 의 GK 검색 API 응답에서 우리가 쓸 필드(급여·기본OV
 뽑아 player_info 에 캐시한다. 우리가 이미 가진 GK spid 만, 카드당 한 번만 받는다.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import httpx
 import pytest
 
+from gksave.config import FC_RECHECK_DAYS
 from gksave.db import connect_memory
 from gksave.playerinfo import (
     FCINFO_BASE,
@@ -21,6 +24,7 @@ from gksave.playerinfo import (
     season_img_url,
     sync_player_detail,
     sync_player_info,
+    sync_season_img,
 )
 
 _ITEM = {
@@ -521,3 +525,75 @@ def test_attach_trait_by_spid():
         {"code": 43, "name": "스위퍼 키퍼", "is_new": False},
     ]
     assert cards[1]["traits"] == []      # 특성 없는 카드
+
+
+# ── 조회 기록(negative cache): "받아봤지만 없더라" 를 기억해 재조회를 막는다 ──────
+# fc-info 에 없는 카드(이름 미등재)나 특성이 0개인 카드는 저장할 행이 없어서, 증분 판정을
+# "결과 테이블에 행이 있냐" 로만 하면 매 실행마다 다시 조회된다. 조회 시도 자체를 기록한다.
+
+def test_sync_info_remembers_attempt_when_player_not_found():
+    con = connect_memory()
+    _seed_gk(con, 100, "없는선수")
+    client = _mock_by_name({})                    # fc-info 가 아무것도 안 돌려줌
+    sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert client._calls["n"] == 1                # 1회는 물어봤다
+    sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert client._calls["n"] == 1                # 두 번째엔 안 물어본다
+
+
+def test_sync_detail_remembers_fetch_of_traitless_card():
+    con = connect_memory()
+    _seed_gk(con, 100238380, "야신")
+    # 페이지는 정상인데 특성이 0개 → player_trait 에 남는 행이 없다
+    client = _mock_full({100238380: (40, "러시아", ["디나모 모스크바"], [])})
+    sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert client._calls["paths"] == ["/player/100238380"]
+    sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert client._calls["paths"] == ["/player/100238380"]   # 재조회 없음
+
+
+def test_sync_detail_does_not_remember_failed_fetch():
+    # 일시적 실패까지 기억하면 그 카드는 TTL 동안 영영 못 받는다 → 성공한 것만 기록.
+    con = connect_memory()
+    _seed_gk(con, 100238380, "야신")
+    calls = {"n": 0}
+
+    def handler(_request):
+        calls["n"] += 1
+        return httpx.Response(500)
+
+    client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
+    r = sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert r["failed"] == 1
+    sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert calls["n"] == 2                        # 실패는 기억 안 하므로 다시 시도
+
+
+def test_fetch_log_expires_so_new_cards_get_a_retry():
+    # fc-info 는 신규 카드를 늦게 올린다. 영구 차단하면 그 카드는 영영 못 받는다.
+    con = connect_memory()
+    _seed_gk(con, 100, "가")
+    stale = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=FC_RECHECK_DAYS + 1)
+    con.execute("INSERT INTO fc_fetch_log (kind, spid, fetched_at) VALUES ('info', 100, ?)",
+                [stale])
+    client = _mock_by_name({"가": [{"id": 100, "salary": 5, "positions": [{"ovr": 90}]}]})
+    r = sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert client._calls["n"] == 1 and r["new"] == 1   # 기간이 지났으면 다시 물어본다
+
+
+def test_sync_season_img_remembers_seasons_missing_from_catalog():
+    # 카탈로그에 없는 시즌이 하나라도 남으면 매 실행마다 목록을 최대 60페이지까지 훑는다.
+    # 훑어봤다는 사실을 기록해 다음 실행에서 건너뛴다.
+    con = connect_memory()
+    _seed_gk(con, 861048940, "가")          # 시즌 861 — 카탈로그에 없음
+    calls = {"n": 0}
+
+    def handler(_request):
+        calls["n"] += 1
+        return httpx.Response(200, json={"items": [], "nextCursor": None, "hasNext": False})
+
+    client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
+    r = sync_season_img(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert calls["n"] == 1 and r["need"] == 1     # 못 찾음
+    sync_season_img(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert calls["n"] == 1                        # 두 번째엔 목록을 안 훑는다

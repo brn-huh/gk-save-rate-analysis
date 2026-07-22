@@ -91,6 +91,17 @@ CREATE TABLE IF NOT EXISTS player_trait (
     PRIMARY KEY (spid, ord)
 );
 
+-- fc-info 조회 시도 기록(negative cache). kind: 'info'(검색) | 'detail'(상세페이지).
+-- 미등재 카드나 특성 0개 카드는 결과 테이블에 남는 행이 없어, 결과만 보면 매번 재조회하게 된다.
+-- "언제 받아봤는지"를 남겨 config.FC_RECHECK_DAYS 동안 건너뛴다. 성공한 조회만 기록한다
+-- (일시적 실패까지 기록하면 그 카드는 TTL 동안 못 받는다).
+CREATE TABLE IF NOT EXISTS fc_fetch_log (
+    kind       VARCHAR,
+    spid       BIGINT,
+    fetched_at TIMESTAMP DEFAULT now(),
+    PRIMARY KEY (kind, spid)
+);
+
 -- GK 출전: 카드가 GK로 뛴 경기 1건 = 1행 (슛 0개 경기도 표본 게이트에 반영)
 CREATE TABLE IF NOT EXISTS gk_match (
     match_id       VARCHAR,

@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import re
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Callable
 
 import duckdb
 import httpx
 
-from .config import NEW_TRAIT_CODES
+from .config import FC_RECHECK_DAYS, NEW_TRAIT_CODES
 
 FCINFO_BASE = "https://fc-info.com"
 _SEARCH_PATH = "/local-api/v2/players/search"
@@ -141,6 +142,21 @@ def attach_info(con: duckdb.DuckDBPyConnection, leaderboard: list[dict[str, Any]
         }
 
 
+def _fetched_recently(con: duckdb.DuckDBPyConnection, kind: str) -> set[int]:
+    """FC_RECHECK_DAYS 안에 조회해 본 spid. 결과가 비어 있어도 다시 안 받게 하는 게 목적."""
+    return {r[0] for r in con.execute(
+        "SELECT spid FROM fc_fetch_log WHERE kind = ? "
+        "AND fetched_at > now() - INTERVAL (?) DAY", [kind, FC_RECHECK_DAYS]).fetchall()}
+
+
+def _record_fetch(con: duckdb.DuckDBPyConnection, kind: str, spids: Iterable[int]) -> None:
+    """조회 성공을 기록. 재조회 때 시각이 갱신되도록 upsert."""
+    for spid in spids:
+        con.execute(
+            "INSERT INTO fc_fetch_log (kind, spid, fetched_at) VALUES (?, ?, now()) "
+            "ON CONFLICT (kind, spid) DO UPDATE SET fetched_at = now()", [kind, spid])
+
+
 def _search_names(client: httpx.Client, names: list[str]) -> list[dict[str, Any]]:
     """이름 배열(≤10)로 GK 검색. fc-info 는 이 선수들의 모든 시즌 카드를 돌려준다."""
     resp = client.post(_SEARCH_PATH, json={"positionIds": [_GK_POSITION], "names": names})
@@ -184,7 +200,9 @@ def sync_season_img(
     """
     ours = {season_of(r[0]) for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()}
     have = {r[0] for r in con.execute("SELECT season_id FROM season_img").fetchall()}
-    need = ours - have
+    # 카탈로그에 없는 시즌이 하나라도 남으면 매 실행마다 목록을 max_pages 까지 훑게 된다.
+    # 훑어본 시즌은 기록해 건너뛴다(spid 칸에 season_id 를 넣는다).
+    need = ours - have - _fetched_recently(con, "season")
     if not need:
         log(f"season_img: 우리 시즌 {len(ours)} 전부 있음 — 호출 없음")
         return {"seasons": len(ours), "need": 0, "new": 0}
@@ -192,6 +210,7 @@ def sync_season_img(
     owns = client is None
     client = client or _new_client()
     before = len(have)
+    searched = set(need)
     cursor: str | None = None
     try:
         for page in range(max_pages):
@@ -215,6 +234,7 @@ def sync_season_img(
     finally:
         if owns:
             client.close()
+    _record_fetch(con, "season", searched)   # 훑기를 끝냈다 — 못 찾은 시즌도 기록
     now = con.execute("SELECT count(*) FROM season_img").fetchone()[0]
     log(f"season_img: 우리 시즌 {len(ours)} · 신규 {now - before} · 미확보 {len(need)}")
     return {"seasons": len(ours), "need": len(need), "new": now - before}
@@ -239,7 +259,9 @@ def sync_player_info(
     """
     ours = {r[0] for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()}
     have = {r[0] for r in con.execute("SELECT spid FROM player_info").fetchall()}
-    need = ours - have
+    # fc-info 에 없는 카드는 저장할 행이 없어 have 에 안 들어간다 → 조회 기록으로도 걸러야
+    # 매 실행마다 같은 이름을 다시 물어보지 않는다.
+    need = ours - have - _fetched_recently(con, "info")
     if not need:
         log(f"player_info: 우리 GK {len(ours):,} 전부 캐시됨 — fc-info 호출 없음")
         return {"ours": len(ours), "already": len(have & ours), "need": 0, "new": 0}
@@ -247,7 +269,12 @@ def sync_player_info(
     # need 에 든 spid 의 이름만 추려 fc-info 에 물어본다 (이름으로만 조회 가능).
     name_by_spid = {r[0]: r[1] for r in con.execute(
         "SELECT sp_id, name FROM meta_spid WHERE name IS NOT NULL").fetchall()}
-    need_names = sorted({name_by_spid[s] for s in need if s in name_by_spid})
+    # 이름 → 그 이름으로 물어볼 spid 들. 조회 뒤 "답이 없던" spid 까지 기록하려면 역방향이 필요하다.
+    spids_by_name: dict[str, list[int]] = {}
+    for s in need:
+        if s in name_by_spid:
+            spids_by_name.setdefault(name_by_spid[s], []).append(s)
+    need_names = sorted(spids_by_name)
 
     owns_client = client is None
     client = client or _new_client()
@@ -256,7 +283,8 @@ def sync_player_info(
         for i in range(0, len(need_names), name_batch):
             if i > 0:
                 sleep(batch_delay)
-            for item in _search_names(client, need_names[i:i + name_batch]):
+            batch = need_names[i:i + name_batch]
+            for item in _search_names(client, batch):
                 _record_season_img(con, item)   # 본 카드마다 시즌 엠블럼도 채운다(무료 부산물)
                 p = parse_player(item)
                 if p is None or p.spid not in need:
@@ -267,6 +295,8 @@ def sync_player_info(
                     [p.spid, p.name, p.salary, p.ovr, p.height, p.weight, p.body_type],
                 )
                 new += 1
+            # 이 배치는 물어봤다 — 답이 없던 spid 도 기록해 다음 실행에서 건너뛴다.
+            _record_fetch(con, "info", [s for nm in batch for s in spids_by_name[nm]])
     finally:
         if owns_client:
             client.close()
@@ -319,13 +349,18 @@ def sync_player_detail(
     ours = [r[0] for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()]
     have = {r[0] for r in con.execute("SELECT DISTINCT spid FROM player_trait").fetchall()}
     have_bio = {r[0] for r in con.execute("SELECT pid FROM player_bio").fetchall()}
-    need = [spid for spid in ours if spid not in have]
+    # 특성이 0개인 카드는 받아도 player_trait 에 행이 안 남는다 → 조회 기록으로도 걸러야
+    # 매 실행마다 같은 상세페이지를 다시 받지 않는다.
+    seen = _fetched_recently(con, "detail")
+    need = [spid for spid in ours if spid not in have and spid not in seen]
     # 특성은 있어(need 에서 빠진) 페이지를 안 받는 pid 중, 국가·클럽이 아직 없는 pid 는
     # 대표 spid 하나를 받아 bio 만 채운다(클럽 파싱 개선 후 재수집에도 이 경로가 쓰인다).
     need_set = set(need)
     seen_pid: set[int] = set()
     for spid in ours:
         pid = _pid_of(spid)
+        if spid in seen:            # 최근에 이 페이지를 봤으면 bio 때문에 다시 받지 않는다
+            continue
         if pid not in have_bio and spid not in need_set and pid not in seen_pid:
             seen_pid.add(pid)
             need.append(spid)
@@ -358,6 +393,8 @@ def sync_player_detail(
             if pid not in have_bio:            # 국가·클럽은 pid 당 1회만
                 _store_bio(con, pid, html)
                 have_bio.add(pid); bio_new += 1
+            # 성공한 조회만 기록한다 — 실패는 남기지 않아 다음 실행에서 재시도된다.
+            _record_fetch(con, "detail", [spid])
     finally:
         if owns:
             client.close()

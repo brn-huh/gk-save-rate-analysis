@@ -18,6 +18,14 @@ open out/index.html
 > **선수 부가정보(급여·OVR·체격·시즌엠블럼)는 `update.sh` 에 없다.** 새 GK 카드가
 > 생겼을 때만 별도로 `gksave playerinfo` 를 한 번 돌려 `player_info`·`season_img` 를 채운다.
 > (fc-info 에서 우리 GK 중 캐시에 없는 것만 받고, 이미 받은 건 다시 안 받는다.)
+>
+> **국적·클럽·특성은 `playerinfo` 에 없다.** `gksave playerdetail` 이 따로 받는다
+> (카드당 요청 1회 + 지연 1초라 오래 걸린다).
+>
+> 두 명령 모두 **조회 시도를 `fc_fetch_log` 에 기록**한다. fc-info 에 없는 카드나 특성이
+> 0개인 카드는 저장할 행이 없어서, 기록이 없으면 매 실행마다 다시 받게 된다.
+> 기록은 `config.FC_RECHECK_DAYS`(30일) 뒤 만료된다 — fc-info 가 신규 카드를 늦게
+> 올리므로 영구 차단은 하지 않는다. 성공한 조회만 기록하므로 일시적 실패는 다음에 재시도된다.
 
 ---
 

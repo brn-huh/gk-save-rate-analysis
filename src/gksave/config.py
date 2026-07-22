@@ -44,6 +44,11 @@ API_KEY_ENV = "NEXON_API_KEY"
 # (robots.txt 의 Sitemap: 줄은 out/robots.txt 가 손으로 유지하므로 같이 고칠 것).
 SITE_URL = "https://gk-save.vercel.app/"
 
+# ── fc-info 조회 기록(negative cache) ────────────────────────────
+# "받아봤지만 저장할 게 없더라"(미등재 카드·특성 0개)를 기억해 재조회를 막는다.
+# 다만 fc-info 는 신규 카드를 늦게 올리므로 영구 차단은 위험 — 이 기간이 지나면 다시 본다.
+FC_RECHECK_DAYS = 30
+
 # ── 분석 스코프 (설계 결정) ──────────────────────────────────────
 MATCHTYPE_OFFICIAL = 50          # 공식경기 (유저 제공 실값으로 확정)
 GK_POSITION = 0                  # spposition에서 GK=0
