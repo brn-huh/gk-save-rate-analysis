@@ -8,6 +8,7 @@ import subprocess
 import pytest
 
 from gksave import render
+from gksave.config import SITE_URL
 
 _NODE = shutil.which("node")
 requires_node = pytest.mark.skipif(_NODE is None, reason="node 없음 — JS 동작 검증 생략")
@@ -270,10 +271,27 @@ def test_analytics_is_the_only_external_dependency():
 
     선수 이미지는 <img src> 라 여기 걸리지 않는다(렌더 차단 아님, 폴백 있음).
     파비콘은 data URI 라 https 리소스가 아니므로 여기 걸리지 않는다.
+    canonical 은 '가져오는' 리소스가 아니라 자기 주소 선언(SEO 메타)이라 제외한다.
     """
     html = render.build_html(_PAYLOAD)
+    html = re.sub(r'<link rel="canonical"[^>]*>', "", html)
     srcs = re.findall(r'<(?:script|link)[^>]*(?:src|href)="(https?://[^"]+)"', html)
     assert srcs == ["https://openapi.nexon.com/js/analytics.js?app_id=307467"]
+
+
+def test_seo_meta_points_at_the_deployed_url():
+    """색인용 메타는 sitemap·robots 와 같은 주소를 가리켜야 한다(불일치 시 색인 누락)."""
+    html = render.build_html(_PAYLOAD)
+    assert f'<link rel="canonical" href="{SITE_URL}">' in html
+    assert f'<meta property="og:url" content="{SITE_URL}">' in html
+    desc = re.search(r'<meta name="description" content="([^"]+)"', html)
+    assert desc and 50 <= len(desc.group(1)) <= 160   # 검색결과 스니펫 길이
+
+
+def test_image_src_attributes_are_escaped():
+    """이미지 URL 은 외부(넥슨·fc-info) 출처 값이 섞인다 → src 속성도 escAttr 필수."""
+    assert 'src="${escAttr' in render._TEMPLATE
+    assert not re.search(r'src="\$\{(?!escAttr)', render._TEMPLATE)
 
 
 def test_drilldown_shows_traits_with_new_badge():

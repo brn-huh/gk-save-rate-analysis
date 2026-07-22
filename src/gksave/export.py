@@ -16,7 +16,7 @@ from typing import Any
 import duckdb
 
 from . import agg, meta, playerinfo, render
-from .config import MIN_MATCHES_GATE, ZONE_CUTS_M
+from .config import MIN_MATCHES_GATE, SITE_URL, ZONE_CUTS_M
 
 # 드릴다운 전용(행 클릭 시에만 쓰는) 카드 상세 필드. index.html 초기 임베드에서 빼고
 # details.json 으로 분리해 첫 화면 전송량을 줄인다(render 가 클릭 때 fetch).
@@ -192,5 +192,18 @@ def export(
     # 공개용 정적 HTML — slim(상세 제외) 임베드. 드릴다운 상세는 details.json 을 클릭 시 fetch.
     # (file:// 직접 열기는 fetch 차단 → 로컬 확인은 `python3 -m http.server` 로.)
     (out_dir / "index.html").write_text(render.build_html(slim), encoding="utf-8")
+
+    # sitemap — 페이지가 한 장뿐이라 URL 도 하나다. lastmod 를 export 시각으로 갱신해
+    # 데이터가 바뀐 걸 검색엔진에 알린다(robots.txt 의 Sitemap: 이 이 파일을 가리킨다).
+    lastmod = str(payload.get("generated_at", ""))[:10]
+    (out_dir / "sitemap.xml").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"  <url>\n    <loc>{SITE_URL}</loc>\n"
+        f"    <lastmod>{lastmod}</lastmod>\n"
+        "    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n"
+        "  </url>\n</urlset>\n",
+        encoding="utf-8",
+    )
 
     return payload

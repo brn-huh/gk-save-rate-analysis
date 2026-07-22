@@ -39,6 +39,11 @@ load_env_files()
 BASE_URL = "https://open.api.nexon.com"
 API_KEY_ENV = "NEXON_API_KEY"
 
+# ── 공개 배포 주소 ───────────────────────────────────────────────
+# canonical/og:url/sitemap 이 공유한다. 커스텀 도메인을 붙이면 여기만 바꾸면 된다
+# (robots.txt 의 Sitemap: 줄은 out/robots.txt 가 손으로 유지하므로 같이 고칠 것).
+SITE_URL = "https://gk-save.vercel.app/"
+
 # ── 분석 스코프 (설계 결정) ──────────────────────────────────────
 MATCHTYPE_OFFICIAL = 50          # 공식경기 (유저 제공 실값으로 확정)
 GK_POSITION = 0                  # spposition에서 GK=0

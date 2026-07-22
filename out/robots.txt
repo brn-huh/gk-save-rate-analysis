@@ -8,6 +8,8 @@ User-agent: *
 Content-Signal: search=yes,ai-input=no,ai-train=no
 Allow: /
 
+Sitemap: https://gk-save.vercel.app/sitemap.xml
+
 # 주요 AI 크롤러 명시 차단
 User-agent: GPTBot
 Disallow: /

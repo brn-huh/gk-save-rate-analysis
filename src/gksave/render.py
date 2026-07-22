@@ -14,6 +14,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .config import SITE_URL
+
 IMAGE_CDN = "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common"
 
 # 브라우저 탭 아이콘(파비콘). 자기완결형 유지를 위해 64px PNG 를 data URI 로 임베드한다.
@@ -118,7 +120,8 @@ def build_html(payload: dict[str, Any]) -> str:
     # <script> 탈출 방지: '<' → <
     data_json = json.dumps(page, ensure_ascii=False).replace("<", "\\u003c")
     return (
-        _TEMPLATE.replace("__FAVICON__", FAVICON)
+        _TEMPLATE.replace("__SITE_URL__", SITE_URL)
+        .replace("__FAVICON__", FAVICON)
         .replace("__IMAGE_JS__", IMAGE_JS)
         .replace("__FILTER_JS__", FILTER_JS)
         .replace("__STATS_JS__", STATS_JS)
@@ -130,6 +133,15 @@ _TEMPLATE = r"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FC온라인 GK 선방률 리더보드</title>
+<meta name="description" content="FC온라인 공식경기 실데이터로 뽑은 골키퍼 선방률·GSAx 리더보드. 선수·시즌·강화단계별 선방률, 거리 구간별·슛 타입별 상세, 급여 대비 가성비까지 비교합니다.">
+<link rel="canonical" href="__SITE_URL__">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FC온라인 GK 선방률 리더보드">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:title" content="FC온라인 GK 선방률 리더보드">
+<meta property="og:description" content="공식경기 실데이터 기반 골키퍼 선방률·GSAx 순위. 시즌·강화단계별로 비교하세요.">
+<meta property="og:url" content="__SITE_URL__">
+<meta name="twitter:card" content="summary">
 <link rel="icon" type="image/png" href="__FAVICON__">
 <link rel="apple-touch-icon" href="__FAVICON__">
 <!-- 넥슨 Open API 애널리틱스(페이지뷰 집계). app_id 는 스크립트가 자기 src 에서 읽으므로
@@ -542,16 +554,18 @@ __IMAGE_JS__
 __FILTER_JS__
 __STATS_JS__
 // 썸네일은 얼굴 → 플레이스홀더 2단. 히어로는 액션샷 → 얼굴 → 플레이스홀더 3단(data-fb).
+// src 도 escAttr 로 감싼다. spid·시즌이미지·국가코드는 전부 외부(넥슨 API·fc-info 스크래핑)
+// 출처라, 따옴표가 섞여 들어오면 속성을 탈출해 이벤트 핸들러를 붙일 수 있다.
 const thumbImg=(spid,name)=>spid==null?'':
-  `<img class="thumb" src="${thumbUrl(spid)}" alt="${escAttr(name||'')}" width="36" height="36" `+
+  `<img class="thumb" src="${escAttr(thumbUrl(spid))}" alt="${escAttr(name||'')}" width="36" height="36" `+
   `loading="lazy" decoding="async" onerror="imgFallback(this)">`;
 const heroImg=(spid,name)=>spid==null?'':
-  `<img class="hero-img" src="${actionUrl(spid)}" data-fb="${portraitUrl(spid)}" `+
+  `<img class="hero-img" src="${escAttr(actionUrl(spid))}" data-fb="${escAttr(portraitUrl(spid))}" `+
   `alt="${escAttr(name||'')}" width="112" height="112" loading="lazy" decoding="async" `+
   `onerror="imgFallback(this)">`;
 // 시즌명 앞 엠블럼 아이콘. 이미지는 넥슨 CDN 직접. 시즌명은 alt/title(hover)로.
 const seasonIcon=(img,name)=>img?
-  `<img class="season-ico" src="${img}" alt="${escAttr(name||'')}" title="${escAttr(name||'')}" `+
+  `<img class="season-ico" src="${escAttr(img)}" alt="${escAttr(name||'')}" title="${escAttr(name||'')}" `+
   `width="18" height="18" loading="lazy" decoding="async" onerror="this.style.display='none'">`:'';
 // 목록용 시즌 셀: 아이콘만 보여준다(텍스트 제거). 아이콘 없으면 시즌명으로 폴백.
 const seasonCell=(img,name)=>img?seasonIcon(img,name):esc(name||'');
@@ -593,7 +607,7 @@ function detailHtml(c){
   const chip=(label,val)=>val==null?'':`<span class="chip"><b>${label}</b>${esc(val)}</span>`;
   // 국가 칩: 넥슨 CDN 국기 + 국가명. code 만 있으면 국기라도 표시(국가명 파싱 실패 대비).
   const natChip = bio.nation_code==null ? '' :
-    `<span class="chip nat"><img class="flag" src="${flagUrl(bio.nation_code)}" alt="" `+
+    `<span class="chip nat"><img class="flag" src="${escAttr(flagUrl(bio.nation_code))}" alt="" `+
     `width="20" height="14" loading="lazy" onerror="this.style.display='none'">${esc(bio.nation_name||'')}</span>`;
   const infoRow=[
     natChip,
@@ -618,7 +632,7 @@ function detailHtml(c){
   const traits=c.traits||[];
   const traitsHtml = traits.length ? `<div class="traits">`+traits.map(t=>
     `<span class="trait${t.is_new?' new':''}">`+
-    `<img class="trait-ico" src="${traitUrl(t.code)}" alt="${escAttr(t.name)}" width="34" height="34" loading="lazy" onerror="this.style.display='none'">`+
+    `<img class="trait-ico" src="${escAttr(traitUrl(t.code))}" alt="${escAttr(t.name)}" width="34" height="34" loading="lazy" onerror="this.style.display='none'">`+
     `<span class="trait-nm">${esc(t.name)}</span>`+
     (t.is_new?`<span class="trait-new">신규</span>`:'')+`</span>`).join('')+`</div>` : '';
   return hero+
@@ -681,7 +695,7 @@ function render(){
     // 신규특성만 이름 옆에 아이콘으로. 아이콘을 span 으로 감싸 hover 시 특성명 툴팁을 띄운다.
     const newIcons=(c.traits||[]).filter(t=>t.is_new).map(t=>
       `<span class="lb-trait-w" data-tip="${escAttr(t.name)}">`+
-      `<img class="lb-trait" src="${traitUrl(t.code)}" alt="${escAttr(t.name)}" `+
+      `<img class="lb-trait" src="${escAttr(traitUrl(t.code))}" alt="${escAttr(t.name)}" `+
       `width="20" height="20" loading="lazy" onerror="this.style.display='none'"></span>`).join('');
     tr.innerHTML=`<td class="rank">${i+1}</td>`+
       `<td><div class="pcell">${thumbImg(c.gk_sp_id,c.player_name)}`+
