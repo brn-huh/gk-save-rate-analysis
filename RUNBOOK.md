@@ -61,6 +61,7 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 | `./scripts/collect.sh` | 수집 후 **묻지 않고 자동으로** update.sh(build+export) 실행 |
 | `./scripts/collect.sh --refresh` | 수집 (pending 없을 때, 새 경기 보충) + 자동 update |
 | `./scripts/collect.sh --max 50000` | 수집량 직접 지정 |
+| `./scripts/collect.sh --day 7` | 수집 창 직접 지정 (기본 1일) |
 | `./scripts/collect.sh --no-update` | 수집만, update.sh 건너뜀 |
 | `./scripts/build.sh` | 증분 빌드 (수집한 것만 파싱 — 빠름) |
 | `./scripts/build.sh --full` | 전체 재파싱 (파싱 로직 바뀌었을 때만) |
@@ -116,10 +117,25 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 ./scripts/collect.sh --max 50000
 ```
 
+### 수집 창 직접 지정 (기본 1일)
+```bash
+cd /Users/jwkim/workspace/gk-save-rate-analysis
+./scripts/collect.sh --day 7     # 오늘로부터 7일 전 이후 매치만
+```
+
+기본은 **1일** — 매일 한 번 돌리는 전제다. 화면(통계) 창은 그대로 롤링 30일이다
+(`update.sh` 의 `export --days 30`). DB 에 쌓인 과거 매치는 지워지지 않으니
+수집 창을 좁혀도 리더보드 30일 집계는 그대로 나온다.
+
+**하루 이상 걸렀으면 그만큼 넓혀서 보충해야 한다.** 3일 쉬었으면 `--day 4`,
+일주일 쉬었으면 `--day 8` 식으로. 안 그러면 그 기간 매치가 영구히 비고,
+나중에 메우려면 이미 done 인 유저를 다시 열어야 해서 `--refresh` 까지 필요해진다.
+
 ### 옵션 조합 예시
 ```bash
 cd /Users/jwkim/workspace/gk-save-rate-analysis
 ./scripts/collect.sh --refresh --max 50000
+./scripts/collect.sh --day 8 --max 200000     # 일주일 거른 뒤 보충
 ```
 
 ### 수집 중단
