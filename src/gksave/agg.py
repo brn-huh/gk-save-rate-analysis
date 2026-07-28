@@ -118,12 +118,26 @@ def rebuild(con: duckdb.DuckDBPyConnection, *, full: bool = False) -> ParseStats
     return stats
 
 
-def _date_pred(since: datetime | None, *, first: bool) -> tuple[str, list]:
-    """날짜 하한 술어. first=True 면 WHERE, 아니면 AND 로 시작."""
-    if since is None:
+def _date_pred(
+    since: datetime | None, until: datetime | None = None, *, first: bool
+) -> tuple[str, list]:
+    """날짜 술어. first=True 면 WHERE, 아니면 AND 로 시작.
+
+    until 을 주면 [since, until) 닫힌 창이 된다. 상한은 미포함이라
+    인접 창이 경계 경기를 겹쳐 세지 않는다(순위 추이의 시점별 집계).
+    """
+    conds: list[str] = []
+    params: list = []
+    if since is not None:
+        conds.append("match_date >= ?")
+        params.append(since)
+    if until is not None:
+        conds.append("match_date < ?")
+        params.append(until)
+    if not conds:
         return "", []
     kw = "WHERE" if first else "AND"
-    return f" {kw} match_date >= ?", [since]
+    return f" {kw} " + " AND ".join(conds), params
 
 
 def _save_pct(saves: int, goals: int) -> float | None:
@@ -185,13 +199,15 @@ def grade_leaderboard(
     *,
     gate: int = MIN_MATCHES_GATE,
     since: datetime | None = None,
+    until: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """(선수×시즌=sp_id) × 강화단계 단위 리더보드. 강화단계를 퉁치지 않는다.
 
     각 (sp_id, spGrade) 조합이 한 행. gate 는 그 조합의 표본 경기수에 건다.
+    until 을 주면 [since, until) 창만 집계한다(순위 추이의 과거 시점).
     """
-    m_pred, m_params = _date_pred(since, first=True)
-    s_pred, s_params = _date_pred(since, first=False)
+    m_pred, m_params = _date_pred(since, until, first=True)
+    s_pred, s_params = _date_pred(since, until, first=False)
     rows = con.execute(
         f"""
         WITH m AS (
