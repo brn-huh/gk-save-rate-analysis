@@ -237,6 +237,12 @@ _TEMPLATE = r"""<!doctype html>
   .dflat,.dnew{color:var(--mut);font-weight:600}
   .dnew{font-size:.78rem;letter-spacing:.02em}
   .ddim{opacity:.38}   /* 선방률 외 지표로 정렬 중 — 시계열은 선방률 기준이라 흐리게 */
+  /* 순위 추이 차트 (행 펼침) */
+  .trendbox{margin-top:8px}
+  .trendsvg{width:100%;height:auto;max-height:180px;background:#0e1424;
+        border:1px solid var(--line);border-radius:9px}
+  .tlab{fill:var(--mut);font-size:9px}
+  .tnote{color:var(--mut);font-size:.78rem;margin:6px 0 0;line-height:1.55}
   .scell{display:inline-flex;align-items:center;gap:6px}
   .season-ico{flex:0 0 auto;object-fit:contain;vertical-align:middle;height:22px;width:auto}
   tr.row{cursor:pointer;transition:background .12s}
@@ -636,6 +642,59 @@ document.getElementById('warn').innerHTML =
 document.getElementById('warnFull').innerHTML = esc(D.warning);
 var gEl=document.getElementById('gateN'); if(gEl) gEl.textContent=D.gate;
 
+// 행 펼침 순위 추이 차트. 시점마다 "지금 필터 풀" 안에서 순위를 다시 매기므로
+// 검색·필터를 바꾸고 다시 펼치면 곡선이 달라진다. lastRows 는 render() 가 채운다.
+let lastRows=[];
+function trendChartHtml(c){
+  if(TP.length<2 || !TC[trendKey(c)]) return '';
+  const series=TP.map((_,i)=>{
+    const arr=[];
+    lastRows.forEach(x=>{const p=trendPct(x,i); if(p!=null) arr.push({x,p});});
+    if(!arr.length) return null;
+    arr.sort((a,b)=>b.p-a.p);
+    const idx=arr.findIndex(o=>o.x===c);
+    return idx<0 ? null : {rank:idx+1, pool:arr.length, pct:arr[idx].p};
+  });
+  const seen=series.filter(Boolean);
+  if(seen.length<2) return '';
+  const maxPool=Math.max(...seen.map(s=>s.pool));
+  // y축을 1~풀크기 전체로 잡으면 상위권 카드(3위↔2위)가 맨 위에 납작하게 붙어
+  // 아무것도 안 보인다. 지나온 순위 구간에 맞춰 확대하되, 최소 폭을 둬서
+  // 1~2위짜리 미세 변동이 화면을 꽉 채우는 반대쪽 과장도 막는다.
+  const ranks=seen.map(s=>s.rank);
+  const rMin=Math.min(...ranks), rMax=Math.max(...ranks);
+  const pad=Math.max(2, Math.round(Math.max(rMax-rMin, 4)*0.35));
+  const yTop=Math.max(1, rMin-pad), yBot=Math.min(maxPool, rMax+pad);
+  const W=560,H=150,PL=38,PR=12,PT=14,PB=24;
+  const px=i=>PL+(W-PL-PR)*(TP.length===1?0:i/(TP.length-1));
+  const py=r=>PT+(H-PT-PB)*((r-yTop)/Math.max(1,yBot-yTop));
+  // 게이트 미달로 빠진 시점에서 선을 끊는다 — 이어 그리면 없던 연속성이 생긴다.
+  const segs=[]; let cur=[];
+  series.forEach((s,i)=>{ if(s) cur.push([px(i),py(s.rank)]); else if(cur.length){segs.push(cur);cur=[];} });
+  if(cur.length) segs.push(cur);
+  const lines=segs.filter(g=>g.length>1).map(g=>
+    `<polyline points="${g.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" `+
+    `fill="none" stroke="#d9b45a" stroke-width="2" stroke-linejoin="round"/>`).join('');
+  const lastI=TP.length-1;
+  const dots=series.map((s,i)=>!s?'':
+    `<circle cx="${px(i).toFixed(1)}" cy="${py(s.rank).toFixed(1)}" r="${i===lastI?4.5:3}" `+
+    `fill="${i===lastI?'#e2707a':'#d9b45a'}"><title>${TP[i]} · ${s.rank}위 / ${s.pool}장 · ${pct(s.pct)}</title></circle>`
+  ).join('');
+  const a=seen[0], z=seen[seen.length-1], d=a.rank-z.rank;
+  const dtxt = d===0?'제자리':(d>0?`▲${d}`:`▼${-d}`);
+  return `<h4 style="margin-top:14px">순위 추이 `+
+    `<small class="muted">${TR.window_days}일 창 · ${TR.step_days}일 간격 · 지금 필터 ${lastRows.length}장 안에서</small></h4>`+
+    `<div class="trendbox"><svg viewBox="0 0 ${W} ${H}" class="trendsvg" role="img" `+
+    `aria-label="순위 추이 ${a.rank}위에서 ${z.rank}위">`+
+    `<line x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="#2a3350"/>`+
+    `<text x="4" y="${PT+4}" class="tlab">${yTop}위</text>`+
+    `<text x="4" y="${H-PB}" class="tlab">${yBot}위</text>`+
+    lines+dots+
+    `<text x="${PL}" y="${H-6}" class="tlab">${TP[0]}</text>`+
+    `<text x="${W-PR}" y="${H-6}" class="tlab" text-anchor="end">${TP[lastI]}</text></svg>`+
+    `<p class="tnote"><b>${a.rank}위 → ${z.rank}위 (${dtxt})</b> · 마지막 점(빨강)은 아직 <b>수집 중인 구간</b>이라 `+
+    `표본이 얇을 수 있어요. 과거 점은 지금 데이터로 <b>소급 계산</b>한 값이라, 그때 실제로 보이던 순위와는 다릅니다.</p></div>`;
+}
 function detailHtml(c){
   const zones=(c.zones||[]).map(z=>
     `<div class="zbar"><span>${esc(z.zone)}</span>`+
@@ -691,6 +750,7 @@ function detailHtml(c){
     `<span class="trait-nm">${esc(t.name)}</span>`+
     (t.is_new?`<span class="trait-new">신규</span>`:'')+`</span>`).join('')+`</div>` : '';
   return hero+
+         trendChartHtml(c)+
          (traitsHtml?`<h4 style="margin-top:12px">특성</h4>${traitsHtml}`:'')+
          `<div class="detail-grid"><div><h4>거리 구간별 (근사 미터)</h4>${zones}</div>`+
          `<div><h4>슛 타입별</h4><table class="mini"><tbody>${types}</tbody></table></div></div>`+
@@ -748,6 +808,7 @@ function render(){
   // 델타는 표시분(vis)이 아니라 rows 전체 기준으로 계산한다. '더 보기'로 몇 장을
   // 펼쳤는지에 따라 같은 카드의 변동 숫자가 달라지면 안 된다.
   const dmap = rankDeltas(rows);
+  lastRows = rows;   // 추이 차트가 "지금 필터 풀" 기준으로 순위를 매기는 근거
   vis.forEach((c,i)=>{
     const tr=document.createElement('tr'); tr.className='row';
     // 신규특성만 이름 옆에 아이콘으로. 아이콘을 span 으로 감싸 hover 시 특성명 툴팁을 띄운다.
