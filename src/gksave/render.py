@@ -230,6 +230,13 @@ _TEMPLATE = r"""<!doctype html>
   button.gate.active{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#1a1405;
         border-color:var(--gold);font-weight:700}
   td.num,td.season{color:var(--mut);font-variant-numeric:tabular-nums}
+  /* 순위 변동 뱃지 — 7일 전 같은 창 대비. 표본 흔들림이 섞이므로 색만 옅게 준다. */
+  td.delta{white-space:nowrap;font-weight:700}
+  .dup{color:#5fd08a}
+  .ddown{color:#e2707a}
+  .dflat,.dnew{color:var(--mut);font-weight:600}
+  .dnew{font-size:.78rem;letter-spacing:.02em}
+  .ddim{opacity:.38}   /* 선방률 외 지표로 정렬 중 — 시계열은 선방률 기준이라 흐리게 */
   .scell{display:inline-flex;align-items:center;gap:6px}
   .season-ico{flex:0 0 auto;object-fit:contain;vertical-align:middle;height:22px;width:auto}
   tr.row{cursor:pointer;transition:background .12s}
@@ -423,7 +430,7 @@ _TEMPLATE = r"""<!doctype html>
   <p class="muted"><b>컬럼 제목</b>을 클릭하면 그 항목으로 정렬됩니다(다시 누르면 오름/내림 전환). 행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
     <table id="lb">
-      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th class="sortable" data-col="grade">강화 <span class="arr"></span></th><th class="sortable" data-col="salary">급여 <span class="arr"></span></th><th class="sortable" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable" data-col="save_pct" id="metricHdr">선방률 <span class="arr"></span></th><th class="sortable" data-col="gsax" id="gsaxHdr">GSAx/100 <span class="arr"></span></th><th class="sortable" data-col="matches">경기수 <span class="arr"></span></th></tr></thead>
+      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th class="sortable" data-col="grade">강화 <span class="arr"></span></th><th class="sortable" data-col="salary">급여 <span class="arr"></span></th><th class="sortable" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable" data-col="save_pct" id="metricHdr">선방률 <span class="arr"></span></th><th class="sortable" data-col="gsax" id="gsaxHdr">GSAx/100 <span class="arr"></span></th><th class="sortable" data-col="matches">경기수 <span class="arr"></span></th><th id="deltaHdr" data-tip="7일 전 같은 창과 비교한 순위 변동. 지금 걸어둔 검색·필터 안에서 계산합니다">변동</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -514,6 +521,52 @@ const METRICS={
   oneone:{label:'1대1 선방률',kind:'sit'}, assisted:{label:'연계·컷백 선방률',kind:'sit'},
   value:{label:'가성비',kind:'value'},
 };
+// ── 순위 추이 (D.trend) ────────────────────────────────────────
+// 서버는 시점별 [matches,saves,goals] 원자료만 준다. 순위는 여기서 매긴다 —
+// 그래야 검색·필터를 바꿀 때마다 "그 풀 안에서의 순위" 변동이 나온다.
+const TR=D.trend||{}, TP=TR.points||[], TC=TR.cards||{};
+const trendKey=c=>c.gk_sp_id+'_'+c.grade;
+// 마지막 점에서 days 일 전에 가장 가까운 시점. step 이 3일이라 정확히 7일 전 점은 없다.
+function trendIdxDaysAgo(days){
+  if(TP.length<2) return -1;
+  const target=new Date(TP[TP.length-1]).getTime()-days*864e5;
+  let best=-1,bd=Infinity;
+  for(let i=0;i<TP.length-1;i++){
+    const d=Math.abs(new Date(TP[i]).getTime()-target);
+    if(d<bd){bd=d;best=i;}
+  }
+  return best;
+}
+// idx 시점의 선방률. 그 시점에 게이트 미달이면 null(=그 카드는 그때 순위에 없었다).
+function trendPct(c,idx){
+  const v=TC[trendKey(c)];
+  if(!v||idx<0||!v[idx]) return null;
+  const sv=v[idx][1], go=v[idx][2], tot=sv+go;
+  return tot>0 ? sv/tot : null;
+}
+// rows(현재 화면에 뜰 카드 집합) 기준 순위 델타. 양수면 상승.
+// 과거에 없던 카드(NEW)가 남의 순위를 밀어내지 않도록, 양쪽 순위를 모두
+// "과거에도 있던 카드"라는 같은 부분집합 안에서 다시 센다.
+function rankDeltas(rows){
+  const idx=trendIdxDaysAgo(7), out=new Map();
+  if(idx<0) return out;
+  const past=[];
+  rows.forEach(c=>{const p=trendPct(c,idx); if(p!=null) past.push({c,p});});
+  past.sort((a,b)=>b.p-a.p);
+  const pr=new Map(); past.forEach((x,i)=>pr.set(x.c,i+1));
+  let n=0;
+  rows.forEach(c=>{ if(pr.has(c)) out.set(c, pr.get(c)-(++n)); });
+  return out;
+}
+function deltaCell(c,dm){
+  // 가정 2: 시계열은 선방률만 담는다. 다른 지표로 정렬 중이면 흐리게 표시.
+  const dim = metric!=='save_pct' ? ' ddim' : '';
+  if(!dm.size) return '';
+  if(!dm.has(c)) return `<span class="dnew${dim}">NEW</span>`;
+  const d=dm.get(c);
+  if(d===0) return `<span class="dflat${dim}">–</span>`;
+  return d>0 ? `<span class="dup${dim}">▲${d}</span>` : `<span class="ddown${dim}">▼${-d}</span>`;
+}
 // 현재 지표의 카드 값(정렬·표시 공통). 상황 표본 미달/급여 없음은 null.
 function metricVal(c){
   if(metric==='save_pct') return c.save_pct;
@@ -657,14 +710,14 @@ function toggle(tr,c){
   const nx=tr.nextElementSibling;
   if(nx&&nx.classList.contains('detail')){nx.remove();return;}
   const d=document.createElement('tr'); d.className='detail'; tr.after(d);
-  if(c.zones){ d.innerHTML=`<td colspan="9">${detailHtml(c)}</td>`; return; }  // 이미 병합됨
-  d.innerHTML='<td colspan="9" class="detail-loading">상세 불러오는 중…</td>';
+  if(c.zones){ d.innerHTML=`<td colspan="10">${detailHtml(c)}</td>`; return; }  // 이미 병합됨
+  d.innerHTML='<td colspan="10" class="detail-loading">상세 불러오는 중…</td>';
   loadDetails().then(det=>{
     const dd=det[c.gk_sp_id+'_'+c.grade]||{};
     c.zones=dd.zones||[]; c.types=dd.types||[]; c.extras=dd.extras||{};
-    if(d.parentNode) d.innerHTML=`<td colspan="9">${detailHtml(c)}</td>`;
+    if(d.parentNode) d.innerHTML=`<td colspan="10">${detailHtml(c)}</td>`;
   }).catch(()=>{ if(d.parentNode)
-    d.innerHTML='<td colspan="9" class="detail-loading">상세를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.</td>';
+    d.innerHTML='<td colspan="10" class="detail-loading">상세를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.</td>';
   });
 }
 function render(){
@@ -683,7 +736,7 @@ function render(){
     if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1;
     return sortDir==='asc' ? av-bv : bv-av;
   });
-  if(!rows.length){tb.innerHTML='<tr><td colspan="9" class="empty">해당하는 카드가 없습니다.</td></tr>';updateHeaders();return;}
+  if(!rows.length){tb.innerHTML='<tr><td colspan="10" class="empty">해당하는 카드가 없습니다.</td></tr>';updateHeaders();return;}
   const gf = gsaxMode;   // GSAx 열 표시값(초근제외 토글에 따라)
   document.getElementById('gsaxHdr').firstChild.textContent =
     (gsaxMode==='gsax_ex_short_per_shot' ? 'GSAx/100(초근×) ' : 'GSAx/100 ');
@@ -692,6 +745,9 @@ function render(){
   // 검색 중(이름 또는 국가/클럽)이면 전체에서 찾도록 캡 무시, 아니면 상위 limit 장만(경량화)
   const searching = q || natClubQ;
   const vis = searching ? rows : rows.slice(0, limit);
+  // 델타는 표시분(vis)이 아니라 rows 전체 기준으로 계산한다. '더 보기'로 몇 장을
+  // 펼쳤는지에 따라 같은 카드의 변동 숫자가 달라지면 안 된다.
+  const dmap = rankDeltas(rows);
   vis.forEach((c,i)=>{
     const tr=document.createElement('tr'); tr.className='row';
     // 신규특성만 이름 옆에 아이콘으로. 아이콘을 span 으로 감싸 hover 시 특성명 툴팁을 띄운다.
@@ -706,7 +762,8 @@ function render(){
       `<td class="num">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
       `<td class="num">${(c.info&&c.info.ovr!=null)?c.info.ovr:''}</td>`+
       `<td class="pct">${metricCell(c)}</td><td class="num">${gps(c[gf])}</td>`+
-      `<td class="num">${c.matches}</td>`;
+      `<td class="num">${c.matches}</td>`+
+      `<td class="num delta">${deltaCell(c,dmap)}</td>`;
     tr.onclick=()=>toggle(tr,c); tb.appendChild(tr);
   });
   if(searching) return;  // 검색 중엔 더보기/접기 없음

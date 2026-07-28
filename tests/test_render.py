@@ -238,9 +238,9 @@ def test_main_list_and_compare_have_salary_column():
     assert 'data-col="salary">급여' in html       # 메인 목록(정렬 헤더)
     assert "<th>급여</th>" in html                # 동일선수 mini 표
     assert "c.info" in html                       # 메인 행이 급여를 그림
-    # 상세 행 colspan 은 컬럼 수(OVR 추가로 9)와 맞아야
-    assert 'colspan="9"' in html
-    assert 'colspan="8"' not in html
+    # 상세 행 colspan 은 컬럼 수(OVR 9 → 순위 변동 추가로 10)와 맞아야
+    assert 'colspan="10"' in html
+    assert 'colspan="9"' not in html
 
 
 def test_hero_shows_player_info_chips_when_present():
