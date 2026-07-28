@@ -99,6 +99,13 @@ def build_payload(
         "leaderboard": leaderboard,
         "grade_effect": agg.within_ouid_grade_effect(con, since=since),
     }
+    # 순위 추이 — 롤링 창을 3일 간격으로 소급 샘플링한 카드별 원자료.
+    # 창 길이를 export 창(since~지금)과 같게 맞춰야 마지막 점이 위 leaderboard 와
+    # 같은 창이 되어, 목록의 현재 순위와 추이의 끝점이 어긋나지 않는다.
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    payload["trend"] = agg.rank_timeseries(
+        con, gate=gate, window_days=(now - since).days if since else 30, end=now
+    )
     # GSAx(난이도 보정): 전체 + 초근거리(<5m) 제외 두 버전
     gsax = agg.gsax_leaderboard(con, gate=gate, since=since)
     gsax_ex = agg.gsax_leaderboard(con, gate=gate, since=since, min_dist_m=ZONE_CUTS_M[0])

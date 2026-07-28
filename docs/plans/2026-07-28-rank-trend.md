@@ -147,6 +147,14 @@ def rank_timeseries(con, *, gate, window_days=30, step_days=3,
   소요 시간과 `index.html` 크기 증가분 기록(수용 기준 7).
 - **커밋**: `feat(export): 순위 추이 시계열 payload 추가`
 
+**✅ 완료 (2026-07-28)** — export 총 **42.6초**, `index.html` 3.96 → 4.40MB(**+0.44MB**, 기준 1.5MB 이내),
+시점 9개(7/04~7/28) 임베드 확인.
+
+> **계획에 없던 지점**: `render.build_html` 은 payload 를 통째로 싣지 않고 **키 화이트리스트**로 고른다
+> (`render.py:109-119`). `payload["trend"]` 만 넣으면 HTML 엔 안 실린다 — 첫 시도에서 `index.html` 이
+> 오히려 줄어(-0.06MB) 잡혔다. 화이트리스트에 `"trend"` 한 줄을 추가했다. T5·T6 도 이 함수를 거치므로
+> 이후 작업엔 영향 없음.
+
 ## T5. 리더보드 델타 뱃지 컬럼
 
 - `src/gksave/render.py` — 테이블 헤더(`:424` 근처)에 `변동` 컬럼 추가.

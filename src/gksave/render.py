@@ -116,6 +116,8 @@ def build_html(payload: dict[str, Any]) -> str:
         "grade_effect": payload.get("grade_effect", {}),
         "leaderboard": payload.get("leaderboard", []),
         "same_player": payload.get("same_player", []),
+        # 순위 추이 시계열. 여기는 화이트리스트라 payload 에 있어도 안 적으면 안 실린다.
+        "trend": payload.get("trend", {}),
     }
     # <script> 탈출 방지: '<' → <
     data_json = json.dumps(page, ensure_ascii=False).replace("<", "\\u003c")
