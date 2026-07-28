@@ -110,9 +110,16 @@
   .ddim{opacity:.38}   /* 선방률 외 지표로 정렬 중 — 시계열은 선방률 기준이라 흐리게 */
   /* 순위 추이 차트 (행 펼침) */
   .trendbox{margin-top:8px}
-  .trendsvg{width:100%;height:auto;max-height:180px;background:#0e1424;
+  .trendsvg{width:100%;height:auto;max-height:270px;background:#0e1424;
         border:1px solid var(--line);border-radius:9px}
-  .tlab{fill:var(--mut);font-size:9px}
+  .tlab{fill:var(--mut);font-size:14px}
+  /* 점 위에 마우스를 올리면 그 시점 값을 즉시 띄운다(기본 title 툴팁은 지연이 있다).
+     paint-order:stroke 로 어두운 외곽선을 깔아 선·격자와 겹쳐도 읽힌다. */
+  .trendsvg .ttip{fill:var(--text);font-size:14px;font-weight:700;opacity:0;
+        pointer-events:none;paint-order:stroke;stroke:#0e1424;stroke-width:5;
+        stroke-linejoin:round;transition:opacity .12s}
+  .trendsvg .tpt:hover .ttip{opacity:1}
+  .trendsvg .tpt:hover .thit{fill:rgba(217,180,90,.16)}
   .tnote{color:var(--mut);font-size:.78rem;margin:6px 0 0;line-height:1.55}
   .scell{display:inline-flex;align-items:center;gap:6px}
   .season-ico{flex:0 0 auto;object-fit:contain;vertical-align:middle;height:22px;width:auto}
@@ -622,7 +629,11 @@ function trendChartHtml(c){
   const rMin=Math.min(...ranks), rMax=Math.max(...ranks);
   const pad=Math.max(2, Math.round(Math.max(rMax-rMin, 4)*0.35));
   const yTop=Math.max(1, rMin-pad), yBot=Math.min(maxPool, rMax+pad);
-  const W=560,H=150,PL=38,PR=12,PT=14,PB=24;
+  // viewBox 를 컨테이너 종횡비에 가깝게 잡는다. 560x150 으로 두면 넓은 화면에서
+  // preserveAspectRatio 가 높이(max-height)에 맞춰 축소해 좌우 170px 씩이 빈다.
+  const narrow=window.innerWidth<640;
+  const W=narrow?520:1000, H=narrow?230:250;
+  const PL=narrow?46:62, PR=narrow?14:20, PT=narrow?16:20, PB=narrow?30:36;
   const px=i=>PL+(W-PL-PR)*(TP.length===1?0:i/(TP.length-1));
   const py=r=>PT+(H-PT-PB)*((r-yTop)/Math.max(1,yBot-yTop));
   // 게이트 미달로 빠진 시점에서 선을 끊는다 — 이어 그리면 없던 연속성이 생긴다.
@@ -631,12 +642,23 @@ function trendChartHtml(c){
   if(cur.length) segs.push(cur);
   const lines=segs.filter(g=>g.length>1).map(g=>
     `<polyline points="${g.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" `+
-    `fill="none" stroke="#d9b45a" stroke-width="2" stroke-linejoin="round"/>`).join('');
+    `fill="none" stroke="#d9b45a" stroke-width="3" stroke-linejoin="round"/>`).join('');
   const lastI=TP.length-1;
-  const dots=series.map((s,i)=>!s?'':
-    `<circle cx="${px(i).toFixed(1)}" cy="${py(s.rank).toFixed(1)}" r="${i===lastI?4.5:3}" `+
-    `fill="${i===lastI?'#e2707a':'#d9b45a'}"><title>${TP[i]} · ${s.rank}위 / ${s.pool}장 · ${pct(s.pct)}</title></circle>`
-  ).join('');
+  // 점(7px)은 마우스로 맞히기엔 너무 작고, 브라우저 기본 <title> 툴팁은 1초쯤
+  // 머물러야 뜬다. 투명한 큰 히트원을 겹치고 CSS :hover 로 값을 즉시 띄운다.
+  const dots=series.map((s,i)=>{
+    if(!s) return '';
+    const x=px(i), y=py(s.rank);
+    const anchor = i===0 ? 'start' : (i===lastI ? 'end' : 'middle');
+    const above = y > PT+40;   // 위쪽에 자리가 없으면 아래에 쓴다
+    return `<g class="tpt">`+
+      `<circle class="thit" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="22" `+
+      `fill="transparent" pointer-events="all"/>`+
+      `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${i===lastI?7:5}" `+
+      `fill="${i===lastI?'#e2707a':'#d9b45a'}" pointer-events="none"/>`+
+      `<text class="ttip" x="${x.toFixed(1)}" y="${(above?y-24:y+32).toFixed(1)}" `+
+      `text-anchor="${anchor}">${TP[i]} · ${s.rank}위 / ${s.pool}장 · ${pct(s.pct)}</text></g>`;
+  }).join('');
   const a=seen[0], z=seen[seen.length-1], d=a.rank-z.rank;
   const dtxt = d===0?'제자리':(d>0?`▲${d}`:`▼${-d}`);
   return `<h4 style="margin-top:14px">선방률 순위 추이 `+
@@ -644,13 +666,15 @@ function trendChartHtml(c){
     `<div class="trendbox"><svg viewBox="0 0 ${W} ${H}" class="trendsvg" role="img" `+
     `aria-label="순위 추이 ${a.rank}위에서 ${z.rank}위">`+
     `<line x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="#2a3350"/>`+
-    `<text x="4" y="${PT+4}" class="tlab">${yTop}위</text>`+
-    `<text x="4" y="${H-PB}" class="tlab">${yBot}위</text>`+
+    `<text x="6" y="${PT+5}" class="tlab">${yTop}위</text>`+
+    `<text x="6" y="${H-PB}" class="tlab">${yBot}위</text>`+
     lines+dots+
-    `<text x="${PL}" y="${H-6}" class="tlab">${TP[0]}</text>`+
-    `<text x="${W-PR}" y="${H-6}" class="tlab" text-anchor="end">${TP[lastI]}</text></svg>`+
-    `<p class="tnote"><b>${a.rank}위 → ${z.rank}위 (${dtxt})</b> · 마지막 점(빨강)은 아직 <b>수집 중인 구간</b>이라 `+
-    `표본이 얇을 수 있어요. 과거 점은 지금 데이터로 <b>소급 계산</b>한 값이라, 그때 실제로 보이던 순위와는 다릅니다.</p></div>`;
+    `<text x="${PL}" y="${H-8}" class="tlab">${TP[0]}</text>`+
+    `<text x="${W-PR}" y="${H-8}" class="tlab" text-anchor="end">${TP[lastI]}</text></svg>`+
+    `<p class="tnote"><b>${a.rank}위 → ${z.rank}위 (${dtxt})</b> · <b>점 위에 마우스를 올리면</b> 그 시점의 `+
+    `등수와 함께 순위를 매긴 카드 수가 나옵니다(카드 수가 늘면 실력이 같아도 등수가 밀립니다). `+
+    `마지막 점(빨강)은 아직 <b>수집 중인 구간</b>이라 표본이 얇을 수 있어요. 과거 점은 지금 데이터로 `+
+    `<b>소급 계산</b>한 값이라, 그때 실제로 보이던 순위와는 다릅니다.</p></div>`;
 }
 function detailHtml(c){
   const zones=(c.zones||[]).map(z=>
