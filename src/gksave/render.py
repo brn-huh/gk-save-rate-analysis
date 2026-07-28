@@ -213,6 +213,10 @@ _TEMPLATE = r"""<!doctype html>
   button.sort.active{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#1a1405;
         border-color:var(--gold);font-weight:700}
   table{width:100%;border-collapse:collapse;font-size:.92rem}
+  /* 표가 넘치면 표만 가로로 스크롤한다(페이지 전체가 밀리지 않게). 예전엔 640px
+     이하에만 걸어뒀는데, '변동' 컬럼이 늘면서 태블릿 폭(≈768px)에서 body 가
+     가로 스크롤되는 회귀가 났다. 넓은 화면에선 내용이 안 넘쳐 무해하다. */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
   th,td{padding:10px 11px;border-bottom:1px solid var(--line);text-align:left}
   thead th{position:sticky;top:0;background:#070b1c;color:var(--gold2);font-size:.78rem;
         font-weight:700;letter-spacing:.02em;z-index:2}
@@ -460,7 +464,8 @@ _TEMPLATE = r"""<!doctype html>
   <ol class="usage">
     <li><b>리더보드 탭</b>에서 선방률·GSAx로 정렬하고, 검색창에 선수 이름을 넣어 찾습니다. <b>여러 명을 한꺼번에</b> 보려면 쉼표로 구분해 넣으세요(예: <b>노이어, 칸</b>). <b>팀컬러 검색</b>으로 특정 국가(예: <b>이탈리아</b>)·클럽(예: <b>유벤투스</b>)·시즌(예: <b>WG</b>)을 볼 수도 있습니다. 옆의 <b>강화 드랍박스</b>로 특정 강화단계만 골라볼 수도 있습니다. 기본은 상위 100장만 보이고 <b>더 보기</b>로 펼칩니다.</li>
     <li><b>지표</b> 드롭다운으로 선방률 컬럼을 <b>근·중거리 선방률</b>(게임처럼 페널티박스 안=근거리, 밖=중거리), <b>1대1·연계</b> 또는 <b>가성비</b>로 바꿔 그 기준으로 순위를 볼 수 있습니다. 상황별은 표본이 너무 적은 카드는 자동 제외하고, 가성비는 <b>급여 대비 GSAx</b>(토글로 선방률 기준)로 계산합니다.</li>
-    <li>표의 <b>행을 클릭</b>하면 그 카드의 거리 구간별·슛 타입별 선방률과 세부 스탯이 펼쳐집니다.</li>
+    <li>맨 오른쪽 <b>변동</b> 컬럼은 <b>약 1주 전과 견준 선방률 순위</b>의 오르내림입니다(뱃지에 마우스를 올리면 실제 비교 시점이 나옵니다). 지금 걸어둔 검색·필터 <b>안에서</b> 다시 매긴 순위라, 예를 들어 <b>이탈리아</b>만 걸면 그 안에서의 등수 변화가 됩니다. 그때 표본 게이트를 못 채웠던 카드는 <b>NEW</b>입니다. <b>주의</b> — 선방률 차이가 워낙 촘촘해서 <b>순위 등락의 상당 부분은 실력 변화가 아니라 표본이 흔들린 결과</b>입니다. 특히 중하위권의 세 자리 숫자는 그대로 믿지 마세요. 다른 지표·정렬로 보는 중이면 왼쪽 #열과 뜻이 달라져 흐리게 표시됩니다.</li>
+    <li>표의 <b>행을 클릭</b>하면 그 카드의 거리 구간별·슛 타입별 선방률과 세부 스탯, 그리고 <b>선방률 순위 추이</b> 그래프가 펼쳐집니다. 그래프의 과거 점은 <b>지금 데이터로 소급 계산</b>한 값이라 그때 화면에 실제로 떠 있던 순위와는 다릅니다. 마지막 점은 아직 수집 중인 구간이라 표본이 얇을 수 있습니다.</li>
     <li><b>동일 선수 비교 탭</b>에서 같은 선수의 시즌·강화별 성적을 나란히 봅니다.</li>
   </ol>
 
@@ -573,7 +578,9 @@ function rankDeltas(rows){
 function deltaCell(c,dm){
   // 시계열은 선방률만 담는다(가정 2). 델타는 언제나 '선방률 순위' 변동이므로,
   // 화면이 다른 지표·정렬을 보고 있으면 #열과 뜻이 달라진다 → 흐리게.
-  const dim = (metric!=='save_pct' || sortCol!=='save_pct') ? ' ddim' : '';
+  // sortDir 까지 봐야 한다. 선방률 오름차순(두 번 클릭)이면 #열은 '낮은 순' 순위인데
+  // 델타는 늘 '높은 순' 기준이라 그대로 두면 두 숫자가 반대 방향을 가리킨다.
+  const dim = (metric!=='save_pct' || sortCol!=='save_pct' || sortDir!=='desc') ? ' ddim' : '';
   if(!dm.size) return '';
   const why = dim ? ' — 지금은 다른 지표·정렬로 보는 중이라 왼쪽 #열과 뜻이 다릅니다' : '';
   const tip = escAttr(`${deltaBase} 시점 대비 선방률 순위 변동 (지금 필터 안에서)${why}`);
@@ -822,8 +829,12 @@ function render(){
   const vis = searching ? rows : rows.slice(0, limit);
   // 델타는 표시분(vis)이 아니라 rows 전체 기준으로 계산한다. '더 보기'로 몇 장을
   // 펼쳤는지에 따라 같은 카드의 변동 숫자가 달라지면 안 된다.
-  const dmap = rankDeltas(rows);
-  lastRows = rows;   // 추이 차트가 "지금 필터 풀" 기준으로 순위를 매기는 근거
+  // 델타·추이는 rows(현재 지표 자격 통과분)가 아니라 pool(공통 필터만 적용)을 쓴다.
+  // 둘 다 '선방률 순위'라 지표 선택과 무관해야 하는데, rows 를 쓰면 지표를 가성비로
+  // 바꾸는 순간 급여 없는 카드가 빠져 모집단이 흔들린다(같은 카드의 순위가 지표만
+  // 바꿔도 달라져 보인다). pool ⊇ rows 이므로 표시행 조회에는 문제가 없다.
+  const dmap = rankDeltas(pool);
+  lastRows = pool;   // 추이 차트가 "지금 필터 풀" 기준으로 순위를 매기는 근거
   vis.forEach((c,i)=>{
     const tr=document.createElement('tr'); tr.className='row';
     // 신규특성만 이름 옆에 아이콘으로. 아이콘을 span 으로 감싸 hover 시 특성명 툴팁을 띄운다.
