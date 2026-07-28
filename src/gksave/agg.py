@@ -266,6 +266,11 @@ def rank_timeseries(
     base = {"window_days": window_days, "step_days": step_days, "gate": gate}
     if data_start is None:
         return {**base, "points": [], "cards": {}}
+    # 데이터 시작을 날짜 경계로 내린다. 실측 시작이 2026-06-01 15:01 이라
+    # 그대로 쓰면 [6/01 00:00, 7/01) 창이 "하한이 데이터보다 이르다"는 이유로
+    # 통째로 버려져 시점을 하나 잃는다. 30일 창에서 반나절 부족은 무해한 반면
+    # 추이가 한 칸 짧아지는 손해는 눈에 보인다.
+    data_start = data_start.replace(hour=0, minute=0, second=0, microsecond=0)
 
     span, step = timedelta(days=window_days), timedelta(days=step_days)
     points: list[datetime] = []

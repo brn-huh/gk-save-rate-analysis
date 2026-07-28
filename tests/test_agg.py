@@ -235,3 +235,68 @@ def test_grade_breakdown(con):
     grades = {r["grade"]: r for r in br}
     assert grades[10]["save_pct"] == pytest.approx(0.75)
     assert grades[11]["save_pct"] == pytest.approx(1.0)
+
+
+# ── 닫힌 창(until) · 순위 추이 시계열 ──────────────────────────
+
+def _dated(match_id, day, sp_id, grade, saves, goals, ouid="U"):
+    """matchDate 를 지정한 매치. 시계열은 창 경계가 전부라 날짜가 핵심이다."""
+    m = _match(match_id, ouid, sp_id, grade, saves, goals)
+    m["matchDate"] = f"2026-06-{day:02d}T12:00:00"
+    return m
+
+
+def test_until_excludes_upper_bound(con):
+    from datetime import datetime
+    _insert(con, _dated("d10", 10, 500, 10, saves=4, goals=0))
+    _insert(con, _dated("d20", 20, 500, 10, saves=0, goals=4))
+    agg.rebuild(con)
+    # [6/10, 6/20) — 상한은 미포함이라 6/20 경기는 빠진다.
+    # _match 는 2팀 매치라 상대 GK(600)도 같이 잡히므로 카드 500만 골라 본다.
+    by = {r["gk_sp_id"]: r for r in
+          agg.grade_leaderboard(con, gate=1, since=datetime(2026, 6, 10),
+                                until=datetime(2026, 6, 20))}
+    assert by[500]["matches"] == 1 and by[500]["save_pct"] == pytest.approx(1.0)
+    # 상한을 하루 늦추면 두 경기가 다 들어와 0.5
+    by2 = {r["gk_sp_id"]: r for r in
+           agg.grade_leaderboard(con, gate=1, since=datetime(2026, 6, 10),
+                                 until=datetime(2026, 6, 21))}
+    assert by2[500]["matches"] == 2 and by2[500]["save_pct"] == pytest.approx(0.5)
+
+
+def test_rank_timeseries_shape_and_window(con):
+    from datetime import datetime
+    for d in (10, 12, 14, 16, 18, 20):
+        _insert(con, _dated(f"t{d}", d, 500, 10, saves=3, goals=1))
+    agg.rebuild(con)
+    ts = agg.rank_timeseries(con, gate=1, window_days=4, step_days=2,
+                             end=datetime(2026, 6, 20))
+    # 창 하한이 데이터 시작(6/10)보다 앞서는 시점은 버린다. 시작은 날짜 경계로
+    # 내리므로 12:00 에 시작해도 [6/10, 6/14) 시점은 살아남는다.
+    assert ts["points"] == ["2026-06-14", "2026-06-16", "2026-06-18", "2026-06-20"]
+    assert ts["window_days"] == 4 and ts["step_days"] == 2 and ts["gate"] == 1
+    # 키는 export._card_key 와 같은 "{sp_id}_{grade}" 여야 클라이언트가 카드를 찾는다
+    assert "500_10" in ts["cards"]
+    slot = ts["cards"]["500_10"]
+    assert len(slot) == len(ts["points"])
+    assert all(v is not None and v[0] >= 1 for v in slot)   # [matches, saves, goals]
+
+
+def test_rank_timeseries_marks_gate_misses_as_none(con):
+    """게이트 미달 시점은 None 이어야 차트에서 선이 끊긴다."""
+    from datetime import datetime
+    _insert(con, _dated("a", 10, 500, 10, saves=3, goals=1))
+    _insert(con, _dated("b", 19, 500, 10, saves=3, goals=1))
+    _insert(con, _dated("c", 20, 500, 10, saves=3, goals=1))
+    agg.rebuild(con)
+    ts = agg.rank_timeseries(con, gate=2, window_days=4, step_days=2,
+                             end=datetime(2026, 6, 21))
+    slot = ts["cards"]["500_10"]
+    assert slot[-1] is not None and slot[-1][0] == 2   # [6/17, 6/21) 에 19·20일 2경기
+    assert any(v is None for v in slot)                # 게이트 못 채운 시점이 있다
+
+
+def test_rank_timeseries_empty_when_no_data(con):
+    from datetime import datetime
+    ts = agg.rank_timeseries(con, gate=1, end=datetime(2026, 6, 20))
+    assert ts["points"] == [] and ts["cards"] == {}

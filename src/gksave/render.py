@@ -436,7 +436,7 @@ _TEMPLATE = r"""<!doctype html>
   <p class="muted"><b>컬럼 제목</b>을 클릭하면 그 항목으로 정렬됩니다(다시 누르면 오름/내림 전환). 행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
     <table id="lb">
-      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th class="sortable" data-col="grade">강화 <span class="arr"></span></th><th class="sortable" data-col="salary">급여 <span class="arr"></span></th><th class="sortable" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable" data-col="save_pct" id="metricHdr">선방률 <span class="arr"></span></th><th class="sortable" data-col="gsax" id="gsaxHdr">GSAx/100 <span class="arr"></span></th><th class="sortable" data-col="matches">경기수 <span class="arr"></span></th><th id="deltaHdr" data-tip="7일 전 같은 창과 비교한 순위 변동. 지금 걸어둔 검색·필터 안에서 계산합니다">변동</th></tr></thead>
+      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th class="sortable" data-col="grade">강화 <span class="arr"></span></th><th class="sortable" data-col="salary">급여 <span class="arr"></span></th><th class="sortable" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable" data-col="save_pct" id="metricHdr">선방률 <span class="arr"></span></th><th class="sortable" data-col="gsax" id="gsaxHdr">GSAx/100 <span class="arr"></span></th><th class="sortable" data-col="matches">경기수 <span class="arr"></span></th><th id="deltaHdr" title="약 1주 전 같은 창과 비교한 '선방률 순위' 변동. 지금 걸어둔 검색·필터 안에서 계산합니다. 각 뱃지에 마우스를 올리면 실제 비교 시점이 나옵니다. 다른 지표·정렬로 보는 중이면 뜻이 달라져 흐리게 표시됩니다.">변동</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -553,25 +553,35 @@ function trendPct(c,idx){
 // rows(현재 화면에 뜰 카드 집합) 기준 순위 델타. 양수면 상승.
 // 과거에 없던 카드(NEW)가 남의 순위를 밀어내지 않도록, 양쪽 순위를 모두
 // "과거에도 있던 카드"라는 같은 부분집합 안에서 다시 센다.
+let deltaBase='';   // 델타가 실제로 비교한 시점(뱃지 툴팁용). step 간격 탓에 정확히 7일 전이 아닐 수 있다.
 function rankDeltas(rows){
   const idx=trendIdxDaysAgo(7), out=new Map();
+  deltaBase = idx>=0 ? TP[idx] : '';
   if(idx<0) return out;
   const past=[];
   rows.forEach(c=>{const p=trendPct(c,idx); if(p!=null) past.push({c,p});});
   past.sort((a,b)=>b.p-a.p);
   const pr=new Map(); past.forEach((x,i)=>pr.set(x.c,i+1));
-  let n=0;
-  rows.forEach(c=>{ if(pr.has(c)) out.set(c, pr.get(c)-(++n)); });
+  // 현재 순위도 반드시 선방률 기준으로 다시 센다. 화면 정렬(경기수·급여·GSAx…)을
+  // 그대로 쓰면 "과거 선방률 순위 − 현재 경기수 순위" 라는 무의미한 뺄셈이 된다
+  // (경기수 정렬 시 전 행이 ▲로만 뜨는 증상으로 드러났다).
+  rows.filter(c=>pr.has(c))
+      .sort((a,b)=>(b.save_pct==null?-1:b.save_pct)-(a.save_pct==null?-1:a.save_pct))
+      .forEach((c,i)=>out.set(c, pr.get(c)-(i+1)));
   return out;
 }
 function deltaCell(c,dm){
-  // 가정 2: 시계열은 선방률만 담는다. 다른 지표로 정렬 중이면 흐리게 표시.
-  const dim = metric!=='save_pct' ? ' ddim' : '';
+  // 시계열은 선방률만 담는다(가정 2). 델타는 언제나 '선방률 순위' 변동이므로,
+  // 화면이 다른 지표·정렬을 보고 있으면 #열과 뜻이 달라진다 → 흐리게.
+  const dim = (metric!=='save_pct' || sortCol!=='save_pct') ? ' ddim' : '';
   if(!dm.size) return '';
-  if(!dm.has(c)) return `<span class="dnew${dim}">NEW</span>`;
+  const why = dim ? ' — 지금은 다른 지표·정렬로 보는 중이라 왼쪽 #열과 뜻이 다릅니다' : '';
+  const tip = escAttr(`${deltaBase} 시점 대비 선방률 순위 변동 (지금 필터 안에서)${why}`);
+  if(!dm.has(c)) return `<span class="dnew${dim}" title="${escAttr(deltaBase+' 시점엔 표본 게이트를 못 채워 순위에 없었습니다')}">NEW</span>`;
   const d=dm.get(c);
-  if(d===0) return `<span class="dflat${dim}">–</span>`;
-  return d>0 ? `<span class="dup${dim}">▲${d}</span>` : `<span class="ddown${dim}">▼${-d}</span>`;
+  if(d===0) return `<span class="dflat${dim}" title="${tip}">–</span>`;
+  return d>0 ? `<span class="dup${dim}" title="${tip}">▲${d}</span>`
+             : `<span class="ddown${dim}" title="${tip}">▼${-d}</span>`;
 }
 // 현재 지표의 카드 값(정렬·표시 공통). 상황 표본 미달/급여 없음은 null.
 function metricVal(c){
@@ -658,6 +668,11 @@ function trendChartHtml(c){
   const seen=series.filter(Boolean);
   if(seen.length<2) return '';
   const maxPool=Math.max(...seen.map(s=>s.pool));
+  // 풀에 카드가 1장뿐이면 어느 시점이든 1위라 평평한 선만 나온다. 추이처럼
+  // 보이지만 아무 정보가 없으므로 차트 대신 이유를 밝힌다.
+  if(maxPool<2) return `<h4 style="margin-top:14px">선방률 순위 추이</h4>`+
+    `<p class="tnote">지금 검색·필터에 남은 카드가 1장뿐이라 순위 추이를 그릴 수 없어요. `+
+    `조건을 넓히면 그 안에서의 순위 변화를 볼 수 있습니다.</p>`;
   // y축을 1~풀크기 전체로 잡으면 상위권 카드(3위↔2위)가 맨 위에 납작하게 붙어
   // 아무것도 안 보인다. 지나온 순위 구간에 맞춰 확대하되, 최소 폭을 둬서
   // 1~2위짜리 미세 변동이 화면을 꽉 채우는 반대쪽 과장도 막는다.
@@ -682,7 +697,7 @@ function trendChartHtml(c){
   ).join('');
   const a=seen[0], z=seen[seen.length-1], d=a.rank-z.rank;
   const dtxt = d===0?'제자리':(d>0?`▲${d}`:`▼${-d}`);
-  return `<h4 style="margin-top:14px">순위 추이 `+
+  return `<h4 style="margin-top:14px">선방률 순위 추이 `+
     `<small class="muted">${TR.window_days}일 창 · ${TR.step_days}일 간격 · 지금 필터 ${lastRows.length}장 안에서</small></h4>`+
     `<div class="trendbox"><svg viewBox="0 0 ${W} ${H}" class="trendsvg" role="img" `+
     `aria-label="순위 추이 ${a.rank}위에서 ${z.rank}위">`+

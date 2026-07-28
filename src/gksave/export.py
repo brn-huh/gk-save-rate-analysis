@@ -102,10 +102,17 @@ def build_payload(
     # 순위 추이 — 롤링 창을 3일 간격으로 소급 샘플링한 카드별 원자료.
     # 창 길이를 export 창(since~지금)과 같게 맞춰야 마지막 점이 위 leaderboard 와
     # 같은 창이 되어, 목록의 현재 순위와 추이의 끝점이 어긋나지 않는다.
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    payload["trend"] = agg.rank_timeseries(
-        con, gate=gate, window_days=(now - since).days if since else 30, end=now
-    )
+    #
+    # since 가 없으면(창 없이 전체 기간 집계) 추이를 만들지 않는다. 그 경우
+    # "30일 창 순위 − 전체 기간 순위" 를 빼는 꼴이 되어 델타가 거짓말을 한다.
+    # 빈 trend 는 화면에서 뱃지·차트가 조용히 빠지는 것으로 처리된다.
+    if since is None:
+        payload["trend"] = {}
+    else:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        payload["trend"] = agg.rank_timeseries(
+            con, gate=gate, window_days=(now - since).days, end=now
+        )
     # GSAx(난이도 보정): 전체 + 초근거리(<5m) 제외 두 버전
     gsax = agg.gsax_leaderboard(con, gate=gate, since=since)
     gsax_ex = agg.gsax_leaderboard(con, gate=gate, since=since, min_dist_m=ZONE_CUTS_M[0])
