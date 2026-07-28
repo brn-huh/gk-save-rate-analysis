@@ -12,7 +12,7 @@ from __future__ import annotations
 import csv
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import duckdb
@@ -237,6 +237,54 @@ def grade_leaderboard(
     for i, d in enumerate(out, 1):
         d["rank"] = i
     return out
+
+
+def rank_timeseries(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    gate: int = MIN_MATCHES_GATE,
+    window_days: int = 30,
+    step_days: int = 3,
+    end: datetime,
+    start: datetime | None = None,
+) -> dict[str, Any]:
+    """롤링 window_days 창을 step_days 간격으로 소급 샘플링한 카드별 원자료 시계열.
+
+    시점 t 의 창은 [t-window_days, t). 창 하한이 데이터 시작보다 앞서는 시점은
+    표본이 창 길이를 못 채워 순위가 튀므로 버린다.
+
+    **순위를 담지 않는다.** 클라이언트가 검색·필터 결과 안에서 다시 매겨야
+    "검색 조건에 맞춘 추이"가 되기 때문(render.py 의 순위는 필터 뒤에 붙는다).
+    여기서는 matches/saves/goals 원자료만 주고 순위 계산은 브라우저에 맡긴다.
+
+    비겹침 주간 창이 아니라 롤링 창을 쓰는 이유: 같은 주를 무작위 반분한
+    노이즈 바닥(|Δ순위| 중앙값 6.4%)과 인접 주간 변동(6.4~8.8%)이 구분되지 않는다.
+    롤링 30일 창은 1주 이동 시 스피어만 0.968 로 훨씬 안정적이다.
+    """
+    row = con.execute("SELECT min(match_date) FROM gk_match").fetchone()
+    data_start = row[0] if row else None
+    base = {"window_days": window_days, "step_days": step_days, "gate": gate}
+    if data_start is None:
+        return {**base, "points": [], "cards": {}}
+
+    span, step = timedelta(days=window_days), timedelta(days=step_days)
+    points: list[datetime] = []
+    t = end
+    while t - span >= data_start and (start is None or t >= start):
+        points.append(t)
+        t -= step
+    points.reverse()
+
+    cards: dict[str, list] = {}
+    for i, t in enumerate(points):
+        for c in grade_leaderboard(con, gate=gate, since=t - span, until=t):
+            key = f"{c['gk_sp_id']}_{c['grade']}"
+            slot = cards.get(key)
+            if slot is None:
+                slot = cards[key] = [None] * len(points)
+            slot[i] = [c["matches"], c["saves"], c["goals"]]
+
+    return {**base, "points": [p.date().isoformat() for p in points], "cards": cards}
 
 
 def gsax_leaderboard(
