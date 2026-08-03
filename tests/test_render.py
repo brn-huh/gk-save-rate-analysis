@@ -524,6 +524,29 @@ def test_leaderboard_has_team_color_search_input():
     assert "matchTeamColor(c,natClubQ)" in html.replace(" ", "")   # 필터에 결합
 
 
+def test_recent_team_color_controls_and_storage_present():
+    html = render.build_html(_PAYLOAD)
+    assert 'id="recentTeamColors"' in html             # 검색창 아래 최근 검색 목록
+    assert 'id="clearRecentTeamColors"' in html        # 전체 삭제
+    assert "gksave_recent_team_colors_v1" in html      # 브라우저별 저장 키
+    assert "localStorage.setItem" in html               # 서버·쿠키 없이 로컬 저장
+    assert "D.leaderboard.some(c=>matchTeamColor" in html  # 결과가 있는 완성 검색어만 저장
+
+
+@requires_node
+def test_recent_team_colors_dedupe_and_keep_latest_three():
+    f = render.FILTER_JS
+    expr = "JSON.stringify(addRecentTeamColor(['프랑스','WS','파리 생제르맹'],'ws'))"
+    assert _eval_js(expr, f) == '["ws","프랑스","파리 생제르맹"]'
+
+
+@requires_node
+def test_recent_team_colors_ignore_invalid_storage_values():
+    f = render.FILTER_JS
+    expr = "JSON.stringify(normalizeRecentTeamColors([' 프랑스 ','',null,'프랑스','WS','파리','첼시']))"
+    assert _eval_js(expr, f) == '["프랑스","WS","파리"]'
+
+
 # ── 리더보드 탭 급여 범위 필터 ──────────────────────────────────────────────
 
 

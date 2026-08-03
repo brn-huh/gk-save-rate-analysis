@@ -73,6 +73,24 @@ const matchTeamColor=(c,q)=>{
   }
   return matchName(c.season_name,q);   // 시즌명(팀컬러)도 검색
 };
+// 최근 팀컬러는 완성된 검색어만 최대 3개 보관한다. localStorage 값이 손상됐거나
+// 예전 형식이어도 페이지가 깨지지 않도록 정규화는 순수 함수로 분리한다.
+const RECENT_TEAM_COLOR_LIMIT=3;
+const normalizeTeamColorQuery=value=>String(value==null?'':value).trim();
+const normalizeRecentTeamColors=values=>{
+  if(!Array.isArray(values)) return [];
+  const out=[], seen=new Set();
+  for(const value of values){
+    const query=normalizeTeamColorQuery(value);
+    const key=query.toLowerCase();
+    if(!query||seen.has(key)) continue;
+    seen.add(key); out.push(query);
+    if(out.length===RECENT_TEAM_COLOR_LIMIT) break;
+  }
+  return out;
+};
+const addRecentTeamColor=(values,value)=>
+  normalizeRecentTeamColors([normalizeTeamColorQuery(value),...(Array.isArray(values)?values:[])]);
 // 리더보드 전용: 급여 범위 필터. lo/hi 는 숫자 또는 null(미지정). 급여 미상(null)은
 // 범위가 하나라도 지정되면 제외한다(검증 불가한 값을 통과시키지 않음).
 const matchSalary=(salary,lo,hi)=>{
@@ -200,11 +218,27 @@ _TEMPLATE = r"""<!doctype html>
   /* 검색 입력창 hover 시 설명 말풍선 (input 은 ::after 가 안 붙어 .field 로 감싼다) */
   .controls .field{position:relative;flex:1;min-width:170px;display:flex}
   .controls .field input{flex:1;min-width:0}
-  .controls .field:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 7px);left:0;
+  .controls .field:hover:not(:focus-within)::after{content:attr(data-tip);position:absolute;top:calc(100% + 7px);left:0;
         width:max-content;max-width:260px;white-space:normal;text-align:left;
         background:var(--panel2);border:1px solid var(--line);color:var(--text);font-size:.78rem;
         line-height:1.4;padding:7px 10px;border-radius:8px;z-index:30;
         box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none}
+  .recent-team-colors{position:absolute;top:calc(100% + 7px);left:0;width:100%;min-width:230px;
+        padding:7px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;z-index:31;
+        box-shadow:0 12px 30px rgba(0,0,0,.55)}
+  .recent-team-colors[hidden]{display:none}
+  .recent-head{display:flex;align-items:center;justify-content:space-between;padding:2px 5px 6px;
+        color:var(--mut);font-size:.72rem}
+  .recent-clear{border:0;background:transparent;color:var(--mut);padding:2px 0;cursor:pointer;
+        font:inherit;font-size:.72rem}
+  .recent-clear:hover,.recent-clear:focus-visible{color:var(--gold)}
+  .recent-item{display:flex;align-items:center;gap:4px}
+  .recent-pick{flex:1;border:0;background:transparent;color:var(--text);padding:7px 8px;
+        border-radius:7px;text-align:left;cursor:pointer;font:inherit;font-size:.83rem}
+  .recent-pick:hover,.recent-pick:focus-visible{background:rgba(240,209,122,.09);color:var(--gold)}
+  .recent-remove{flex:0 0 auto;width:28px;height:28px;border:0;border-radius:7px;background:transparent;
+        color:var(--mut);cursor:pointer;font:inherit;font-size:.9rem;line-height:1}
+  .recent-remove:hover,.recent-remove:focus-visible{background:rgba(255,255,255,.06);color:var(--text)}
   .controls select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;font-size:.85rem;
         background:var(--panel);color:var(--text);font-family:inherit;cursor:pointer}
   button.sort{padding:7px 13px;border:1px solid var(--line);background:var(--panel);color:var(--mut);
@@ -418,7 +452,13 @@ _TEMPLATE = r"""<!doctype html>
 <div class="panel active" id="panel-lb">
   <div class="controls">
     <span class="field" data-tip="여러 명은 쉼표로 구분해서 검색해요. 예: 노이어, 칸"><input id="search" placeholder="이름 검색"></span>
-    <span class="field" data-tip="국가·클럽·시즌 검색 (예: 이탈리아 / 유벤투스 / WG)"><input id="natClubSearch" placeholder="팀컬러 검색"></span>
+    <span class="field" id="teamColorField" data-tip="국가·클럽·시즌 검색 (예: 프랑스 / 파리 생제르맹 / WS)">
+      <input id="natClubSearch" placeholder="팀컬러 검색" autocomplete="off" aria-expanded="false" aria-controls="recentTeamColors">
+      <span class="recent-team-colors" id="recentTeamColors" hidden>
+        <span class="recent-head"><span>최근 팀컬러</span><button type="button" class="recent-clear" id="clearRecentTeamColors">모두 지우기</button></span>
+        <span id="recentTeamColorList"></span>
+      </span>
+    </span>
     <select id="gradeFilter"><option value="">강화 전체</option></select>
     <span class="lab">급여</span>
     <input id="salMin" class="numf" type="number" inputmode="numeric" min="0" placeholder="이상">
@@ -894,7 +934,67 @@ function render(){
   }
 }
 document.getElementById('search').oninput=e=>{q=e.target.value.trim().toLowerCase();limit=PAGE;render();};
-document.getElementById('natClubSearch').oninput=e=>{natClubQ=e.target.value.trim().toLowerCase();limit=PAGE;render();};
+const TEAM_COLOR_STORAGE_KEY='gksave_recent_team_colors_v1';
+const teamColorInput=document.getElementById('natClubSearch');
+const teamColorField=document.getElementById('teamColorField');
+const recentTeamColorPanel=document.getElementById('recentTeamColors');
+const recentTeamColorList=document.getElementById('recentTeamColorList');
+let recentTeamColors=[];
+try{recentTeamColors=normalizeRecentTeamColors(JSON.parse(localStorage.getItem(TEAM_COLOR_STORAGE_KEY)||'[]'));}
+catch(_){recentTeamColors=[];}
+function saveRecentTeamColors(){
+  try{localStorage.setItem(TEAM_COLOR_STORAGE_KEY,JSON.stringify(recentTeamColors));}catch(_){}
+}
+function hideRecentTeamColors(){
+  recentTeamColorPanel.hidden=true;
+  teamColorInput.setAttribute('aria-expanded','false');
+}
+function drawRecentTeamColors(){
+  recentTeamColorList.innerHTML='';
+  recentTeamColors.forEach(value=>{
+    const row=document.createElement('span'); row.className='recent-item';
+    const pick=document.createElement('button'); pick.type='button'; pick.className='recent-pick';
+    pick.textContent=value; pick.title=value+' 검색';
+    pick.onmousedown=e=>e.preventDefault();
+    pick.onclick=()=>{
+      teamColorInput.value=value; natClubQ=value.toLowerCase(); limit=PAGE;
+      recentTeamColors=addRecentTeamColor(recentTeamColors,value); saveRecentTeamColors();
+      hideRecentTeamColors(); render();
+    };
+    const remove=document.createElement('button'); remove.type='button'; remove.className='recent-remove';
+    remove.textContent='×'; remove.title=value+' 삭제'; remove.setAttribute('aria-label',value+' 최근 검색에서 삭제');
+    remove.onmousedown=e=>e.preventDefault();
+    remove.onclick=()=>{
+      recentTeamColors=recentTeamColors.filter(x=>x.toLowerCase()!==value.toLowerCase());
+      saveRecentTeamColors(); showRecentTeamColors();
+    };
+    row.append(pick,remove); recentTeamColorList.append(row);
+  });
+}
+function showRecentTeamColors(){
+  drawRecentTeamColors();
+  recentTeamColorPanel.hidden=!recentTeamColors.length;
+  teamColorInput.setAttribute('aria-expanded',recentTeamColors.length?'true':'false');
+}
+function commitRecentTeamColor(){
+  const value=normalizeTeamColorQuery(teamColorInput.value);
+  if(!value||!D.leaderboard.some(c=>matchTeamColor(c,value.toLowerCase()))) return;
+  recentTeamColors=addRecentTeamColor(recentTeamColors,value); saveRecentTeamColors();
+}
+teamColorInput.onfocus=showRecentTeamColors;
+teamColorInput.oninput=e=>{
+  natClubQ=e.target.value.trim().toLowerCase(); limit=PAGE; hideRecentTeamColors(); render();
+};
+teamColorInput.onkeydown=e=>{
+  if(e.key==='Enter'){e.preventDefault();commitRecentTeamColor();hideRecentTeamColors();}
+  else if(e.key==='Escape') hideRecentTeamColors();
+};
+teamColorInput.onblur=()=>{commitRecentTeamColor();setTimeout(hideRecentTeamColors,100);};
+document.getElementById('clearRecentTeamColors').onmousedown=e=>e.preventDefault();
+document.getElementById('clearRecentTeamColors').onclick=()=>{
+  recentTeamColors=[]; saveRecentTeamColors(); hideRecentTeamColors();
+};
+document.addEventListener('pointerdown',e=>{if(!teamColorField.contains(e.target)) hideRecentTeamColors();});
 // 급여 범위 — 빈칸이면 null(미지정). 숫자 아니면 무시.
 const parseSal=v=>{const n=parseInt(v,10);return Number.isFinite(n)?n:null;};
 document.getElementById('salMin').oninput=e=>{salMin=parseSal(e.target.value);limit=PAGE;render();};
