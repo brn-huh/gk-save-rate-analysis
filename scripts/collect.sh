@@ -5,7 +5,7 @@
 # 수집이 끝나면 묻지 않고 바로 update.sh(build + export)를 실행한다.
 #
 # 사용법:
-#   ./scripts/collect.sh              # 기본 (3만 매치, 최근 1일 수집 후 자동 update)
+#   ./scripts/collect.sh              # 기본 (100만 매치, 최근 1일 수집 후 자동 update)
 #   ./scripts/collect.sh --refresh    # pending 없을 때 (새 경기 보충)
 #   ./scripts/collect.sh --max 50000
 #   ./scripts/collect.sh --day 7      # 수집 창을 최근 7일로 (며칠 걸렀을 때 보충)
@@ -15,7 +15,8 @@ set -o pipefail
 cd "$(dirname "$0")/.."
 . .venv/bin/activate
 
-MAX=30000
+# 기본 상한 100만 — 사실상 "하루치 다 긁기". 실제 종료는 --day 창이 결정한다.
+MAX=1000000
 # 수집 창 기본 1일 — 매일 1회 돌리는 전제. 화면(통계) 창은 그대로 롤링 30일이다
 # (update.sh 의 export --days 30). DB 에 쌓인 과거 매치는 남아 있으니 영향 없다.
 # 하루 이상 거르면 그 기간만큼 구멍이 나니, 걸렀을 땐 --day 로 넓혀 보충한다.
