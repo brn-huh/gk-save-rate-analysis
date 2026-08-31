@@ -209,6 +209,8 @@ _TEMPLATE = r"""<!doctype html>
   .controls input::placeholder{color:#5a6483}
   /* 급여 숫자 입력은 검색창처럼 늘어나지 않게 고정 폭 */
   .controls input.numf{flex:0 0 auto;width:74px;min-width:0;padding:9px 10px;text-align:center}
+  .gate-input{display:inline-flex;align-items:center;gap:5px;color:var(--mut);font-size:.82rem;white-space:nowrap}
+  .gate-input input{flex:0 0 auto;width:72px;min-width:0;padding:8px 8px;text-align:center}
   .controls .lab{color:var(--mut);font-size:.82rem}
   /* 필터 초기화 아이콘 버튼(텍스트 없음) */
   .controls .icon-btn{flex:0 0 auto;width:34px;height:34px;padding:0;border:1px solid var(--line);
@@ -262,11 +264,6 @@ _TEMPLATE = r"""<!doctype html>
   td.rank{color:var(--gold2);width:2.4rem;font-weight:700;font-variant-numeric:tabular-nums}
   td.pct{font-variant-numeric:tabular-nums;font-weight:700;color:var(--gold)}
   td.pct .ci{display:block;font-size:.7rem;font-weight:500;color:var(--mut)}
-  button.gate{padding:6px 11px;border:1px solid var(--line);background:var(--panel);color:var(--mut);
-        border-radius:9px;cursor:pointer;font-size:.82rem;font-family:inherit;transition:.15s}
-  button.gate:hover{border-color:var(--gold2);color:var(--text)}
-  button.gate.active{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#1a1405;
-        border-color:var(--gold);font-weight:700}
   td.num,td.season{color:var(--mut);font-variant-numeric:tabular-nums}
   /* 순위 변동 뱃지 — 7일 전 같은 창 대비. 표본 흔들림이 섞이므로 색만 옅게 준다. */
   td.delta{white-space:nowrap;font-weight:700}
@@ -477,10 +474,9 @@ _TEMPLATE = r"""<!doctype html>
       <option value="value">가성비</option>
     </select>
     <button id="valueBasis" class="sort" style="display:none">기준: GSAx</button>
-    <span class="lab">경기수↑</span>
-    <button class="gate active" data-gate="200">200</button>
-    <button class="gate" data-gate="300">300</button>
-    <button class="gate" data-gate="500">500</button>
+    <label class="gate-input" for="gateInput">경기수 ≥
+      <input id="gateInput" type="number" inputmode="numeric" min="100" max="50000" step="1" value="200" title="최소 경기 수: 100~50000">
+    </label>
     <button id="resetFilters" class="icon-btn" title="필터 초기화" aria-label="필터 초기화">↺</button>
   </div>
   <div class="champions" id="champions"></div>
@@ -525,7 +521,7 @@ _TEMPLATE = r"""<!doctype html>
     <dt>GSAx(초근제외)</dt>
     <dd>초근거리(5m 미만) 슛을 뺀 GSAx. 골문 앞 난사처럼 GK가 어쩔 수 없는 상황을 제외해, 포지셔닝·반응 능력을 더 잘 드러냅니다.</dd>
     <dt>경기수 · 게이트</dt>
-    <dd>경기수 = 그 카드로 수집·집계된 경기 수(= 통계 표본). 경기수가 적으면 우연(뽀록)일 수 있어 신뢰도가 낮습니다. 그래서 최소 <b id="gateN"></b>경기 이상(게이트)인 카드만 순위에 올립니다. 리더보드 위 <b>경기수↑ 200/300/500</b> 버튼으로 기준을 올려 <b>뽀록 상위권을 걸러</b> 볼 수 있습니다.</dd>
+    <dd>경기수 = 그 카드로 수집·집계된 경기 수(= 통계 표본). 경기수가 적으면 우연(뽀록)일 수 있어 신뢰도가 낮습니다. 그래서 최소 <b id="gateN"></b>경기 이상(게이트)인 카드만 순위에 올립니다. 리더보드 위 <b>경기수 ≥</b> 입력칸에서 100~50000 사이 기준을 직접 정해 <b>뽀록 상위권을 걸러</b> 볼 수 있습니다.</dd>
     <dt>신뢰구간 (±%p)</dt>
     <dd>선방률 옆 <b>±N%p</b>는 그 표본에서 나온 <b>95% 신뢰구간</b>(Wilson)입니다. 실제 선방률이 이 범위 안에 있을 가능성이 높다는 뜻으로, 유효슛(≈경기수×5)이 많을수록 좁아집니다. 예: 50경기 ±6%p, 200경기 ±3%p. 두 카드의 구간이 크게 겹치면 순위 차이를 단정할 수 없습니다. 단, 이는 <b>정밀도</b>지 정확도가 아니며(유저 실력 등 교란은 별개 — GSAx 참고), 슛이 완전 독립은 아니라 실제 구간은 이보다 약간 넓습니다.</dd>
   </dl>
@@ -1037,10 +1033,16 @@ document.getElementById('metricSel').onchange=e=>{
 };
 vbBtn.onclick=()=>{ valueBasis = valueBasis==='gsax' ? 'save_pct' : 'gsax';
   syncValueBasisBtn(); limit=PAGE; render(); };
-// 경기수 게이트 필터 (200/300/500) — 데이터 재요청 없이 화면에서만 거른다
-document.querySelectorAll('[data-gate]').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('[data-gate]').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active'); minGate=+b.dataset.gate; limit=PAGE; render();
+// 경기수 게이트 필터 (100~50000) — 데이터 재요청 없이 화면에서만 거른다
+const gateInput=document.getElementById('gateInput');
+function setGate(value){
+  const n=Number.parseInt(value,10);
+  minGate=Math.min(50000,Math.max(100,Number.isFinite(n)?n:200));
+  gateInput.value=minGate; limit=PAGE; render();
+}
+gateInput.addEventListener('change',()=>setGate(gateInput.value));
+gateInput.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();setGate(gateInput.value);gateInput.blur();}
 });
 // 필터 초기화 — 검색·필터·정렬·게이트를 전부 기본값으로.
 document.getElementById('resetFilters').onclick=()=>{
@@ -1052,7 +1054,7 @@ document.getElementById('resetFilters').onclick=()=>{
   document.getElementById('salMin').value=''; document.getElementById('salMax').value='';
   gSel.value=''; document.getElementById('metricSel').value='save_pct';
   document.getElementById('exShort').classList.remove('active');
-  document.querySelectorAll('[data-gate]').forEach(x=>x.classList.toggle('active', x.dataset.gate==='200'));
+  gateInput.value=200;
   syncValueBasisBtn();
   render();
 };

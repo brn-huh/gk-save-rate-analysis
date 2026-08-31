@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS raw_match (
 -- 스노우볼 프론티어: harvest 한 ouid를 영속 큐로 관리
 CREATE TABLE IF NOT EXISTS frontier (
     ouid     VARCHAR PRIMARY KEY,
-    state    VARCHAR DEFAULT 'pending',   -- pending | done
+    state    VARCHAR DEFAULT 'pending',   -- pending | in_progress | done
     added_at TIMESTAMP DEFAULT now()
 );
 

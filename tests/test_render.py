@@ -143,12 +143,12 @@ def test_wilson_handles_missing_counts_no_nan():
     assert _eval_js("ciText(undefined,5)", f) == ""       # 한쪽 키만 없어도 안전(NaN 차단)
 
 
-def test_gate_toggle_buttons_present():
+def test_gate_input_present():
     html = render.build_html(_PAYLOAD)
-    # 경기수 게이트 필터 토글 200/300/500 (기본 200)
-    for g in ("200", "300", "500"):
-        assert f'data-gate="{g}"' in html
-    assert 'data-gate="50"' not in html and 'data-gate="100"' not in html
+    # 경기수 게이트를 버튼 여러 개 대신 100~50000 숫자 입력 하나로 제공한다.
+    assert 'id="gateInput"' in html
+    assert 'min="100"' in html and 'max="50000"' in html
+    assert 'data-gate=' not in html
     assert "minGate=200" in html.replace(" ", "")   # 기본 게이트 200
 
 

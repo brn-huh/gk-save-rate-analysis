@@ -8,11 +8,15 @@ from gksave.collect import frontier_counts
 from gksave.db import connect_memory
 
 
-def _seed(con, pending=0, done=0):
+def _seed(con, pending=0, done=0, in_progress=0):
     for i in range(pending):
         con.execute("INSERT INTO frontier (ouid, state) VALUES (?, 'pending')", [f"p{i}"])
     for i in range(done):
         con.execute("INSERT INTO frontier (ouid, state) VALUES (?, 'done')", [f"d{i}"])
+    for i in range(in_progress):
+        con.execute(
+            "INSERT INTO frontier (ouid, state) VALUES (?, 'in_progress')", [f"a{i}"]
+        )
 
 
 def test_counts_pending_and_done():
@@ -22,6 +26,14 @@ def test_counts_pending_and_done():
     assert c.pending == 5
     assert c.done == 3
     assert c.total == 8
+
+
+def test_counts_in_progress_in_total():
+    con = connect_memory()
+    _seed(con, pending=2, done=3, in_progress=4)
+    c = frontier_counts(con)
+    assert c.in_progress == 4
+    assert c.total == 9
 
 
 def test_empty_frontier_is_all_zero():

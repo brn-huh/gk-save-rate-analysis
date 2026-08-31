@@ -15,6 +15,37 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 open out/index.html
 ```
 
+### 수집 속도 설정
+
+넥슨 Open API 한도는 **초당 최대 500건, 일일 최대 2,000만 건**이다.
+`GKSAVE_RATE`는 초당 상한만 제어하고 일일 사용량은 추적하지 않는다.
+
+이론상 최대는 `GKSAVE_RATE=500`이지만, 롤링 한도 여유를 둔 운영값은 `450` 정도다.
+`RATE=500`이면 일일 한도를 약 11시간 만에 소진한다. 동시성은 응답 지연에 맞춰
+올려야 하며, 지연 5.3초 기준 `RATE × 지연시간 ≈ 2,650`이 포화 조건이다.
+`GKSAVE_CONCURRENCY`는 앱의 동시 요청 수뿐 아니라 HTTPX의 실제 연결 상한과
+keep-alive 연결 상한에도 사용된다. 따라서 값을 크게 올리면 연결 대기 병목은 줄지만
+CPU·메모리·발열과 429 가능성이 함께 증가한다.
+
+발열을 우선한 시작값은 아래와 같다. 이후 10분 평균·429 로그를 보며
+조금씩 조정한다.
+
+```bash
+GKSAVE_RATE=400 GKSAVE_CONCURRENCY=800 GKSAVE_USER_WORKERS=300 \
+  gksave collect --refresh --max-matches 50000
+```
+
+`GKSAVE_CONCURRENCY=360`은 응답 지연 5.3초에서 약 68 req/s까지만 채울 수 있다.
+`GKSAVE_USER_WORKERS`는 동시에 탐색할 유저 수이고, `GKSAVE_MATCH_QUEUE`는 대기 중인
+match 작업 큐 크기다. 둘은 연결 수와 별개이며 `.env.local`에서 조정한다.
+
+수집 중 로그는 10분마다 신규 매치 처리량과 CPU·macOS 메모리 여유율 평균을
+별도 구분자로 출력한다. macOS 기본 명령만으로는
+기기별 CPU·RAM 온도를 안정적으로 읽을 수 없어 온도는 기록하지 않는다.
+
+429가 발생하면 요청은 최대 6회까지 재시도되고, 레이트는 즉시 절반으로 감속된다.
+수집이 끝나면 429·5xx 누적 횟수와 감속된 최종 레이트를 확인한다.
+
 > **선수 부가정보(급여·OVR·체격·시즌엠블럼)는 `update.sh` 에 없다.** 새 GK 카드가
 > 생겼을 때만 별도로 `gksave playerinfo` 를 한 번 돌려 `player_info`·`season_img` 를 채운다.
 > (fc-info 에서 우리 GK 중 캐시에 없는 것만 받고, 이미 받은 건 다시 안 받는다.)
@@ -60,6 +91,7 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 | `./scripts/status.sh` | 현재 매치 수 · 대기 유저(pending) 확인 |
 | `./scripts/collect.sh` | 수집 후 **묻지 않고 자동으로** update.sh(build+export) 실행 |
 | `./scripts/collect.sh --refresh` | 수집 (pending 없을 때, 새 경기 보충) + 자동 update |
+| `./scripts/collect.sh --seed-nicknames "닉1,닉2"` | 시드 유저를 추가해 수집 |
 | `./scripts/collect.sh --max 50000` | 수집량 직접 지정 |
 | `./scripts/collect.sh --day 7` | 수집 창 직접 지정 (기본 1일) |
 | `./scripts/collect.sh --no-update` | 수집만, update.sh 건너뜀 |
@@ -104,6 +136,15 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 cd /Users/jwkim/workspace/gk-save-rate-analysis
 ./scripts/collect.sh
 ```
+
+새로운 시작점(활동 중인 유저)을 추가하려면:
+
+```bash
+./scripts/collect.sh --seed-nicknames "닉1,닉2"
+```
+
+이미 큐에 등록된 닉네임을 다시 넣으면 중복으로 추가하지 않고 `이미 등록됨`으로
+기록한다.
 
 ### 상황 B — 대기 유저가 0일 때 (새 경기 보충)
 ```bash

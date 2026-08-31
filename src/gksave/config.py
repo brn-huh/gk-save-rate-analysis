@@ -126,10 +126,16 @@ class Settings:
     db_name: str = "gksave.duckdb"
 
     # 레이트리밋 (기본 5, 환경변수 GKSAVE_RATE 로 조정. 429는 백오프가 흡수)
-    # 넥슨 한도: 초당 50 / 분당 1,000(병목=평균 16.7/s) / 일일 2천만.
-    # 지속 안전 최대 ≈ 15/s(900/min). 그 이상은 분당 한도로 429 유발.
+    # 넥슨 한도: 초당 최대 500 / 일일 최대 2천만.
+    # 일일 사용량은 여기서 추적하지 않으므로, RATE=500이면 약 11시간에 일일 한도 소진.
     max_requests_per_sec: float = field(
         default_factory=lambda: float(os.environ.get("GKSAVE_RATE", "5"))
+    )
+    user_workers: int = field(
+        default_factory=lambda: int(os.environ.get("GKSAVE_USER_WORKERS", "8"))
+    )
+    match_queue_size: int = field(
+        default_factory=lambda: int(os.environ.get("GKSAVE_MATCH_QUEUE", "2000"))
     )
     # 429/5xx 재시도
     max_retries: int = 6

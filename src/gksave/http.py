@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import random
 import time
+from datetime import datetime
 from typing import Any, Callable
 
 import httpx
@@ -68,6 +69,15 @@ class AdaptiveRate:
             return
         self.current = min(self.base, self.current + steps * self.recover_step)
         self._last_change += steps * self.recover_interval
+
+
+def _log_rate_limited(*, count: int, rate: AdaptiveRate) -> None:
+    """429 를 맞을 때마다 즉시 찍는다. 수집 중 한도 근접 여부를 보기 위함."""
+    print(
+        f"{datetime.now():%Y-%m-%d %H:%M:%S} | ! 429 rate limit "
+        f"(누적 {count}회) · 레이트 {rate.base:.0f}→{rate.current:.1f}/s",
+        flush=True,
+    )
 
 
 class RateLimiter:
@@ -167,6 +177,7 @@ class ResilientClient:
                 if resp.status_code == 429:
                     self.rate_limited_count += 1
                     self.rate.on_rate_limited()   # 한계 신호 → 즉시 반토막
+                    _log_rate_limited(count=self.rate_limited_count, rate=self.rate)
                 else:
                     self.server_error_count += 1
                 if attempt >= self.s.max_retries:
@@ -228,6 +239,10 @@ class AsyncResilientClient:
             base_url=BASE_URL,
             timeout=settings.request_timeout_sec,
             headers={"x-nxopen-api-key": api_key()},
+            limits=httpx.Limits(
+                max_connections=concurrency,
+                max_keepalive_connections=concurrency,
+            ),
             transport=transport,
         )
 
@@ -270,6 +285,7 @@ class AsyncResilientClient:
                 if resp.status_code == 429:
                     self.rate_limited_count += 1
                     self.rate.on_rate_limited()   # 한계 신호 → 즉시 반토막
+                    _log_rate_limited(count=self.rate_limited_count, rate=self.rate)
                 else:
                     self.server_error_count += 1
                 if attempt >= self.s.max_retries:

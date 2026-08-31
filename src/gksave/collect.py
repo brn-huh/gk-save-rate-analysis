@@ -11,7 +11,12 @@ dedup: matchId는 raw_match PK, ouid는 frontier PK로 자동 중복 제거.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+import os
+import re
+import subprocess
+import sys
+import time
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
@@ -31,6 +36,24 @@ def _log(msg: str) -> None:
     print(msg, flush=True)
 
 
+def _memory_free_percent() -> float | None:
+    """macOS 시스템 메모리 여유율. 센서 온도 대신 메모리 압박을 보여준다."""
+    if sys.platform != "darwin":
+        return None
+    try:
+        out = subprocess.run(
+            ["/usr/bin/memory_pressure", "-Q"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        ).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    match = re.search(r"free percentage:\s*(\d+)%", out)
+    return float(match.group(1)) if match else None
+
+
 def _default_since() -> datetime:
     """--since/--days 미지정 시 수집 하한. naive UTC (match_date 와 같은 기준)."""
     now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -47,10 +70,11 @@ def _pct(n: int, total: int) -> str:
 class FrontierCounts:
     done: int
     pending: int
+    in_progress: int = 0
 
     @property
     def total(self) -> int:
-        return self.done + self.pending
+        return self.done + self.pending + self.in_progress
 
     @property
     def done_pct(self) -> float:
@@ -62,7 +86,11 @@ def frontier_counts(con: duckdb.DuckDBPyConnection) -> FrontierCounts:
     rows = dict(
         con.execute("SELECT state, count(*) FROM frontier GROUP BY state").fetchall()
     )
-    return FrontierCounts(done=rows.get("done", 0), pending=rows.get("pending", 0))
+    return FrontierCounts(
+        done=rows.get("done", 0),
+        pending=rows.get("pending", 0),
+        in_progress=rows.get("in_progress", 0),
+    )
 
 
 def _log_progress(
@@ -76,7 +104,8 @@ def _log_progress(
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log(
         f"{ts} | 매치 {stored:,}/{max_new_matches:,} ({_pct(stored, max_new_matches)}) "
-        f"· 유저 {c.done:,}/{c.total:,} ({_pct(c.done, c.total)}) · 대기 {c.pending:,}"
+        f"· 유저 {c.done:,}/{c.total:,} ({_pct(c.done, c.total)}) "
+        f"· 처리중 {c.in_progress:,} · 대기 {c.pending:,}"
     )
 
 
@@ -133,6 +162,15 @@ def reset_done(con: duckdb.DuckDBPyConnection) -> int:
     return n
 
 
+def _add_frontier(con: duckdb.DuckDBPyConnection, ouid: str) -> bool:
+    """새 OUID를 frontier에 넣고 실제 신규 삽입 여부를 반환한다."""
+    return con.execute(
+        "INSERT INTO frontier (ouid, state) VALUES (?, 'pending') "
+        "ON CONFLICT DO NOTHING RETURNING ouid",
+        [ouid],
+    ).fetchone() is not None
+
+
 def seed_from_nicknames(
     con: duckdb.DuckDBPyConnection,
     client: ResilientClient,
@@ -153,12 +191,11 @@ def seed_from_nicknames(
         except ApiError as e:
             log(f"[seed] 닉네임 '{nick}' → ouid 실패: {e}")
             continue
-        con.execute(
-            "INSERT INTO frontier (ouid, state) VALUES (?, 'pending') ON CONFLICT DO NOTHING",
-            [ouid],
-        )
-        added += 1
-        log(f"[seed] '{nick}' → ouid {ouid[:8]}… 큐 추가")
+        if _add_frontier(con, ouid):
+            added += 1
+            log(f"[seed] '{nick}' → ouid {ouid[:8]}… 큐 추가")
+        else:
+            log(f"[seed] '{nick}' → ouid {ouid[:8]}… 이미 등록됨")
     return added
 
 
@@ -224,10 +261,41 @@ async def _a_user_matches(client: AsyncResilientClient, ouid: str, offset: int, 
 
 
 async def _a_detail(client: AsyncResilientClient, mid: str):
+    return await client.get("/fconline/v1/match-detail", {"matchid": mid})
+
+
+@dataclass
+class _UserRun:
+    ouid: str
+    outstanding: int = 0
+    scan_complete: bool = False
+    failed: bool = False
+
+
+@dataclass
+class _MatchWork:
+    match_id: str
+    waiters: set[str] = field(default_factory=set)
+
+
+def _store_detail(
+    con: duckdb.DuckDBPyConnection, match_id: str, detail: dict[str, Any]
+) -> bool:
+    """raw_match와 frontier 확장을 함께 커밋하고 실제 신규 삽입 여부를 반환한다."""
+    con.execute("BEGIN")
     try:
-        return await client.get("/fconline/v1/match-detail", {"matchid": mid})
-    except ApiError:
-        return None
+        inserted = con.execute(
+            "INSERT INTO raw_match (match_id, match_date, payload) VALUES (?, ?, ?) "
+            "ON CONFLICT DO NOTHING RETURNING match_id",
+            [match_id, parse_match_date(detail), encode_payload(detail)],
+        ).fetchone()
+        if inserted is not None:
+            _harvest_ouids(con, detail)
+        con.execute("COMMIT")
+        return inserted is not None
+    except BaseException:
+        con.execute("ROLLBACK")
+        raise
 
 
 async def snowball_async(
@@ -238,62 +306,199 @@ async def snowball_async(
     user_pages: int = 3,
     limit: int = 100,
     since: datetime | None = None,
+    user_workers: int = 8,
+    match_queue_size: int = 2000,
+    detail_workers: int = 10,
     log: Logger = _log,
 ) -> int:
-    """스노우볼 — 한 ouid의 신규 match-detail 을 동시에 가져와 지연을 겹친다.
+    """여러 유저 탐색과 match-detail 요청을 겹치고 저장은 한 곳에서 처리한다."""
+    if user_workers <= 0 or match_queue_size <= 0 or detail_workers <= 0:
+        raise ValueError("worker와 queue 크기는 양의 정수여야 합니다")
 
-    user/match 리스트는 순차(콜 적음), match-detail(대다수)은 동시 fetch 로
-    레이트 예산을 꽉 채운다. dedup·frontier·재개는 동기 버전과 동일.
-    """
     stored = 0
-    while stored < max_new_matches:
-        row = con.execute(
-            "SELECT ouid FROM frontier WHERE state = 'pending' LIMIT 1"
-        ).fetchone()
-        if row is None:
-            _log_progress(con, stored=stored, max_new_matches=max_new_matches, log=log)
-            log(f"{datetime.now():%Y-%m-%d %H:%M:%S} | 유저 큐 소진")
-            break
-        ouid = row[0]
+    deferred: set[str] = set()
+    average_window_started = time.monotonic()
+    average_window_stored = 0
+    average_cpu_started = os.times().user + os.times().system
+    resource_sample_started = average_window_started
+    average_memory_free_total = 0.0
+    average_memory_samples = 0
 
-        new_ids: list[str] = []
-        reached_old = False
-        for p in range(user_pages):
-            try:
-                ids = await _a_user_matches(client, ouid, p * limit, limit)
-            except ApiError as e:
-                log(f"{datetime.now():%Y-%m-%d %H:%M:%S} | user/match 오류(ouid={ouid[:8]}…): {e}")
-                break
-            if not ids:
-                break
-            for mid in ids:
-                if since is not None:
-                    t = match_id_time(mid)
-                    if t is not None and t < since:
-                        reached_old = True
-                        break
-                if not have_match(con, mid):
-                    new_ids.append(mid)
-            if reached_old:
-                break
+    def log_average(*, force: bool = False) -> None:
+        nonlocal average_window_started, average_window_stored
+        nonlocal average_cpu_started, resource_sample_started
+        nonlocal average_memory_free_total, average_memory_samples
+        now = time.monotonic()
+        if now - resource_sample_started >= 60 or force:
+            memory_free = _memory_free_percent()
+            if memory_free is not None:
+                average_memory_free_total += memory_free
+                average_memory_samples += 1
+            resource_sample_started = now
 
-        # 신규 매치 상세를 동시에 가져오기
-        results = await asyncio.gather(*(_a_detail(client, m) for m in new_ids)) if new_ids else []
-        for mid, detail in zip(new_ids, results):
-            if detail is None or have_match(con, mid):
-                continue
-            con.execute(
-                "INSERT INTO raw_match (match_id, match_date, payload) VALUES (?, ?, ?) "
-                "ON CONFLICT DO NOTHING",
-                [mid, parse_match_date(detail), encode_payload(detail)],
+        average_elapsed = now - average_window_started
+        if average_elapsed >= 600 or (force and average_elapsed >= 60):
+            average_delta = stored - average_window_stored
+            cpu_now = os.times().user + os.times().system
+            average_cpu_percent = (cpu_now - average_cpu_started) / average_elapsed * 100
+            average_memory_note = ""
+            if average_memory_samples:
+                average_memory_note = (
+                    f" · 메모리 여유 평균 "
+                    f"{average_memory_free_total / average_memory_samples:.0f}%"
+                )
+            log("")
+            log("#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#")
+            log("#          10분 처리량 평균          #")
+            log(
+                f"{datetime.now():%Y-%m-%d %H:%M:%S} | "
+                f"최근 {average_elapsed / 60:.1f}분 평균 신규 {average_delta:,}매치 · "
+                f"분당 평균 {average_delta / average_elapsed * 60:.1f}매치 · "
+                f"CPU 평균 {average_cpu_percent:.1f}%{average_memory_note}"
             )
-            _harvest_ouids(con, detail)
-            stored += 1
-            if stored >= max_new_matches:
+            log("#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#")
+            log("")
+            average_window_started = now
+            average_window_stored = stored
+            average_cpu_started = cpu_now
+            resource_sample_started = now
+            average_memory_free_total = 0.0
+            average_memory_samples = 0
+
+    con.execute("UPDATE frontier SET state = 'pending' WHERE state = 'in_progress'")
+
+    try:
+        while stored < max_new_matches:
+            pending = [
+                row[0]
+                for row in con.execute(
+                    "SELECT ouid FROM frontier WHERE state = 'pending' ORDER BY added_at"
+                ).fetchall()
+                if row[0] not in deferred
+            ][:user_workers]
+            if not pending:
+                _log_progress(con, stored=stored, max_new_matches=max_new_matches, log=log)
+                log(f"{datetime.now():%Y-%m-%d %H:%M:%S} | 유저 큐 소진")
                 break
 
-        con.execute("UPDATE frontier SET state = 'done' WHERE ouid = ?", [ouid])
-        _log_progress(con, stored=stored, max_new_matches=max_new_matches, log=log)
+            con.executemany(
+                "UPDATE frontier SET state = 'in_progress' WHERE ouid = ? AND state = 'pending'",
+                [(ouid,) for ouid in pending],
+            )
+            users = {ouid: _UserRun(ouid) for ouid in pending}
+            works: dict[str, _MatchWork] = {}
+            match_queue: asyncio.Queue[_MatchWork] = asyncio.Queue(match_queue_size)
+            result_queue: asyncio.Queue[tuple[_MatchWork, dict[str, Any] | None]] = (
+                asyncio.Queue(max(detail_workers * 2, 1))
+            )
+            stop = asyncio.Event()
+            fatal: list[BaseException] = []
+
+            async def register(ouid: str, mid: str) -> None:
+                if stop.is_set() or have_match(con, mid):
+                    return
+                work = works.get(mid)
+                if work is not None:
+                    if ouid not in work.waiters:
+                        work.waiters.add(ouid)
+                        users[ouid].outstanding += 1
+                    return
+                work = _MatchWork(mid, {ouid})
+                works[mid] = work
+                users[ouid].outstanding += 1
+                await match_queue.put(work)
+
+            async def scan_user(user: _UserRun) -> None:
+                reached_old = False
+                try:
+                    for page in range(user_pages):
+                        if stop.is_set():
+                            user.failed = True
+                            return
+                        ids = await _a_user_matches(client, user.ouid, page * limit, limit)
+                        if not ids:
+                            break
+                        for mid in ids:
+                            if since is not None:
+                                match_time = match_id_time(mid)
+                                if match_time is not None and match_time < since:
+                                    reached_old = True
+                                    break
+                            await register(user.ouid, mid)
+                        if reached_old:
+                            break
+                    user.scan_complete = True
+                except ApiError as exc:
+                    user.failed = True
+                    log(
+                        f"{datetime.now():%Y-%m-%d %H:%M:%S} | "
+                        f"user/match 오류(ouid={user.ouid[:8]}…): {exc}"
+                    )
+
+            async def fetch_details() -> None:
+                while True:
+                    work = await match_queue.get()
+                    try:
+                        try:
+                            detail = await _a_detail(client, work.match_id)
+                        except ApiError:
+                            detail = None
+                        except Exception as exc:  # 내부/transport 계약 위반은 전체 중단
+                            fatal.append(exc)
+                            stop.set()
+                            detail = None
+                        await result_queue.put((work, detail))
+                    finally:
+                        match_queue.task_done()
+
+            async def write_results() -> None:
+                nonlocal stored
+                while True:
+                    work, detail = await result_queue.get()
+                    try:
+                        failed = detail is None or stored >= max_new_matches or bool(fatal)
+                        if not failed:
+                            try:
+                                if _store_detail(con, work.match_id, detail):
+                                    stored += 1
+                            except BaseException as exc:
+                                fatal.append(exc)
+                                stop.set()
+                                failed = True
+                        if stored >= max_new_matches:
+                            stop.set()
+                        for ouid in work.waiters:
+                            user = users[ouid]
+                            user.outstanding -= 1
+                            user.failed |= failed
+                        works.pop(work.match_id, None)
+                    finally:
+                        result_queue.task_done()
+
+            detail_tasks = [asyncio.create_task(fetch_details()) for _ in range(detail_workers)]
+            writer_task = asyncio.create_task(write_results())
+            try:
+                await asyncio.gather(*(scan_user(user) for user in users.values()))
+                await match_queue.join()
+                await result_queue.join()
+            finally:
+                for task in [*detail_tasks, writer_task]:
+                    task.cancel()
+                await asyncio.gather(*detail_tasks, writer_task, return_exceptions=True)
+
+            for user in users.values():
+                done = user.scan_complete and not user.failed and user.outstanding == 0
+                state = "done" if done else "pending"
+                con.execute("UPDATE frontier SET state = ? WHERE ouid = ?", [state, user.ouid])
+                if not done:
+                    deferred.add(user.ouid)
+            _log_progress(con, stored=stored, max_new_matches=max_new_matches, log=log)
+            log_average()
+            if fatal:
+                raise fatal[0]
+    finally:
+        con.execute("UPDATE frontier SET state = 'pending' WHERE state = 'in_progress'")
+    log_average(force=True)
     return stored
 
 
@@ -317,17 +522,17 @@ async def run_async(
     con = connect(settings)
     try:
         async with AsyncResilientClient(settings, concurrency=concurrency) as client:
+            con.execute("UPDATE frontier SET state = 'pending' WHERE state = 'in_progress'")
             for nick in seed_nicknames or []:
                 try:
                     ouid = (await client.get("/fconline/v1/id", {"nickname": nick}))["ouid"]
                 except ApiError as e:
                     log(f"[seed] 닉네임 '{nick}' → ouid 실패: {e}")
                     continue
-                con.execute(
-                    "INSERT INTO frontier (ouid, state) VALUES (?, 'pending') ON CONFLICT DO NOTHING",
-                    [ouid],
-                )
-                log(f"[seed] '{nick}' → ouid {ouid[:8]}… 큐 추가")
+                if _add_frontier(con, ouid):
+                    log(f"[seed] '{nick}' → ouid {ouid[:8]}… 큐 추가")
+                else:
+                    log(f"[seed] '{nick}' → ouid {ouid[:8]}… 이미 등록됨")
             if refresh:
                 n = reset_done(con)
                 log(f"=== 갱신 모드: done ouid {n}개를 pending 으로 ===")
@@ -337,7 +542,16 @@ async def run_async(
                 return
             log(f"=== 스노우볼 확장 (동시) · 시작 대기 {start.pending:,} "
                 f"(완료 {start.done:,} / 전체 {start.total:,}, {start.done_pct:.1f}%) ===")
-            await snowball_async(con, client, max_new_matches=max_new_matches, since=since, log=log)
+            await snowball_async(
+                con,
+                client,
+                max_new_matches=max_new_matches,
+                since=since,
+                user_workers=settings.user_workers,
+                match_queue_size=settings.match_queue_size,
+                detail_workers=concurrency,
+                log=log,
+            )
             end = frontier_counts(con)
             delta = end.pending - start.pending
             log(f"=== 수집 종료 · 대기 {start.pending:,} → {end.pending:,} "
@@ -378,6 +592,7 @@ def run(
     con = connect(settings)
     try:
         with ResilientClient(settings) as client:
+            con.execute("UPDATE frontier SET state = 'pending' WHERE state = 'in_progress'")
             if seed_nicknames:
                 log("=== 시드(닉네임→ouid) ===")
                 seed_from_nicknames(con, client, seed_nicknames, log=log)
