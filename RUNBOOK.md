@@ -15,6 +15,28 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 open out/index.html
 ```
 
+### DB 백업과 복구
+
+수집을 이어서 복구하는 데 필요한 원본은 `data/` 폴더다. 현재 폴더에는 보통 아래
+두 파일이 있으며, DuckDB의 작업 로그까지 보존하려면 폴더 전체를 백업한다.
+
+```text
+data/gksave.duckdb
+data/gksave.duckdb.wal
+```
+
+백업할 때는 수집·빌드·export 프로세스를 먼저 종료한 뒤 `data/` 폴더를 개인 보관
+위치에 복사한다. 실행 중인 DB 파일을 복사하면 마지막 작업이 빠질 수 있다.
+
+복구할 때는 GitHub에서 소스를 다시 받은 뒤 백업한 `data/` 폴더를 프로젝트 루트에
+그대로 되돌려 놓고 `./scripts/status.sh`로 매치 수와 pending 유저를 확인한다. 이후
+`./scripts/collect.sh`를 실행하면 `frontier`의 pending 상태에서 수집을 이어간다.
+
+`.env.local`의 `NEXON_API_KEY`와 수집 설정은 DB에 들어있지 않으므로 필요하면 별도로
+안전하게 백업하거나 다시 작성해야 한다. `out/`은 배포용 결과물이라 복구에 필요하지
+않고 `./scripts/update.sh`로 다시 만들 수 있다. DB와 `.env.local`에는 OUID·API 키가
+있을 수 있으므로 GitHub나 공개 백업에는 올리지 않는다.
+
 ### 수집 속도 설정
 
 넥슨 Open API 한도는 **초당 최대 500건, 일일 최대 2,000만 건**이다.

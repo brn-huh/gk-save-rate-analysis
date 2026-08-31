@@ -26,4 +26,5 @@ out/leaderboard.csv
 
 # macOS
 .DS_Store
+*.swp
 .gstack/
