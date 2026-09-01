@@ -174,12 +174,24 @@ def test_same_player_table_shows_ci():
 
 def test_list_uses_icon_only_season_cell_with_title():
     html = render.build_html(_PAYLOAD)
-    # 목록은 seasonCell(아이콘 우선, 시즌명은 title 로만) 을 쓴다
-    assert "const seasonCell=" in html
-    assert "title=" in html                        # hover 로 시즌명 확인
-    # 목록 행·동일선수 표가 seasonCell 을 호출(원시 season_name 직접 출력 아님)
-    assert html.count("seasonCell(c.season_img") >= 1
-    assert "seasonCell(c.season_img,c.season_name)" in html.replace(" ", "")
+    row = html.split("vis.forEach((c,i)=>{")[1].split("if(searching) return")[0]
+    assert "seasonIcon(c.season_img,c.season_name)" in row
+    assert 'class="pn-row"' in row
+    assert row.count("gradeBadge(c.grade)") == 2  # 모바일 이름 옆 + PC 강화 열
+    assert '<td class="num mobile-optional">${c.grade}강</td>' not in row
+    assert 'class="mobile-card-meta"' not in row
+
+
+@requires_node
+def test_grade_badge_uses_fc_info_grade_bands():
+    html = render.build_html(_PAYLOAD)
+    src = re.search(r"const gradeKind=.*?;", html).group(0)
+    grades = (1, 2, 4, 5, 7, 8, 10, 11, 13)
+    assert [_eval_js(f"gradeKind({grade})", src) for grade in grades] == [
+        "none", "bronze", "bronze", "silver", "silver", "gold", "gold", "platinum", "platinum",
+    ]
+    assert "background-image:url(https://cdn.fc-info.com/platinum.webp)" in html
+    assert ".grade-platinum" in html and "background-size:cover" in html
 
 
 def test_season_name_shows_emblem_icon_when_present():
@@ -197,10 +209,10 @@ def test_season_name_shows_emblem_icon_when_present():
 
 
 def test_mobile_width_cap_scoped_to_table_not_same_player_summary():
-    # .pcell 폭 제한(118px)이 전역이면 동일선수 summary 에서 총경기 배지가 폭을 다 먹어
-    # 선수 이름이 0px 로 잘린다 → td 안의 .pcell 로만 한정돼야 한다.
+    # 모바일 핵심 4열만 남기므로 선수 셀을 118px 로 자를 이유가 없다.
+    # 동일선수 summary 에 전역 제한이 걸리면 총경기 배지가 폭을 다 먹어 이름이 잘린다.
     html = render.build_html(_PAYLOAD)
-    assert "td .pcell{max-width:118px}" in html
+    assert "td .pcell{max-width:118px}" not in html
     assert ".pcell{gap:7px;max-width:118px}" not in html   # 전역 제한이면 회귀
 
 
@@ -324,6 +336,7 @@ def test_drilldown_lazy_loads_details():
     assert "function loadDetails(" in html                     # 1회 캐시 로더
     assert "detail-loading" in html                            # 로딩/에러 표기
     assert "c.gk_sp_id+'_'+c.grade" in html.replace(" ", "").replace('"', "'")  # spid_grade 키
+    assert "requestIdleCallback" not in html                   # 행을 열기 전 상세 데이터 요청 금지
 
 
 def test_has_reset_filters_button():
@@ -602,6 +615,7 @@ def test_headers_are_clickable_sort_with_arrows():
     assert "sortDir==='asc'?'desc':'asc'" in html.replace(" ", "").replace('"', "'")
     # 옛 정렬 버튼(data-sort)은 없어야
     assert "data-sort=" not in html
+    assert 'aria-sort' in html and 'tabindex="0"' in html
 
 
 @requires_node
@@ -636,7 +650,7 @@ def test_gsax_ex_short_toggle_present():
 def test_grade_filter_dropdown_present():
     html = render.build_html(_PAYLOAD)
     assert 'id="gradeFilter"' in html
-    assert "강화 전체" in html                 # 기본 옵션(필터 없음)
+    assert '<option value="">강화</option>' in html
     assert "gradeFilter" in html                # 필터 상태 변수·onchange 핸들러
 
 
@@ -676,9 +690,56 @@ def test_grade_effect_survives_in_help_tab():
     assert "grade_effect" in html
 
 
-def test_leaderboard_table_scrolls_inside_its_own_container():
-    # 375px 에서 표는 606px 다. 표를 감싸지 않으면 페이지 본문이 통째로 가로 스크롤된다.
+def test_mobile_leaderboard_keeps_only_core_columns():
     html = render.build_html(_PAYLOAD)
-    assert "overflow-x:auto" in html.replace(" ", "")
-    # 표가 래퍼 안에 들어 있어야 한다
-    assert re.search(r'<div class="tw">\s*<table id="lb">', html)
+    assert "#lb .mobile-optional{display:none}" in html
+    assert 'class="sortable mobile-metric"' in html
+    assert 'class="sortable mobile-matches"' in html
+    assert "window.innerWidth<640?mobileMetricLabels[metric]" in html
+
+
+def test_mobile_header_meta_and_collapsible_controls():
+    html = render.build_html(_PAYLOAD)
+    assert ">FC온라인 GK 선방률 순위<" in html
+    assert "`기간 ${dr.min} ~ ${dr.max} · `" in html
+    assert "`${period}총 경기 ${totalMatches}건`" in html
+    assert "총 수집 경기" not in html
+    assert 'id="readingGuide"' not in html and 'aria-label="읽는 법 보기"' not in html
+    assert '<div class="reading-note" id="warn"></div>' in html
+    assert 'id="advancedFilters"' in html
+    assert "window.matchMedia('(min-width:641px)').matches" in html
+
+
+def test_mobile_filter_priority_and_champion_card_meta():
+    html = render.build_html(_PAYLOAD)
+    advanced_start = html.index('<details class="advanced-filters"')
+    advanced_end = html.index("</details>", advanced_start)
+    primary = html[html.index('<div class="controls primary-controls">'):advanced_start]
+    advanced = html[advanced_start:advanced_end]
+    assert 'id="metricSel"' in advanced
+    assert all(f'id="{field}"' in primary for field in ("teamColorField", "gradeFilter", "salMin", "salMax"))
+    assert ".champ .csub,.champ img.hero-img,.champ .cunit{display:none}" in html
+    assert 'class="cseason-name"' not in html
+    assert 'class="cgrade">${c.grade}강' in html
+    assert '<option value="">강화</option>' in html
+    assert ".leaderboard-tip{display:none}" in html
+
+
+def test_mobile_touch_targets_and_row_keyboard_support():
+    html = render.build_html(_PAYLOAD)
+    assert "min-height:44px" in html
+    assert 'class="row-toggle"' in html
+    assert "e.key==='Enter'" in html and "e.key===' '" in html
+
+
+def test_mobile_detail_row_spans_only_visible_columns():
+    html = render.build_html(_PAYLOAD)
+    assert "const detailColspan=window.innerWidth<=640?4:9;" in html
+    assert 'colspan="${detailColspan}"' in html
+
+
+def test_detail_hero_is_compact_and_aligns_season_with_grade():
+    html = render.build_html(_PAYLOAD)
+    assert ".hero-img{width:88px;height:88px" in html
+    assert ".hero-meta .sub{display:flex;align-items:center" in html
+    assert '<span>· ${c.grade}강</span>' in html

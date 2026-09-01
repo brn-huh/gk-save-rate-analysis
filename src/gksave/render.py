@@ -152,13 +152,13 @@ def build_html(payload: dict[str, Any]) -> str:
 _TEMPLATE = r"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FC온라인 GK 선방률 리더보드</title>
+<title>FC온라인 GK 선방률 순위</title>
 <meta name="description" content="FC온라인 공식경기 실데이터로 뽑은 골키퍼 선방률·GSAx 리더보드. 선수·시즌·강화단계별 선방률, 거리 구간별·슛 타입별 상세, 급여 대비 가성비까지 비교합니다.">
 <link rel="canonical" href="__SITE_URL__">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="FC온라인 GK 선방률 리더보드">
+<meta property="og:site_name" content="FC온라인 GK 선방률 순위">
 <meta property="og:locale" content="ko_KR">
-<meta property="og:title" content="FC온라인 GK 선방률 리더보드">
+<meta property="og:title" content="FC온라인 GK 선방률 순위">
 <meta property="og:description" content="공식경기 실데이터 기반 골키퍼 선방률·GSAx 순위. 시즌·강화단계별로 비교하세요.">
 <meta property="og:url" content="__SITE_URL__">
 <meta name="twitter:card" content="summary">
@@ -282,8 +282,8 @@ _TEMPLATE = r"""<!doctype html>
   .trendsvg .ttip{fill:var(--text);font-size:14px;font-weight:700;opacity:0;
         pointer-events:none;paint-order:stroke;stroke:#0e1424;stroke-width:5;
         stroke-linejoin:round;transition:opacity .12s}
-  .trendsvg .tpt:hover .ttip{opacity:1}
-  .trendsvg .tpt:hover .thit{fill:rgba(217,180,90,.16)}
+  .trendsvg .tpt:hover .ttip,.trendsvg .tpt:focus .ttip{opacity:1}
+  .trendsvg .tpt:hover .thit,.trendsvg .tpt:focus .thit{fill:rgba(217,180,90,.16)}
   .tnote{color:var(--mut);font-size:.78rem;margin:6px 0 0;line-height:1.55}
   .scell{display:inline-flex;align-items:center;gap:6px}
   .season-ico{flex:0 0 auto;object-fit:contain;vertical-align:middle;height:22px;width:auto}
@@ -308,7 +308,7 @@ _TEMPLATE = r"""<!doctype html>
   .muted{color:var(--mut);font-size:.85rem}
   /* 명예의 전당: 분야별 챔피언 3인(리더보드 목록 위, 전체 데이터 고정) */
   .champions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0 12px}
-  .champ{position:relative;display:flex;flex-direction:column;cursor:pointer;
+  .champ{position:relative;display:flex;flex-direction:column;cursor:pointer;color:inherit;font:inherit;text-align:left;
     background:linear-gradient(165deg,var(--panel2),var(--panel));
     border:1px solid rgba(240,209,122,.30);border-radius:14px;padding:12px 12px 13px;
     transition:transform .12s ease,border-color .12s,box-shadow .12s}
@@ -316,6 +316,7 @@ _TEMPLATE = r"""<!doctype html>
   .champ .badge{font-size:.82rem;font-weight:800;color:var(--gold);display:flex;align-items:center;gap:5px}
   .champ .csub{font-size:.72rem;color:var(--mut);margin:2px 0 10px}
   .champ img.hero-img{width:112px;height:112px;border-radius:12px;margin:2px auto 10px}
+  .champ .cinfo,.champ .cname{display:block;min-width:0}
   .champ .cname{font-size:1.04rem;font-weight:800;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .champ .cseason{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:.76rem;color:var(--mut);margin-top:3px;min-height:20px}
   .champ .cseason .scell{min-width:0}
@@ -326,25 +327,29 @@ _TEMPLATE = r"""<!doctype html>
   .champ-empty:hover{transform:none;border-color:rgba(240,209,122,.30);box-shadow:none}
   .champ .cempty{margin:auto 0;padding:18px 0;font-size:.85rem;color:var(--mut);text-align:center}
   @media(max-width:640px){
-    .champions{grid-template-columns:1fr;gap:9px}
-    .champ{flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:11px}
-    .champ .badge{order:0;width:100%}
-    .champ .csub{order:1;width:100%;margin:0}
-    .champ img.hero-img{order:2;width:76px;height:76px;margin:0;flex:0 0 auto}
-    .champ .cinfo{order:3;flex:1;min-width:0}
-    .champ .cstat{order:4;width:100%;margin:0;padding-top:9px;border-top:1px solid var(--line)}
+    .champions{grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}
+    .champ{gap:5px;padding:9px;min-width:0}
+    .champ .badge{font-size:.7rem;white-space:nowrap}
+    .champ .csub,.champ img.hero-img,.champ .cunit{display:none}
+    .champ .cname{font-size:.8rem}
+    .champ .cseason{font-size:.68rem;flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
+    .champ .cseason .scell,.champ .cgrade{flex:0 0 auto}
+    .champ .desktop-card-meta{display:none}
+    .champ .cstat{padding-top:2px}
+    .champ .cval{font-size:1.05rem}
   }
   details{margin:5px 0;border-bottom:1px solid var(--line)}
   summary{cursor:pointer;font-weight:700;padding:7px 0;color:var(--text)}
   summary:hover{color:var(--gold)}
+  .advanced-filters{margin:0;border:0}
+  .advanced-filters>summary{display:none}
   .empty{text-align:center;color:var(--mut);padding:24px}
   footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);
          color:var(--mut);font-size:.8rem;line-height:1.7}
   footer a{color:var(--gold2);text-decoration:none}
-  /* 상단 상시 배너(주의 라벨 + 강화효과) */
-  .banner{background:rgba(240,209,122,.07);border:1px solid rgba(240,209,122,.28);border-radius:10px;
-        padding:11px 14px;font-size:.86rem;line-height:1.5;margin:14px 0 4px;color:#e7d5a8}
-  .banner b{color:var(--gold)}
+  .reading-note{background:rgba(240,209,122,.07);border:1px solid rgba(240,209,122,.28);
+        border-radius:10px;padding:11px 14px;font-size:.86rem;line-height:1.5;margin:28px 0 4px;color:#e7d5a8}
+  .reading-note b{color:var(--gold)}
   /* 탭 */
   .tabs{display:flex;gap:6px;margin:16px 0 4px;border-bottom:1px solid var(--line);flex-wrap:wrap}
   .tab{padding:9px 15px;border:1px solid transparent;border-bottom:none;border-radius:9px 9px 0 0;
@@ -376,9 +381,22 @@ _TEMPLATE = r"""<!doctype html>
   .thumb{width:36px;height:36px;border-radius:50%;object-fit:cover;object-position:50% 42%;
         background:#141a35;border:1px solid var(--gold2);flex:0 0 auto}
   .pcell{display:flex;align-items:center;gap:9px;min-width:0}
+  .pcell>.season-ico{height:20px;max-width:30px}
+  .ptext{display:flex;min-width:0;flex-direction:column}
+  .pn-row{display:flex;align-items:center;gap:5px;min-width:0}
+  .row-toggle{display:block;width:100%;padding:0;border:0;background:transparent;color:inherit;
+        font:inherit;text-align:left;cursor:pointer}
   /* min-width:0 이 없으면 flex 아이템이 콘텐츠 폭 아래로 못 줄어 말줄임이 안 걸린다.
      한글은 공백이 없어 줄바꿈을 허용하면 글자 단위로 쪼개진다 → 반드시 nowrap + 말줄임. */
   .pcell .pn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .grade-badge{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:22px;height:20px;
+        box-sizing:border-box;border:1.5px solid;border-radius:3px;font:800 .72rem/1 Arial,sans-serif}
+  .pn-row .grade-badge{display:none}
+  .grade-none{color:#c5c8c9;background:linear-gradient(140deg,#51545a,#42464d);border-color:#62676d #393a3c #393a3c #62676d}
+  .grade-bronze{color:#7e3f27;background:linear-gradient(140deg,#de946b,#ad5f42);border-color:#e4b7a2 #864229 #864229 #e4b7a2}
+  .grade-silver{color:#4e545e;background:linear-gradient(140deg,#d8d9dc,#b8bdca);border-color:#d8dadc #a5a8ae #a5a8ae #d8dadc}
+  .grade-gold{color:#695100;background:linear-gradient(140deg,#f9dd62,#dca908);border-color:#e9d36c #cda000 #cda000 #e9d36c}
+  .grade-platinum{color:#2d2b43;background-image:url(https://cdn.fc-info.com/platinum.webp);background-size:cover;border-color:#bdc5e5 #5274c0 #5274c0 #607dc4}
   /* 목록 이름 옆 신규특성 아이콘 — hover 시 특성명 툴팁 말풍선 */
   .pcell .lb-trait-w{position:relative;display:inline-flex;flex:0 0 auto}
   .pcell .lb-trait{width:20px;height:20px;object-fit:contain;display:block}
@@ -391,13 +409,13 @@ _TEMPLATE = r"""<!doctype html>
   .sp-total{margin-left:9px;font-size:.78rem;font-weight:600;color:var(--gold2);
         background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px 8px;
         font-variant-numeric:tabular-nums;white-space:nowrap}
-  /* 상세 히어로 — 원본이 128px 이라 112px 를 넘겨 키우지 않는다 */
+  /* 상세 히어로 — 정보 영역을 밀어내지 않도록 사진은 작게 유지한다. */
   .hero{display:flex;align-items:center;gap:16px;padding-bottom:14px;margin-bottom:14px;
         border-bottom:1px solid var(--line)}
-  .hero-img{width:112px;height:112px;border-radius:12px;object-fit:cover;flex:0 0 auto;
+  .hero-img{width:88px;height:88px;border-radius:12px;object-fit:cover;flex:0 0 auto;
         background:radial-gradient(circle at 50% 34%,#1b2242,#0b1024);border:1px solid var(--line)}
   .hero-meta h3{margin:0 0 3px;font-size:1.05rem;font-weight:800;letter-spacing:-.01em}
-  .hero-meta .sub{margin:0 0 9px;color:var(--mut);font-size:.85rem}
+  .hero-meta .sub{display:flex;align-items:center;gap:5px;margin:0 0 9px;color:var(--mut);font-size:.85rem}
   .hero-meta .big{font-size:1.5rem;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums}
   .hero-meta .big small{margin-left:7px;font-size:.78rem;font-weight:600;color:var(--mut)}
   .hero-meta .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
@@ -417,27 +435,43 @@ _TEMPLATE = r"""<!doctype html>
   .trait.new{border-color:var(--gold2);background:rgba(240,209,122,.08)}
   .trait .trait-new{font-size:.66rem;font-weight:700;color:#1a1405;background:var(--gold);
         border-radius:5px;padding:1px 5px;margin-left:2px}
-  /* 표는 375px 에서 606px 다. 본문이 아니라 표만 가로로 스크롤시킨다.
-     overflow-x 를 상시로 걸면 overflow-y 가 auto 로 승격돼 sticky thead 가 깨진다.
-     데스크톱은 표가 안 넘치므로 모바일에서만 감싼다. */
+  button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,
+  th.sortable:focus-visible,.champ:focus-visible,.row-toggle:focus-visible{
+    outline:2px solid var(--gold);outline-offset:2px}
   @media(max-width:640px){
-    .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    body{padding:18px 12px 48px}
+    h1{font-size:1.45rem}
+    .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;flex-wrap:nowrap}
+    .tab{min-height:48px;padding:8px 5px;font-size:.8rem;line-height:1.25}
+    .controls input,.controls select,button.sort,.controls .icon-btn,.more button,
+    .recent-pick,.recent-remove,.recent-clear{min-height:44px;font-size:1rem;touch-action:manipulation}
+    .controls .icon-btn{width:44px;height:44px}
+    .recent-remove{width:44px;height:44px}
+    .recent-clear{padding:8px}
+    .controls .field{min-width:100%}
+    summary{min-height:44px}
+    .advanced-filters>summary{display:flex;align-items:center;min-height:44px;padding:8px 0;list-style:none}
+    .advanced-filters>summary::-webkit-details-marker{display:none}
+    .advanced-filters>summary::after{content:'+';margin-left:auto;color:var(--gold)}
+    .advanced-filters[open]>summary::after{content:'−'}
+    .leaderboard-tip{display:none}
+    .controls .field:hover:not(:focus-within)::after{display:none}
+    #lb{table-layout:fixed}
+    #lb .mobile-optional{display:none}
+    #lb th:nth-child(1){width:38px}
+    #lb th:nth-child(2){width:auto}
+    #lb th.mobile-metric{width:82px}
+    #lb th.mobile-matches{width:58px}
+    #lb thead th{height:44px}
     .hero{flex-direction:column;align-items:flex-start;gap:12px}
     .thumb{width:28px;height:28px}
     .pcell{gap:7px}
-    /* 리더보드 표의 선수 컬럼만 폭을 묶어 긴 이름을 말줄임(줄바꿈 금지 — 세로로 쪼개짐).
-       동일선수 summary 의 .pcell 은 총경기 배지까지 들어가 118px 로 묶으면 이름이 0px 로
-       잘린다 → 표 셀(td) 안의 .pcell 로만 한정한다. */
-    td .pcell{max-width:118px}
+    .pn-row .grade-badge{display:inline-flex}
     th,td{padding:9px 8px}
   }
 </style></head><body>
-<h1><span class="star">★</span><span class="t">FC온라인 골키퍼 선방률 리더보드</span></h1>
+<h1><span class="star">★</span><span class="t">FC온라인 GK 선방률 순위</span></h1>
 <p class="meta" id="meta"></p>
-
-<div class="banner">
-  <div id="warn"></div>
-</div>
 
 <div class="tabs">
   <button class="tab active" data-tab="lb">리더보드</button>
@@ -447,22 +481,25 @@ _TEMPLATE = r"""<!doctype html>
 
 <!-- 탭 1: 리더보드 -->
 <div class="panel active" id="panel-lb">
-  <div class="controls">
-    <span class="field" data-tip="여러 명은 쉼표로 구분해서 검색해요. 예: 노이어, 칸"><input id="search" placeholder="이름 검색"></span>
+  <div class="controls primary-controls">
+    <span class="field"><input id="search" placeholder="이름 검색 (쉼표로 여러 명)" aria-label="선수 이름 검색"></span>
     <span class="field" id="teamColorField" data-tip="국가·클럽·시즌 검색 (예: 프랑스 / 파리 생제르맹 / WS)">
-      <input id="natClubSearch" placeholder="팀컬러 검색" autocomplete="off" aria-expanded="false" aria-controls="recentTeamColors">
+      <input id="natClubSearch" placeholder="팀컬러 검색" autocomplete="off" aria-label="팀컬러 검색: 국가, 클럽 또는 시즌" aria-expanded="false" aria-controls="recentTeamColors">
       <span class="recent-team-colors" id="recentTeamColors" hidden>
         <span class="recent-head"><span>최근 팀컬러</span><button type="button" class="recent-clear" id="clearRecentTeamColors">모두 지우기</button></span>
         <span id="recentTeamColorList"></span>
       </span>
     </span>
-    <select id="gradeFilter"><option value="">강화 전체</option></select>
+    <select id="gradeFilter" aria-label="강화 단계"><option value="">강화</option></select>
     <span class="lab">급여</span>
-    <input id="salMin" class="numf" type="number" inputmode="numeric" min="0" placeholder="이상">
+    <input id="salMin" class="numf" type="number" inputmode="numeric" min="0" placeholder="이상" aria-label="최소 급여">
     <span class="lab">~</span>
-    <input id="salMax" class="numf" type="number" inputmode="numeric" min="0" placeholder="이하">
-    <button id="exShort" class="sort" title="GSAx 열에서 초근거리(&lt;5m) 뽀록성 슛 제외">GSAx 초근제외</button>
-    <span class="lab">지표</span>
+    <input id="salMax" class="numf" type="number" inputmode="numeric" min="0" placeholder="이하" aria-label="최대 급여">
+  </div>
+  <details class="advanced-filters" id="advancedFilters">
+    <summary>상세 필터</summary>
+    <div class="controls">
+    <label class="lab" for="metricSel">지표</label>
     <select id="metricSel">
       <option value="save_pct">선방률</option>
       <optgroup label="거리별 선방률">
@@ -474,16 +511,23 @@ _TEMPLATE = r"""<!doctype html>
       <option value="value">가성비</option>
     </select>
     <button id="valueBasis" class="sort" style="display:none">기준: GSAx</button>
+    <button id="exShort" class="sort" title="GSAx 열에서 초근거리(&lt;5m) 뽀록성 슛 제외">GSAx 초근제외</button>
     <label class="gate-input" for="gateInput">경기수 ≥
       <input id="gateInput" type="number" inputmode="numeric" min="100" max="50000" step="1" value="200" title="최소 경기 수: 100~50000">
     </label>
     <button id="resetFilters" class="icon-btn" title="필터 초기화" aria-label="필터 초기화">↺</button>
-  </div>
+    </div>
+  </details>
+  <script>
+  if(window.matchMedia('(min-width:641px)').matches){
+    document.getElementById('advancedFilters').open=true;
+  }
+  </script>
   <div class="champions" id="champions"></div>
-  <p class="muted"><b>컬럼 제목</b>을 클릭하면 그 항목으로 정렬됩니다(다시 누르면 오름/내림 전환). 행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
+  <p class="muted leaderboard-tip"><b>컬럼 제목</b>을 클릭하면 그 항목으로 정렬됩니다(다시 누르면 오름/내림 전환). 행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
     <table id="lb">
-      <thead><tr><th>#</th><th>선수</th><th>시즌</th><th class="sortable" data-col="grade">강화 <span class="arr"></span></th><th class="sortable" data-col="salary">급여 <span class="arr"></span></th><th class="sortable" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable" data-col="save_pct" id="metricHdr">선방률 <span class="arr"></span></th><th class="sortable" data-col="gsax" id="gsaxHdr">GSAx/100 <span class="arr"></span></th><th class="sortable" data-col="matches">경기수 <span class="arr"></span></th><th id="deltaHdr" title="약 1주 전 같은 창과 비교한 '선방률 순위' 변동. 지금 걸어둔 검색·필터 안에서 계산합니다. 각 뱃지에 마우스를 올리면 실제 비교 시점이 나옵니다. 다른 지표·정렬로 보는 중이면 뜻이 달라져 흐리게 표시됩니다.">변동</th></tr></thead>
+      <thead><tr><th>#</th><th>선수</th><th class="sortable mobile-optional" tabindex="0" data-col="grade">강화 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="salary">급여 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable mobile-metric" tabindex="0" data-col="save_pct" id="metricHdr">선방률 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="gsax" id="gsaxHdr">GSAx/100 <span class="arr"></span></th><th class="sortable mobile-matches" tabindex="0" data-col="matches">경기수 <span class="arr"></span></th><th class="mobile-optional" id="deltaHdr" title="약 1주 전 같은 창과 비교한 '선방률 순위' 변동. 지금 걸어둔 검색·필터 안에서 계산합니다. 각 뱃지에 마우스를 올리면 실제 비교 시점이 나옵니다. 다른 지표·정렬로 보는 중이면 뜻이 달라져 흐리게 표시됩니다.">변동</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -551,6 +595,8 @@ _TEMPLATE = r"""<!doctype html>
   <h2>주의</h2>
   <div class="warn" id="warnFull"></div>
 </div>
+
+<div class="reading-note" id="warn"></div>
 
 <footer>
   데이터 출처: 본 분석의 모든 경기 데이터는 <b>NEXON Open API</b>
@@ -682,7 +728,7 @@ const thumbImg=(spid,name)=>spid==null?'':
   `loading="lazy" decoding="async" onerror="imgFallback(this)">`;
 const heroImg=(spid,name)=>spid==null?'':
   `<img class="hero-img" src="${escAttr(actionUrl(spid))}" data-fb="${escAttr(portraitUrl(spid))}" `+
-  `alt="${escAttr(name||'')}" width="112" height="112" loading="lazy" decoding="async" `+
+  `alt="${escAttr(name||'')}" width="88" height="88" loading="lazy" decoding="async" `+
   `onerror="imgFallback(this)">`;
 // 시즌명 앞 엠블럼 아이콘. 이미지는 넥슨 CDN 직접. 시즌명은 alt/title(hover)로.
 const seasonIcon=(img,name)=>img?
@@ -690,15 +736,17 @@ const seasonIcon=(img,name)=>img?
   `width="18" height="18" loading="lazy" decoding="async" onerror="this.style.display='none'">`:'';
 // 목록용 시즌 셀: 아이콘만 보여준다(텍스트 제거). 아이콘 없으면 시즌명으로 폴백.
 const seasonCell=(img,name)=>img?seasonIcon(img,name):esc(name||'');
+const gradeKind=grade=>grade>=11?'platinum':grade>=8?'gold':grade>=5?'silver':grade>=2?'bronze':'none';
+const gradeBadge=grade=>`<span class="grade-badge grade-${gradeKind(grade)}" title="${escAttr(String(grade)+'강')}">${esc(grade)}</span>`;
 
 const dr=D.date_range||{};
 // date_range 는 since 를 반영한 실제 집계 창이다. 원시 ISO since 를 덧붙이면 중복이자 노이즈.
-const period=(dr.min&&dr.max)?`데이터 기간 ${dr.min} ~ ${dr.max} · `:'';
+const period=(dr.min&&dr.max)?`기간 ${dr.min} ~ ${dr.max} · `:'';
 const totalMatches = Number(D.total_collected_matches || 0).toLocaleString('ko-KR');
 document.getElementById('meta').textContent =
-  `${period}총 수집 경기 ${totalMatches}건 · ${D.leaderboard.length}장`;
+  `${period}총 경기 ${totalMatches}건`;
 document.getElementById('warn').innerHTML =
-  '<b>⚠️ 읽는 법:</b> 이 순위는 보정하지 않은 선방률이라 카드 성능뿐 아니라 <b>유저 실력</b>도 섞여 있어요. 카드 순위가 아니라 <b>참고용</b>으로만 봐주세요. 용어·자세한 설명은 <b>지표 설명</b> 탭.';
+  '<b>읽는 법:</b> 이 순위는 보정하지 않은 선방률이라 카드 성능뿐 아니라 <b>유저 실력</b>도 섞여 있어요. 카드 순위가 아니라 <b>참고용</b>으로만 봐주세요. 용어·자세한 설명은 <b>지표 설명</b> 탭.';
 document.getElementById('warnFull').innerHTML = esc(D.warning);
 var gEl=document.getElementById('gateN'); if(gEl) gEl.textContent=D.gate;
 
@@ -752,7 +800,7 @@ function trendChartHtml(c){
     const x=px(i), y=py(s.rank);
     const anchor = i===0 ? 'start' : (i===lastI ? 'end' : 'middle');
     const above = y > PT+40;   // 위쪽에 자리가 없으면 아래에 쓴다
-    return `<g class="tpt">`+
+    return `<g class="tpt" tabindex="0" aria-label="${TP[i]} ${s.rank}위, 전체 ${s.pool}장, 선방률 ${pct(s.pct)}">`+
       `<circle class="thit" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="22" `+
       `fill="transparent" pointer-events="all"/>`+
       `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${i===lastI?7:5}" `+
@@ -772,7 +820,7 @@ function trendChartHtml(c){
     lines+dots+
     `<text x="${PL}" y="${H-8}" class="tlab">${TP[0]}</text>`+
     `<text x="${W-PR}" y="${H-8}" class="tlab" text-anchor="end">${TP[lastI]}</text></svg>`+
-    `<p class="tnote"><b>${a.rank}위 → ${z.rank}위 (${dtxt})</b> · <b>점 위에 마우스를 올리면</b> 그 시점의 `+
+    `<p class="tnote"><b>${a.rank}위 → ${z.rank}위 (${dtxt})</b> · <b>점을 누르거나 마우스를 올리면</b> 그 시점의 `+
     `등수와 함께 순위를 매긴 카드 수가 나옵니다(카드 수가 늘면 실력이 같아도 등수가 밀립니다). `+
     `마지막 점(빨강)은 아직 <b>수집 중인 구간</b>이라 표본이 얇을 수 있어요. 과거 점은 지금 데이터로 `+
     `<b>소급 계산</b>한 값이라, 그때 실제로 보이던 순위와는 다릅니다.</p></div>`;
@@ -819,7 +867,7 @@ function detailHtml(c){
   const hero=
     `<div class="hero">${heroImg(c.gk_sp_id,c.player_name)}<div class="hero-meta">`+
     `<h3>${esc(c.player_name||('spId '+c.gk_sp_id))}</h3>`+
-    `<p class="sub"><span class="scell">${seasonIcon(c.season_img,c.season_name)}${esc(c.season_name||'')}</span> · ${c.grade}강</p>`+
+    `<p class="sub"><span class="scell">${seasonIcon(c.season_img,c.season_name)}${esc(c.season_name||'')}</span><span>· ${c.grade}강</span></p>`+
     `<div class="big">${pct(c.save_pct)}<small>선방률 ${ciText(c.saves,c.goals)} · 경기수 ${c.matches}</small></div>`+
     (infoRow?`<div class="chips">${infoRow}</div>`:'')+
     clubsRow+
@@ -850,16 +898,19 @@ function loadDetails(){
 }
 function toggle(tr,c){
   const nx=tr.nextElementSibling;
-  if(nx&&nx.classList.contains('detail')){nx.remove();return;}
+  const btn=tr.querySelector('.row-toggle');
+  if(nx&&nx.classList.contains('detail')){nx.remove();btn.setAttribute('aria-expanded','false');return;}
+  btn.setAttribute('aria-expanded','true');
   const d=document.createElement('tr'); d.className='detail'; tr.after(d);
-  if(c.zones){ d.innerHTML=`<td colspan="10">${detailHtml(c)}</td>`; return; }  // 이미 병합됨
-  d.innerHTML='<td colspan="10" class="detail-loading">상세 불러오는 중…</td>';
+  const detailColspan=window.innerWidth<=640?4:9;
+  if(c.zones){ d.innerHTML=`<td colspan="${detailColspan}">${detailHtml(c)}</td>`; return; }  // 이미 병합됨
+  d.innerHTML=`<td colspan="${detailColspan}" class="detail-loading">상세 불러오는 중…</td>`;
   loadDetails().then(det=>{
     const dd=det[c.gk_sp_id+'_'+c.grade]||{};
     c.zones=dd.zones||[]; c.types=dd.types||[]; c.extras=dd.extras||{};
-    if(d.parentNode) d.innerHTML=`<td colspan="10">${detailHtml(c)}</td>`;
+    if(d.parentNode) d.innerHTML=`<td colspan="${detailColspan}">${detailHtml(c)}</td>`;
   }).catch(()=>{ if(d.parentNode)
-    d.innerHTML='<td colspan="10" class="detail-loading">상세를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.</td>';
+    d.innerHTML=`<td colspan="${detailColspan}" class="detail-loading">상세를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.</td>`;
   });
 }
 function render(){
@@ -882,7 +933,9 @@ function render(){
   const gf = gsaxMode;   // GSAx 열 표시값(초근제외 토글에 따라)
   document.getElementById('gsaxHdr').firstChild.textContent =
     (gsaxMode==='gsax_ex_short_per_shot' ? 'GSAx/100(초근×) ' : 'GSAx/100 ');
-  document.getElementById('metricHdr').firstChild.textContent = METRICS[metric].label + ' ';
+  const mobileMetricLabels={save_pct:'선방률',near:'근거리',mid:'중거리',oneone:'1대1',assisted:'연계',value:'가성비'};
+  document.getElementById('metricHdr').firstChild.textContent =
+    (window.innerWidth<640?mobileMetricLabels[metric]:METRICS[metric].label) + ' ';
   updateHeaders();
   // 검색 중(이름 또는 국가/클럽)이면 전체에서 찾도록 캡 무시, 아니면 상위 limit 장만(경량화)
   const searching = q || natClubQ;
@@ -903,15 +956,17 @@ function render(){
       `<img class="lb-trait" src="${escAttr(traitUrl(t.code))}" alt="${escAttr(t.name)}" `+
       `width="20" height="20" loading="lazy" onerror="this.style.display='none'"></span>`).join('');
     tr.innerHTML=`<td class="rank">${i+1}</td>`+
-      `<td><div class="pcell">${thumbImg(c.gk_sp_id,c.player_name)}`+
-      `<span class="pn">${esc(c.player_name||('spId '+c.gk_sp_id))}</span>${newIcons}</div></td>`+
-      `<td class="season"><span class="scell">${seasonCell(c.season_img,c.season_name)}</span></td><td class="num">${c.grade}강</td>`+
-      `<td class="num">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
-      `<td class="num">${(c.info&&c.info.ovr!=null)?c.info.ovr:''}</td>`+
-      `<td class="pct">${metricCell(c)}</td><td class="num">${gps(c[gf])}</td>`+
+      `<td><button type="button" class="row-toggle" aria-expanded="false" aria-label="${escAttr((c.player_name||('spId '+c.gk_sp_id))+' '+c.grade+'강 상세 보기')}"><span class="pcell">${thumbImg(c.gk_sp_id,c.player_name)}${seasonIcon(c.season_img,c.season_name)}`+
+      `<span class="ptext"><span class="pn-row"><span class="pn">${esc(c.player_name||('spId '+c.gk_sp_id))}</span>${gradeBadge(c.grade)}</span></span>${newIcons}</span></button></td>`+
+      `<td class="num mobile-optional">${gradeBadge(c.grade)}</td>`+
+      `<td class="num mobile-optional">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
+      `<td class="num mobile-optional">${(c.info&&c.info.ovr!=null)?c.info.ovr:''}</td>`+
+      `<td class="pct">${metricCell(c)}</td><td class="num mobile-optional">${gps(c[gf])}</td>`+
       `<td class="num">${c.matches}</td>`+
-      `<td class="num delta">${deltaCell(c,dmap)}</td>`;
-    tr.onclick=()=>toggle(tr,c); tb.appendChild(tr);
+      `<td class="num delta mobile-optional">${deltaCell(c,dmap)}</td>`;
+    tr.onclick=e=>{if(!e.target.closest('button'))toggle(tr,c);};
+    tr.querySelector('.row-toggle').onclick=e=>{e.stopPropagation();toggle(tr,c);};
+    tb.appendChild(tr);
   });
   if(searching) return;  // 검색 중엔 더보기/접기 없음
   if(rows.length>limit){
@@ -1006,6 +1061,7 @@ function updateHeaders(){
   document.querySelectorAll('#lb thead th.sortable').forEach(th=>{
     const on = th.dataset.col===sortCol;
     th.classList.toggle('active', on);
+    th.setAttribute('aria-sort',on?(sortDir==='asc'?'ascending':'descending'):'none');
     th.querySelector('.arr').textContent = on ? (sortDir==='asc'?'▲':'▼') : '⇅';
   });
 }
@@ -1014,6 +1070,9 @@ document.querySelectorAll('#lb thead th.sortable').forEach(th=>th.onclick=()=>{
   if(sortCol===col) sortDir = sortDir==='asc' ? 'desc' : 'asc';  // 같은 컬럼 재클릭 → 방향 토글
   else { sortCol=col; sortDir='desc'; }                          // 새 컬럼 → 내림차순부터
   limit=PAGE; render();
+});
+document.querySelectorAll('#lb thead th.sortable').forEach(th=>th.onkeydown=e=>{
+  if(e.key==='Enter'||e.key===' '){e.preventDefault();th.click();}
 });
 // GSAx 초근제외 토글 — GSAx 열의 값·정렬 대상을 초근거리 제외 버전으로 전환.
 document.getElementById('exShort').onclick=()=>{
@@ -1120,18 +1179,20 @@ spFilter();
 // ── 명예의 전당: 분야별 챔피언 3인 ────────────────────────────────────────
 // 리더보드 목록 위에 GSAx·가성비·1대1 각 분야 1위를 부각. 전체 데이터 기준으로
 // 고정(필터 무관)하고, 카드 클릭 시 그 지표로 리더보드를 전환해 전체 순위로 잇는다.
-// 같은 이름·강화라도 시즌이 다르면 다른 카드이므로 시즌 엠블럼·시즌명을 함께 표기한다.
+// 같은 이름·강화라도 시즌이 다르면 다른 카드이므로 시즌 엠블럼을 함께 표기한다.
 function champCard(badge, sub, c, valHtml, unit, act){
-  if(!c) return `<div class="champ champ-empty"><div class="badge">👑 ${badge}</div>`+
+  if(!c) return `<div class="champ champ-empty"><div class="badge">${badge}</div>`+
     `<div class="csub">${sub}</div><div class="cempty">조건에 맞는 후보가 없어요</div></div>`;
   const ovr=c.info&&c.info.ovr!=null?' · OVR '+c.info.ovr:'';
   const sal=c.info&&c.info.salary!=null?' · 급여 '+c.info.salary:'';
-  return `<div class="champ" data-act="${act}">`+
-    `<div class="badge">👑 ${badge}</div><div class="csub">${sub}</div>`+
+  return `<button type="button" class="champ" data-act="${act}">`+
+    `<span class="badge">${badge}</span><span class="csub">${sub}</span>`+
     heroImg(c.gk_sp_id,c.player_name)+
-    `<div class="cinfo"><div class="cname">${esc(c.player_name||('spId '+c.gk_sp_id))}</div>`+
-    `<div class="cseason"><span class="scell">${seasonIcon(c.season_img,c.season_name)}</span> · ${c.grade}강${ovr}${sal}</div></div>`+
-    `<div class="cstat"><span class="cval">${valHtml}</span><span class="cunit">${unit}</span></div></div>`;
+    `<span class="cinfo"><span class="cname">${esc(c.player_name||('spId '+c.gk_sp_id))}</span>`+
+    `<span class="cseason"><span class="scell">${seasonIcon(c.season_img,c.season_name)}</span>`+
+    `<span class="cgrade">${c.grade}강</span>`+
+    `<span class="desktop-card-meta">${ovr}${sal}</span></span></span>`+
+    `<span class="cstat"><span class="cval">${valHtml}</span><span class="cunit">${unit}</span></span></button>`;
 }
 function renderChampions(L){
   const el=document.getElementById('champions'); if(!el) return;
@@ -1157,8 +1218,6 @@ function applyChampMetric(act){
 }
 
 render();   // 최초 렌더가 renderChampions(pool) 도 호출한다(필터 반영)
-// 첫 화면 렌더 후 유휴시간에 상세를 미리 받아둔다 → 대부분 드릴다운이 즉시 열린다.
-(window.requestIdleCallback||(f=>setTimeout(f,1500)))(()=>loadDetails().catch(()=>{}));
 </script>
 </body></html>
 """
