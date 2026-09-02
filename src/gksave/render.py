@@ -23,6 +23,10 @@ IMAGE_CDN = "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common"
 # 라운드 사각형에 둘러싸여 안전) 후 사각형으로 크롭·64px 축소 → base64 를 favicon.txt 로 커밋.
 FAVICON = (Path(__file__).parent / "favicon.txt").read_text().strip()
 
+# 11강 이상 배지 배경. 외부 사이트를 페이지 열 때마다 호출하지 않도록 WebP 원본을
+# base64 텍스트로 보관하고 자기완결 HTML 안에 data URI 로 삽입한다.
+PLATINUM = "".join((Path(__file__).parent / "platinum.txt").read_text().splitlines())
+
 # 페이지에 그대로 실려 나가는 이미지 JS. tests/test_render.py 가 node 로 이 문자열을
 # 직접 실행해 pid 파생과 폴백 체인을 검증하므로, DOM 에 의존하는 코드를 넣지 말 것.
 IMAGE_JS = r"""
@@ -142,6 +146,7 @@ def build_html(payload: dict[str, Any]) -> str:
     return (
         _TEMPLATE.replace("__SITE_URL__", SITE_URL)
         .replace("__FAVICON__", FAVICON)
+        .replace("__PLATINUM__", PLATINUM)
         .replace("__IMAGE_JS__", IMAGE_JS)
         .replace("__FILTER_JS__", FILTER_JS)
         .replace("__STATS_JS__", STATS_JS)
@@ -396,7 +401,7 @@ _TEMPLATE = r"""<!doctype html>
   .grade-bronze{color:#7e3f27;background:linear-gradient(140deg,#de946b,#ad5f42);border-color:#e4b7a2 #864229 #864229 #e4b7a2}
   .grade-silver{color:#4e545e;background:linear-gradient(140deg,#d8d9dc,#b8bdca);border-color:#d8dadc #a5a8ae #a5a8ae #d8dadc}
   .grade-gold{color:#695100;background:linear-gradient(140deg,#f9dd62,#dca908);border-color:#e9d36c #cda000 #cda000 #e9d36c}
-  .grade-platinum{color:#2d2b43;background-image:url(https://cdn.fc-info.com/platinum.webp);background-size:cover;border-color:#bdc5e5 #5274c0 #5274c0 #607dc4}
+  .grade-platinum{color:#2d2b43;background-image:url(data:image/webp;base64,__PLATINUM__);background-size:cover;border-color:#bdc5e5 #5274c0 #5274c0 #607dc4}
   /* 목록 이름 옆 신규특성 아이콘 — hover 시 특성명 툴팁 말풍선 */
   .pcell .lb-trait-w{position:relative;display:inline-flex;flex:0 0 auto}
   .pcell .lb-trait{width:20px;height:20px;object-fit:contain;display:block}

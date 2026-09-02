@@ -183,14 +183,15 @@ def test_list_uses_icon_only_season_cell_with_title():
 
 
 @requires_node
-def test_grade_badge_uses_fc_info_grade_bands():
+def test_grade_badge_uses_grade_bands_and_embedded_platinum_image():
     html = render.build_html(_PAYLOAD)
     src = re.search(r"const gradeKind=.*?;", html).group(0)
     grades = (1, 2, 4, 5, 7, 8, 10, 11, 13)
     assert [_eval_js(f"gradeKind({grade})", src) for grade in grades] == [
         "none", "bronze", "bronze", "silver", "silver", "gold", "gold", "platinum", "platinum",
     ]
-    assert "background-image:url(https://cdn.fc-info.com/platinum.webp)" in html
+    assert "background-image:url(data:image/webp;base64," in html
+    assert "cdn.fc-info.com" not in html
     assert ".grade-platinum" in html and "background-size:cover" in html
 
 
