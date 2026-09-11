@@ -75,10 +75,12 @@ def _cmd_meta(_args) -> None:
         con.close()
 
 
-def _cmd_playerinfo(_args) -> None:
+def _cmd_playerinfo(args) -> None:
     con = connect(DEFAULT)
     try:
-        playerinfo.sync_player_info(con)
+        playerinfo.sync_player_info(
+            con, batch_delay=args.delay, retry_missing=args.retry_missing,
+        )
         playerinfo.sync_season_img(con)
     finally:
         con.close()
@@ -211,9 +213,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("meta", help="선수명·시즌 메타 캐시 갱신").set_defaults(func=_cmd_meta)
 
-    sub.add_parser(
+    pi = sub.add_parser(
         "playerinfo", help="선수 급여·기본OVR·키·몸무게·체형 캐시 (fc-info, 우리 GK만·1회)"
-    ).set_defaults(func=_cmd_playerinfo)
+    )
+    pi.add_argument("--delay", type=float, default=1.0, help="fc-info 요청 사이 지연(초)")
+    pi.add_argument(
+        "--retry-missing", action="store_true",
+        help="기존 조회 기록을 이번 실행에서만 무시하고 누락 카드를 다시 확인",
+    )
+    pi.set_defaults(func=_cmd_playerinfo)
 
     pd = sub.add_parser(
         "playerdetail",

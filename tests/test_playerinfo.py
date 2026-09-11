@@ -82,12 +82,13 @@ def test_non_gk_position_ovr_still_taken_from_first():
 def _mock_by_name(catalog):
     """catalog: {name: [player dict, ...]}. names 배열 요청에 매칭 카드를 돌려주는 목."""
     import json as _json
-    calls = {"n": 0, "names": []}
+    calls = {"n": 0, "names": [], "batches": []}
 
     def handler(request):
         calls["n"] += 1
         names = _json.loads(request.content).get("names", [])
         calls["names"].extend(names)
+        calls["batches"].append(names)
         items = [p for nm in names for p in catalog.get(nm, [])]
         return httpx.Response(200, json={"items": items, "nextCursor": None, "hasNext": False})
 
@@ -113,11 +114,51 @@ def test_searches_by_our_player_names_and_stores_matches():
                {"id": 999, "name": "가", "salary": 9, "positions": [{"ovr": 130}]}],  # 우리 것 아님
         "나": [{"id": 200, "name": "나", "salary": 7, "positions": [{"ovr": 110}]}],
     })
-    r = sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    delays = []
+    r = sync_player_info(con, client=client, sleep=delays.append, log=lambda _m: None)
     rows = con.execute("SELECT spid, salary FROM player_info ORDER BY spid").fetchall()
     assert rows == [(100, 5), (200, 7)]          # 999(우리 것 아님)는 저장 안 됨
     assert r["new"] == 2
     assert set(client._calls["names"]) == {"가", "나"}   # 우리 이름만 물어봄
+    assert client._calls["batches"] == [["가"], ["나"]]  # 기본은 한 이름씩
+    assert delays == [1.0]                                 # 이름 사이에도 지연
+
+
+def test_follows_name_search_pagination_with_delay():
+    import json as _json
+
+    con = connect_memory()
+    _seed_gk(con, 100, "가")
+    calls = []
+    delays = []
+
+    def handler(request):
+        body = _json.loads(request.content)
+        calls.append(body.get("cursor"))
+        if "cursor" not in body:
+            return httpx.Response(200, json={
+                "items": [{"id": 999, "salary": 9, "positions": []}],
+                "nextCursor": "next-page",
+                "hasNext": True,
+            })
+        return httpx.Response(200, json={
+            "items": [
+                {"id": 100, "salary": 5, "positions": [{"ovr": 90}]},
+                {"id": 100, "salary": 5, "positions": [{"ovr": 90}]},
+            ],
+            "nextCursor": None,
+            "hasNext": False,
+        })
+
+    client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
+    r = sync_player_info(
+        con, client=client, batch_delay=2.0, sleep=delays.append, log=lambda _m: None,
+    )
+
+    assert calls == [None, "next-page"]
+    assert delays == [2.0]
+    assert r["new"] == 1
+    assert con.execute("SELECT salary FROM player_info WHERE spid=100").fetchone()[0] == 5
 
 
 def test_skips_already_cached_and_short_circuits_network():
@@ -579,6 +620,19 @@ def test_fetch_log_expires_so_new_cards_get_a_retry():
     client = _mock_by_name({"가": [{"id": 100, "salary": 5, "positions": [{"ovr": 90}]}]})
     r = sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
     assert client._calls["n"] == 1 and r["new"] == 1   # 기간이 지났으면 다시 물어본다
+
+
+def test_retry_missing_ignores_recent_fetch_log_once():
+    con = connect_memory()
+    _seed_gk(con, 100, "가")
+    con.execute("INSERT INTO fc_fetch_log (kind, spid) VALUES ('info', 100)")
+    client = _mock_by_name({"가": [{"id": 100, "salary": 5, "positions": []}]})
+
+    r = sync_player_info(
+        con, client=client, retry_missing=True, sleep=lambda _x: None, log=lambda _m: None,
+    )
+
+    assert client._calls["n"] == 1 and r["new"] == 1
 
 
 def test_sync_season_img_remembers_seasons_missing_from_catalog():

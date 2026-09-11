@@ -157,11 +157,30 @@ def _record_fetch(con: duckdb.DuckDBPyConnection, kind: str, spids: Iterable[int
             "ON CONFLICT (kind, spid) DO UPDATE SET fetched_at = now()", [kind, spid])
 
 
-def _search_names(client: httpx.Client, names: list[str]) -> list[dict[str, Any]]:
-    """이름 배열(≤10)로 GK 검색. fc-info 는 이 선수들의 모든 시즌 카드를 돌려준다."""
-    resp = client.post(_SEARCH_PATH, json={"positionIds": [_GK_POSITION], "names": names})
-    resp.raise_for_status()
-    return resp.json().get("items", [])
+def _search_names(
+    client: httpx.Client,
+    names: list[str],
+    *,
+    page_delay: float,
+    sleep: Callable[[float], None],
+) -> list[dict[str, Any]]:
+    """이름 배열(≤10)의 모든 GK 검색 페이지를 호출 간 지연을 두고 가져온다."""
+    items: list[dict[str, Any]] = []
+    cursor: str | None = None
+    while True:
+        if cursor is not None:
+            sleep(page_delay)
+        body: dict[str, Any] = {"positionIds": [_GK_POSITION], "names": names}
+        if cursor:
+            body["cursor"] = cursor
+        resp = client.post(_SEARCH_PATH, json=body)
+        resp.raise_for_status()
+        data = resp.json()
+        items.extend(data.get("items", []))
+        next_cursor = data.get("nextCursor")
+        if not data.get("hasNext") or not next_cursor or next_cursor == cursor:
+            return items
+        cursor = next_cursor
 
 
 def _record_season_img(con: duckdb.DuckDBPyConnection, item: dict[str, Any]) -> None:
@@ -245,7 +264,8 @@ def sync_player_info(
     *,
     client: httpx.Client | None = None,
     batch_delay: float = 1.0,
-    name_batch: int = 10,
+    name_batch: int = 1,
+    retry_missing: bool = False,
     sleep: Callable[[float], None] = time.sleep,
     log: Callable[[str], None] = print,
 ) -> dict[str, int]:
@@ -261,7 +281,8 @@ def sync_player_info(
     have = {r[0] for r in con.execute("SELECT spid FROM player_info").fetchall()}
     # fc-info 에 없는 카드는 저장할 행이 없어 have 에 안 들어간다 → 조회 기록으로도 걸러야
     # 매 실행마다 같은 이름을 다시 물어보지 않는다.
-    need = ours - have - _fetched_recently(con, "info")
+    recent = set() if retry_missing else _fetched_recently(con, "info")
+    need = ours - have - recent
     if not need:
         log(f"player_info: 우리 GK {len(ours):,} 전부 캐시됨 — fc-info 호출 없음")
         return {"ours": len(ours), "already": len(have & ours), "need": 0, "new": 0}
@@ -279,21 +300,25 @@ def sync_player_info(
     owns_client = client is None
     client = client or _new_client()
     new = 0
+    inserted: set[int] = set()
     try:
         for i in range(0, len(need_names), name_batch):
             if i > 0:
                 sleep(batch_delay)
             batch = need_names[i:i + name_batch]
-            for item in _search_names(client, batch):
+            for item in _search_names(
+                client, batch, page_delay=batch_delay, sleep=sleep,
+            ):
                 _record_season_img(con, item)   # 본 카드마다 시즌 엠블럼도 채운다(무료 부산물)
                 p = parse_player(item)
-                if p is None or p.spid not in need:
+                if p is None or p.spid not in need or p.spid in inserted:
                     continue
                 con.execute(
                     "INSERT INTO player_info (spid, name, salary, ovr, height, weight, body_type) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
                     [p.spid, p.name, p.salary, p.ovr, p.height, p.weight, p.body_type],
                 )
+                inserted.add(p.spid)
                 new += 1
             # 이 배치는 물어봤다 — 답이 없던 spid 도 기록해 다음 실행에서 건너뛴다.
             _record_fetch(con, "info", [s for nm in batch for s in spids_by_name[nm]])
