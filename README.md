@@ -15,7 +15,7 @@ FC온라인 공식경기(matchtype=50) 데이터로 **골키퍼를 (선수 × �
   - 슛 난이도 → **GSAx**(기대선방 모델), 유저 실력 → **강화효과(within-ouid)**
 - **강화단계를 퉁치지 않음** — (선수 × 시즌 × 강화단계) 단위로 각각 순위.
 - **표본 투명성** — 경기수 게이트(100~50,000 직접 입력) + 모든 순위에 경기수·선방률 95% 신뢰구간(±%p) 표기.
-- **순위 추이** — 롤링 30일 창을 3일 간격으로 소급 샘플링해, 카드가 오르는 중인지 내리는 중인지를
+- **순위 추이** — 롤링 45일 창을 3일 간격으로 소급 샘플링해, 카드가 오르는 중인지 내리는 중인지를
   **지금 걸어둔 검색·필터 안에서** 보여준다(목록의 `변동` 뱃지 + 행 펼침 라인차트).
 - **선수 부가정보** — 급여·기본 OVR·키·몸무게·체형·시즌 엠블럼·선수 이미지(fc-info + 넥슨 CDN).
 - **드릴다운** — 카드별 거리 구간별(초근/근/중/원)·슛 타입별(감아차기/헤더/파워샷…) 선방률.
@@ -90,14 +90,14 @@ gksave spike
 # 2) 수집 — 닉네임 시드 → 스노우볼 BFS. 재개 가능(끊겨도 이어서).
 gksave collect --seed-nicknames "닉1,닉2" --max-matches 30000
 gksave collect --refresh              # 처리한 유저 다시 열어 새 경기 보충
-gksave collect --days 35              # 특정 창만 (미지정 시 롤링 COLLECT_WINDOW_DAYS=35 적용)
+gksave collect --days 50              # 특정 창만 (미지정 시 롤링 COLLECT_WINDOW_DAYS=50 적용)
 
 # 3) 집계·표출
 gksave build                          # raw_match 재파싱 → gk_match/shot (4만 ≈ 28초)
 gksave meta                           # 선수명·시즌 캐시 (최초 1회)
 gksave playerinfo                     # 급여·OVR·체격·시즌엠블럼 캐시 (fc-info, 우리 GK만·1회)
 gksave export --gate 50 --out out     # 리더보드 JSON/CSV + 공개 index.html
-gksave export --days 30 --out out     # 최근 30일만
+gksave export --days 45 --out out     # 최근 45일만
 
 # 4) 조회 (콘솔)
 gksave leaderboard --gate 50 --top 20             # raw 선방률 순위

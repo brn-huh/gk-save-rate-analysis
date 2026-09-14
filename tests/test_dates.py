@@ -49,7 +49,7 @@ def _dated_match(mid, date_str, saves, goals, sp_id=500, grade=10):
 def test_date_range_respects_since():
     """페이지 상단 '데이터 기간'은 집계에 실제로 쓰인 창을 보여줘야 한다.
 
-    롤링 30일 창을 켜기 전에는 since 가 없어 이 불일치가 드러나지 않았다.
+    롤링 통계 창을 켜기 전에는 since 가 없어 이 불일치가 드러나지 않았다.
     since 를 무시하면 '데이터 기간 6/1~7/10' 이라 써놓고 6/10 부터만 집계하게 된다.
     """
     from gksave import export

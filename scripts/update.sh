@@ -4,7 +4,7 @@
 cd "$(dirname "$0")/.."
 . .venv/bin/activate
 
-# 통계 창은 롤링 30일. 수집 창(35일)보다 5일 좁아 경계에서 데이터가 비지 않는다.
+# 통계 창은 롤링 45일. 수집 창(50일)보다 5일 좁아 경계에서 데이터가 비지 않는다.
 # build/export 중 하나라도 실패하면 중단한다.
 echo "=== build (증분) ===" && gksave build || exit 1
 
@@ -22,6 +22,6 @@ gksave meta          || echo "! meta 실패 — 이번 회차는 건너뜀" >&2
 gksave playerinfo    || echo "! playerinfo 실패 — 이번 회차는 건너뜀" >&2
 gksave playerdetail --limit 120 || echo "! playerdetail 실패 — 이번 회차는 건너뜀" >&2
 
-echo "=== export (롤링 30일) ===" && gksave export --gate 200 --days 30 --out out || exit 1
+echo "=== export (롤링 45일) ===" && gksave export --gate 200 --days 45 --out out || exit 1
 
 echo "✓ build/export 완료 (git commit/push는 수동 진행)"
