@@ -149,7 +149,7 @@ def test_gate_input_present():
     assert 'id="gateInput"' in html
     assert 'min="100"' in html and 'max="50000"' in html
     assert 'data-gate=' not in html
-    assert "minGate=200" in html.replace(" ", "")   # 기본 게이트 200
+    assert "minGate=500" in html.replace(" ", "")   # 기본 게이트 500
 
 
 def test_ci_shown_in_list_and_hero():

@@ -362,7 +362,7 @@
     <button id="valueBasis" class="sort" style="display:none">기준: GSAx</button>
     <button id="exShort" class="sort" title="GSAx 열에서 초근거리(&lt;5m) 뽀록성 슛 제외">GSAx 초근제외</button>
     <label class="gate-input" for="gateInput">경기수 ≥
-      <input id="gateInput" type="number" inputmode="numeric" min="100" max="50000" step="1" value="200" title="최소 경기 수: 100~50000">
+      <input id="gateInput" type="number" inputmode="numeric" min="100" max="50000" step="1" value="500" title="최소 경기 수: 100~50000">
     </label>
     <button id="resetFilters" class="icon-btn" title="필터 초기화" aria-label="필터 초기화">↺</button>
     </div>
@@ -460,7 +460,7 @@
 const D = JSON.parse(document.getElementById('gk-data').textContent);
 const PAGE=100;
 let sortCol='save_pct', sortDir='desc', gsaxMode='gsax_per_shot';
-let q='', limit=PAGE, minGate=200, gradeFilter='', natClubQ='', salMin=null, salMax=null;
+let q='', limit=PAGE, minGate=500, gradeFilter='', natClubQ='', salMin=null, salMax=null;
 // "지표" 드롭다운 — 선방률 컬럼이 보여주고 정렬하는 값을 바꾼다. 기본 선방률.
 let metric='save_pct', valueBasis='gsax';   // valueBasis: 가성비 기준(gsax|save_pct)
 const SIT_GATE=30;   // 상황별 정렬 표본 게이트(그 상황 슛 수)
@@ -1031,7 +1031,7 @@ vbBtn.onclick=()=>{ valueBasis = valueBasis==='gsax' ? 'save_pct' : 'gsax';
 const gateInput=document.getElementById('gateInput');
 function setGate(value){
   const n=Number.parseInt(value,10);
-  minGate=Math.min(50000,Math.max(100,Number.isFinite(n)?n:200));
+  minGate=Math.min(50000,Math.max(100,Number.isFinite(n)?n:500));
   gateInput.value=minGate; limit=PAGE; render();
 }
 gateInput.addEventListener('change',()=>setGate(gateInput.value));
@@ -1041,14 +1041,14 @@ gateInput.addEventListener('keydown',e=>{
 // 필터 초기화 — 검색·필터·정렬·게이트를 전부 기본값으로.
 document.getElementById('resetFilters').onclick=()=>{
   q=''; natClubQ=''; salMin=null; salMax=null; gradeFilter='';
-  minGate=200; sortCol='save_pct'; sortDir='desc'; gsaxMode='gsax_per_shot';
+  minGate=500; sortCol='save_pct'; sortDir='desc'; gsaxMode='gsax_per_shot';
   metric='save_pct'; valueBasis='gsax'; limit=PAGE;
   document.getElementById('search').value='';
   document.getElementById('natClubSearch').value='';
   document.getElementById('salMin').value=''; document.getElementById('salMax').value='';
   gSel.value=''; document.getElementById('metricSel').value='save_pct';
   document.getElementById('exShort').classList.remove('active');
-  gateInput.value=200;
+  gateInput.value=500;
   syncValueBasisBtn();
   render();
 };
