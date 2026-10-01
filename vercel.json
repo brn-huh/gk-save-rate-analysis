@@ -4,6 +4,13 @@
   "outputDirectory": "out",
   "framework": null,
   "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/:path*",
+      "destination": "https://gk-save.com/:path*",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
