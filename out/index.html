@@ -420,7 +420,7 @@
   <details><summary>거리 구간별 · 슛 타입별</summary>
     <dl class="terms">
       <dt>거리 구간별</dt><dd>실점·선방을 골문과의 근사 거리(초근/근/중/원거리)로 나눈 선방률. 어느 거리에 강하고 약한지 보여줍니다.</dd>
-      <dt>슛 타입별</dt><dd>노멀·감아차기·헤더·발리 등 슛 종류별 선방률. 표본 3개 미만 타입은 노이즈라 숨깁니다. <b>기타(#13)</b> 처럼 표기된 항목은 넥슨 공개 명세가 1~12번만 정의하는데 게임에 그 뒤 추가된 슛 종류입니다. 이름을 임의로 붙이지 않고 번호를 그대로 둡니다.</dd>
+      <dt>슛 타입별</dt><dd>노멀·감아차기·헤더·발리 등 슛 종류별 선방률. 표본 3개 미만이거나 넥슨 공개 명세에 이름이 없는 타입은 숨깁니다.</dd>
     </dl>
   </details>
   <details><summary>상황 · 수비 맥락 · GK 스탯</summary>
@@ -757,13 +757,14 @@ function trendChartHtml(c){
     `마지막 점(빨강)은 아직 <b>수집 중인 구간</b>이라 표본이 얇을 수 있어요. 과거 점은 지금 데이터로 `+
     `<b>소급 계산</b>한 값이라, 그때 실제로 보이던 순위와는 다릅니다.</p></div>`;
 }
+const visibleShotTypes=types=>(types||[]).filter(t=>t.shots>=3&&t.type>=1&&t.type<=12);
 function detailHtml(c){
   const zones=(c.zones||[]).map(z=>
     `<div class="zbar"><span>${esc(z.zone)}</span>`+
     `<span class="zt">${pct(z.save_pct)}</span>`+
     `<span class="zbg"><span class="zf" style="width:${z.save_pct==null?0:(z.save_pct*100).toFixed(0)}%"></span></span>`+
     `<span class="zn">${z.saves}/${z.shots}</span></div>`).join('') || '<span class="muted">좌표 없음</span>';
-  const types=(c.types||[]).filter(t=>t.shots>=3).map(t=>
+  const types=visibleShotTypes(c.types).map(t=>
     `<tr><td>${esc(t.name)}</td><td class="pct">${pct(t.save_pct)}</td><td class="num">${t.saves}/${t.shots}</td></tr>`).join('');
   const e=c.extras||{};
   const stat=(label,val)=>`<div class="stat"><span>${label}</span><b>${val}</b></div>`;

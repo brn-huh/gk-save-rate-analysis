@@ -340,6 +340,15 @@ def test_drilldown_lazy_loads_details():
     assert "requestIdleCallback" not in html                   # 행을 열기 전 상세 데이터 요청 금지
 
 
+@requires_node
+def test_drilldown_hides_undefined_shot_types():
+    html = render.build_html(_PAYLOAD)
+    helper = re.search(r"const visibleShotTypes=.*?;", html)
+    assert helper
+    rows = "[{type:1,shots:2},{type:2,shots:3},{type:12,shots:3},{type:13,shots:30},{type:14,shots:30}]"
+    assert _eval_js(f"visibleShotTypes({rows}).map(t=>t.type).join(',')", helper.group()) == "2,12"
+
+
 def test_has_reset_filters_button():
     html = render.build_html(_PAYLOAD)
     assert 'id="resetFilters"' in html                         # 필터 초기화 아이콘 버튼
