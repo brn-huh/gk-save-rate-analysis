@@ -69,6 +69,24 @@ def test_date_range_respects_since():
     assert windowed["date_range"]["max"] == "2026-06-20"
 
 
+def test_export_computes_gsax_once(monkeypatch):
+    from gksave import export
+
+    con = connect_memory()
+    calls = 0
+    original = agg.gsax_leaderboard
+
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(agg, "gsax_leaderboard", counted)
+    export.build_payload(con, gate=1)
+    assert calls == 1
+    con.close()
+
+
 def test_since_filters_leaderboard():
     con = connect_memory()
     for d in (_dated_match("old", "2026-01-01T00:00:00", saves=0, goals=3),

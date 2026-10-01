@@ -16,7 +16,7 @@ from typing import Any
 import duckdb
 
 from . import agg, meta, playerinfo, render
-from .config import MIN_MATCHES_GATE, SITE_URL, ZONE_CUTS_M
+from .config import MIN_MATCHES_GATE, SITE_URL
 
 # 드릴다운 전용(행 클릭 시에만 쓰는) 카드 상세 필드. index.html 초기 임베드에서 빼고
 # details.json 으로 분리해 첫 화면 전송량을 줄인다(render 가 클릭 때 fetch).
@@ -113,21 +113,16 @@ def build_payload(
         payload["trend"] = agg.rank_timeseries(
             con, gate=gate, window_days=(now - since).days, end=now
         )
-    # GSAx(난이도 보정): 전체 + 초근거리(<5m) 제외 두 버전
+    # GSAx(난이도 보정)
     gsax = agg.gsax_leaderboard(con, gate=gate, since=since)
-    gsax_ex = agg.gsax_leaderboard(con, gate=gate, since=since, min_dist_m=ZONE_CUTS_M[0])
     payload["gsax"] = gsax
 
-    # 리더보드 카드에 두 GSAx 붙이기 (같은 (sp_id, 강화) 키로) → 동일선수·페이지에서도 반영
+    # 리더보드 카드에 GSAx 붙이기 (같은 (sp_id, 강화) 키로) → 동일선수·페이지에서도 반영
     gsax_by = {(g["gk_sp_id"], g["grade"]): g for g in gsax}
-    gsax_ex_by = {(g["gk_sp_id"], g["grade"]): g for g in gsax_ex}
     for c in leaderboard:
         gk = gsax_by.get((c["gk_sp_id"], c["grade"]))
         c["gsax"] = gk["gsax"] if gk else None
         c["gsax_per_shot"] = gk["gsax_per_shot"] if gk else None
-        ge = gsax_ex_by.get((c["gk_sp_id"], c["grade"]))
-        c["gsax_ex_short"] = ge["gsax"] if ge else None
-        c["gsax_ex_short_per_shot"] = ge["gsax_per_shot"] if ge else None
 
     # 카드별 거리 존별·타입별 (대량 집계 2쿼리) → 각 카드에 첨부(페이지 드릴다운용)
     zones_all = agg.zone_breakdown_all(con, since=since)

@@ -620,29 +620,27 @@ def test_headers_are_clickable_sort_with_arrows():
 
 
 @requires_node
-def test_sort_val_reads_nested_info_and_gsax_mode():
-    # sortVal 은 급여·OVR 을 c.info 에서, GSAx 는 활성 모드에서 읽는다.
+def test_sort_val_reads_nested_info_and_gsax():
+    # sortVal 은 급여·OVR 을 c.info 에서, GSAx 는 카드 값에서 읽는다.
     js = render.FILTER_JS + render.STATS_JS + """
-let gsaxMode='gsax_per_shot';
 function sortVal(c,col){
   if(col==='salary') return c.info&&c.info.salary;
   if(col==='ovr') return c.info&&c.info.ovr;
-  if(col==='gsax') return c[gsaxMode];
+  if(col==='gsax') return c.gsax_per_shot;
   return c[col];
 }
-const c={grade:9,save_pct:0.7,matches:120,gsax_per_shot:0.05,gsax_ex_short_per_shot:0.04,info:{salary:24,ovr:113}};
+const c={grade:9,save_pct:0.7,matches:120,gsax_per_shot:0.05,info:{salary:24,ovr:113}};
 """
     assert _eval_js("sortVal(c,'salary')", js) == "24"
     assert _eval_js("sortVal(c,'ovr')", js) == "113"
     assert _eval_js("sortVal(c,'matches')", js) == "120"
-    assert _eval_js("sortVal(c,'gsax')", js) == "0.05"        # 기본 모드
-    assert _eval_js("(gsaxMode='gsax_ex_short_per_shot',sortVal(c,'gsax'))", js) == "0.04"
+    assert _eval_js("sortVal(c,'gsax')", js) == "0.05"
 
 
-def test_gsax_ex_short_toggle_present():
+def test_gsax_ex_short_toggle_removed():
     html = render.build_html(_PAYLOAD)
-    assert 'id="exShort"' in html                     # 초근제외 토글
-    assert "gsax_ex_short_per_shot" in html           # 토글이 초근제외 모드로 전환
+    assert 'id="exShort"' not in html
+    assert "gsax_ex_short_per_shot" not in html
 
 
 # ── 리더보드 탭 강화단계 필터(드랍박스) ─────────────────────────────────────
