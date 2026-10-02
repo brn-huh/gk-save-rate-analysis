@@ -353,13 +353,14 @@ _TEMPLATE = r"""<!doctype html>
   footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);
          color:var(--mut);font-size:.8rem;line-height:1.7}
   footer a{color:var(--gold2);text-decoration:none}
-  .privacy{max-width:760px;margin:28px auto 0;padding:20px;border:1px solid var(--line);
+  .privacy-disclosure{margin:0;border:0}
+  .privacy{max-width:760px;margin:8px auto 0;padding:20px;border:1px solid var(--line);
         border-radius:10px;background:var(--panel);color:var(--text);font-size:1rem;line-height:1.75;overflow-wrap:anywhere}
   .privacy h2{margin-top:0}
   .privacy h3{font-size:1rem;margin:24px 0 8px;color:var(--gold)}
   .privacy a{color:var(--gold2);text-decoration:underline;text-underline-offset:3px}
   .privacy a:focus-visible,.privacy-link:focus-visible{outline:2px solid var(--gold);outline-offset:4px}
-  .privacy-link{display:inline-block;padding:8px 0}
+  .privacy-link{padding:8px 0;color:var(--gold2);font-size:.8rem;font-weight:400}
   .reading-note{background:rgba(240,209,122,.07);border:1px solid rgba(240,209,122,.28);
         border-radius:10px;padding:11px 14px;font-size:.86rem;line-height:1.5;margin:28px 0 4px;color:#e7d5a8}
   .reading-note b{color:var(--gold)}
@@ -613,11 +614,12 @@ _TEMPLATE = r"""<!doctype html>
   (<a href="https://open.api.nexon.com" target="_blank" rel="noopener">open.api.nexon.com</a>)
   의 FC 온라인 매치 데이터를 수집·가공해 제공합니다.<br>
   넥슨 및 FC 온라인과 무관한 비공식 팬 분석이며, 지표는 공개 API 데이터에 기반한 추정치입니다.<br>
-  문의·건의·아이디어 제안: <a href="https://forms.gle/cAsUoUvSBDSrTdHw5" target="_blank" rel="noopener">여기로 남겨주세요</a><br>
-  <a class="privacy-link" href="#privacy">개인정보처리방침</a>
+  문의·건의·아이디어 제안: <a href="https://forms.gle/cAsUoUvSBDSrTdHw5" target="_blank" rel="noopener">여기로 남겨주세요</a>
 </footer>
 
-<section class="privacy" id="privacy" aria-labelledby="privacy-title" tabindex="-1">
+<details class="privacy-disclosure" id="privacy">
+  <summary class="privacy-link">개인정보처리방침</summary>
+<section class="privacy" aria-labelledby="privacy-title">
   <h2 id="privacy-title">개인정보처리방침</h2>
   <p>시행일: <time datetime="2026-10-02">2026년 10월 2일</time></p>
   <p>FC온라인 GK 선방률 순위는 회원가입 없이 이용하는 통계 서비스입니다. 통계 조회를 위해 이름·이메일·전화번호를 입력받지 않습니다. 다만 브라우저 저장 기능, 방문 통계, 호스팅 및 문의 과정에서는 아래와 같이 정보가 처리됩니다.</p>
@@ -642,6 +644,7 @@ _TEMPLATE = r"""<!doctype html>
   <h3>5. 방침 변경</h3>
   <p>사용하는 서비스나 정보 처리 방식이 달라지면 이 페이지의 내용과 시행일을 갱신하여 안내합니다.</p>
 </section>
+</details>
 
 <script id="gk-data" type="application/json">__DATA__</script>
 <script>
