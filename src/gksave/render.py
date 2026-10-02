@@ -353,6 +353,13 @@ _TEMPLATE = r"""<!doctype html>
   footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);
          color:var(--mut);font-size:.8rem;line-height:1.7}
   footer a{color:var(--gold2);text-decoration:none}
+  .privacy{max-width:760px;margin:28px auto 0;padding:20px;border:1px solid var(--line);
+        border-radius:10px;background:var(--panel);color:var(--text);font-size:1rem;line-height:1.75;overflow-wrap:anywhere}
+  .privacy h2{margin-top:0}
+  .privacy h3{font-size:1rem;margin:24px 0 8px;color:var(--gold)}
+  .privacy a{color:var(--gold2);text-decoration:underline;text-underline-offset:3px}
+  .privacy a:focus-visible,.privacy-link:focus-visible{outline:2px solid var(--gold);outline-offset:4px}
+  .privacy-link{display:inline-block;padding:8px 0}
   .reading-note{background:rgba(240,209,122,.07);border:1px solid rgba(240,209,122,.28);
         border-radius:10px;padding:11px 14px;font-size:.86rem;line-height:1.5;margin:28px 0 4px;color:#e7d5a8}
   .reading-note b{color:var(--gold)}
@@ -606,8 +613,35 @@ _TEMPLATE = r"""<!doctype html>
   (<a href="https://open.api.nexon.com" target="_blank" rel="noopener">open.api.nexon.com</a>)
   의 FC 온라인 매치 데이터를 수집·가공해 제공합니다.<br>
   넥슨 및 FC 온라인과 무관한 비공식 팬 분석이며, 지표는 공개 API 데이터에 기반한 추정치입니다.<br>
-  문의·건의·아이디어 제안: <a href="https://forms.gle/cAsUoUvSBDSrTdHw5" target="_blank" rel="noopener">여기로 남겨주세요</a>
+  문의·건의·아이디어 제안: <a href="https://forms.gle/cAsUoUvSBDSrTdHw5" target="_blank" rel="noopener">여기로 남겨주세요</a><br>
+  <a class="privacy-link" href="#privacy">개인정보처리방침</a>
 </footer>
+
+<section class="privacy" id="privacy" aria-labelledby="privacy-title" tabindex="-1">
+  <h2 id="privacy-title">개인정보처리방침</h2>
+  <p>시행일: <time datetime="2026-10-02">2026년 10월 2일</time></p>
+  <p>FC온라인 GK 선방률 순위는 회원가입 없이 이용하는 통계 서비스입니다. 통계 조회를 위해 이름·이메일·전화번호를 입력받지 않습니다. 다만 브라우저 저장 기능, 방문 통계, 호스팅 및 문의 과정에서는 아래와 같이 정보가 처리됩니다.</p>
+
+  <h3>1. 검색과 브라우저 저장</h3>
+  <p>선수 검색과 필터는 브라우저 안에서 처리됩니다. 최근 팀컬러 검색어는 최대 3개까지 현재 브라우저의 로컬 저장소(localStorage)에 저장되며, 이 검색 기능은 검색어를 서버로 전송하지 않습니다. 최근 검색의 개별 삭제·전체 삭제 또는 브라우저 설정의 사이트 데이터 삭제로 지울 수 있습니다. 직접 삭제하거나 새 검색어로 대체되기 전까지 저장되며, 브라우저 정책에 따라 먼저 삭제될 수도 있습니다.</p>
+
+  <h3>2. 방문 통계와 외부 서비스</h3>
+  <p><strong>NEXON Open API Analytics:</strong> 방문 현황 집계를 위해 방문 페이지 주소, 사이트 도메인, 유입 페이지 주소, 화면 너비·높이가 넥슨으로 전송됩니다. 넥슨 서버와 통신하는 과정에서 IP 주소 등 접속 정보가 전달될 수 있습니다. 선수 이미지·시즌 엠블럼을 불러올 때도 넥슨의 이미지 서버에 접속합니다. 자세한 사항은 <a href="https://member.nexon.com/policy/privacy.aspx">넥슨 개인정보처리방침</a>을 참고하세요.</p>
+  <p><strong>Cloudflare:</strong> 사이트 제공과 보안을 위해 사용하며, 이 과정에서 IP 주소 및 요청·접속 관련 정보가 처리될 수 있습니다. 자세한 사항은 <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare 개인정보처리방침</a>을 참고하세요.</p>
+
+  <h3>3. Google AdSense 광고와 쿠키</h3>
+  <p><strong>현재는 애드센스 사이트 확인용 메타 태그만 적용되어 있으며, 애드센스 광고 스크립트는 실행하지 않습니다.</strong> 아래 내용은 향후 광고를 게재할 때 적용됩니다. 광고를 도입할 때 이 방침과 필요한 동의 설정을 함께 갱신합니다.</p>
+  <p>광고가 게재되면 Google 및 서드 파티 광고 공급업체는 쿠키를 사용하여 이용자의 이 사이트 또는 다른 웹사이트 방문 기록에 따라 광고를 제공할 수 있습니다. Google과 광고 파트너는 이러한 광고 쿠키를 맞춤 광고와 광고 효과 측정 등에 사용하며, 광고 요청 과정에서 IP 주소와 방문 페이지 주소 등이 Google에 전달될 수 있습니다.</p>
+  <p><a href="https://policies.google.com/privacy?hl=ko">Google 개인정보처리방침</a>과 <a href="https://policies.google.com/technologies/partner-sites?hl=ko">Google의 파트너 사이트 정보 이용 안내</a>에서 자세한 내용을 확인할 수 있습니다. <a href="https://myadcenter.google.com/">Google 내 광고 센터</a>에서 맞춤 광고를 사용 중지하거나, <a href="https://www.aboutads.info/choices/">서드 파티 맞춤 광고 거부 안내</a>에서 참여 업체의 쿠키 이용 거부 방법을 확인할 수 있습니다.</p>
+  <p>브라우저 설정에서도 쿠키를 차단하거나 삭제할 수 있습니다. 맞춤 광고를 거부해도 일반 광고는 표시될 수 있으며, 쿠키 차단은 일부 외부 서비스의 동작에 영향을 줄 수 있습니다.</p>
+
+  <h3>4. 문의, 보관 및 삭제 요청</h3>
+  <p>개인정보 관련 문의와 열람·정정·삭제·처리정지 요청은 <a href="https://forms.gle/cAsUoUvSBDSrTdHw5">운영자 문의 양식(Google Forms)</a>으로 보낼 수 있습니다. 양식에 직접 제출한 내용과 자발적으로 제공한 연락처는 문의 확인 및 답변을 위해 처리합니다. 비밀번호나 주민등록번호 등 불필요한 민감정보는 입력하지 마세요.</p>
+  <p>운영자가 받은 문의 정보는 처리 목적을 달성하면 지체 없이 삭제합니다. 관계 법령상 보관 의무가 있는 경우에는 해당 기간 동안 보관합니다. Google Forms 이용에는 Google의 개인정보처리방침도 적용되며, 외부 서비스 제공자가 처리하는 정보의 보관·삭제 기준은 위에 연결한 각 제공자의 방침에서 확인할 수 있습니다.</p>
+
+  <h3>5. 방침 변경</h3>
+  <p>사용하는 서비스나 정보 처리 방식이 달라지면 이 페이지의 내용과 시행일을 갱신하여 안내합니다.</p>
+</section>
 
 <script id="gk-data" type="application/json">__DATA__</script>
 <script>
