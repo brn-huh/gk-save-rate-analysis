@@ -361,11 +361,48 @@ def test_has_reset_filters_button():
 def test_metric_dropdown_and_value_toggle_present():
     html = render.build_html(_PAYLOAD)
     assert 'id="metricSel"' in html                            # 지표 드롭다운
-    for v in ('value="near"', 'value="mid"', 'value="oneone"', 'value="value"'):
+    for v in ('value="gsax"', 'value="near"', 'value="mid"', 'value="oneone"', 'value="value"'):
         assert v in html                                       # 근/중거리·상황·가성비 옵션
     assert 'id="valueBasis"' in html                           # 가성비 GSAx/선방률 토글
     assert "SIT_GATE" in html                                  # 상황 표본 게이트
     assert "function metricEligible(" in html
+
+
+@requires_node
+def test_default_and_reset_sort_by_gsax():
+    html = render.build_html(_PAYLOAD)
+    assert re.search(r'<select id="metricSel">\s*<option value="gsax">GSAx/100</option>', html)
+    initial = html.split("const PAGE=", 1)[1].split("// ── 순위 추이", 1)[0]
+    helpers = html.split("function metricVal(c){", 1)[1].split("const esc=", 1)[0]
+    sorting = html.split("  let rows=pool.filter", 1)[1].split("  const mobileMetricLabels=", 1)[0]
+    reset = html.split("document.getElementById('resetFilters').onclick=()=>{", 1)[1].split("\n};", 1)[0]
+    js = "const PAGE=" + initial + "function metricVal(c){" + helpers + """
+const pool=[
+  {name:'선방률 1위',save_pct:0.8,gsax_per_shot:-0.01},
+  {name:'보정 1위',save_pct:0.5,gsax_per_shot:0.06},
+  {name:'보정 없음',save_pct:0.9,gsax_per_shot:null}
+];
+function snapshot(){
+""" + "  let rows=pool.filter" + sorting + """
+  return {metric, sortDir, order:rows.map(c=>c.name), value:metricCell(rows[0]),
+    secondary:sortVal(rows[0],'secondary'), missing:metricCell(pool[2])};
+}
+const first=snapshot(), fields={};
+const document={getElementById:id=>fields[id]||(fields[id]={})};
+const gSel={}, gateInput={};
+function syncValueBasisBtn(){}
+function render(){}
+metric='save_pct'; sortCol='matches'; sortDir='asc';
+""" + reset
+    result = json.loads(_eval_js(
+        "JSON.stringify({first, reset:snapshot(), selected:fields.metricSel.value})", js,
+    ))
+    expected = {
+        "metric": "gsax", "sortDir": "desc",
+        "order": ["보정 1위", "선방률 1위", "보정 없음"],
+        "value": "+6.0", "secondary": 0.5, "missing": "N/A",
+    }
+    assert result == {"first": expected, "reset": expected, "selected": "gsax"}
 
 
 @requires_node
@@ -618,7 +655,7 @@ def test_leaderboard_has_ovr_column():
 def test_headers_are_clickable_sort_with_arrows():
     html = render.build_html(_PAYLOAD)
     # 숫자 컬럼이 정렬 가능 헤더(data-col)로, 화살표 표기 로직·방향 토글이 있어야
-    for col in ("grade", "salary", "ovr", "save_pct", "gsax", "matches"):
+    for col in ("grade", "salary", "ovr", "save_pct", "secondary", "matches"):
         assert f'data-col="{col}"' in html
     assert "function updateHeaders(" in html
     assert "sortDir==='asc'?'▲':'▼'" in html.replace(" ", "").replace('"', "'")
@@ -732,7 +769,7 @@ button.onclick();
     ))
     assert result == {
         "card": {"badge": "GSAx 킹", "name": "보정 1위", "value": "+30.0", "unit": "GSAx/100", "act": "gsax"},
-        "metric": "save_pct", "selected": "save_pct", "sortCol": "gsax",
+        "metric": "gsax", "selected": "gsax", "sortCol": "save_pct",
         "sortDir": "desc", "limit": 100, "rendered": True, "scrolled": True,
     }
 

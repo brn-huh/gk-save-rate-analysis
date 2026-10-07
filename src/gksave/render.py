@@ -518,6 +518,7 @@ _TEMPLATE = r"""<!doctype html>
     <div class="controls">
     <label class="lab" for="metricSel">지표</label>
     <select id="metricSel">
+      <option value="gsax">GSAx/100</option>
       <option value="save_pct">선방률</option>
       <optgroup label="거리별 선방률">
         <option value="near">근거리 (박스 안)</option><option value="mid">중거리 (박스 밖)</option>
@@ -543,7 +544,7 @@ _TEMPLATE = r"""<!doctype html>
   <p class="muted leaderboard-tip"><b>컬럼 제목</b>을 클릭하면 그 항목으로 정렬됩니다(다시 누르면 오름/내림 전환). 행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
     <table id="lb">
-      <thead><tr><th>#</th><th>선수</th><th class="sortable mobile-optional" tabindex="0" data-col="grade">강화 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="salary">급여 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable mobile-metric" tabindex="0" data-col="save_pct" id="metricHdr">선방률 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="gsax">GSAx/100 <span class="arr"></span></th><th class="sortable mobile-matches" tabindex="0" data-col="matches">경기수 <span class="arr"></span></th><th class="mobile-optional" id="deltaHdr" title="약 1주 전 같은 창과 비교한 '선방률 순위' 변동. 지금 걸어둔 검색·필터 안에서 계산합니다. 각 뱃지에 마우스를 올리면 실제 비교 시점이 나옵니다. 다른 지표·정렬로 보는 중이면 뜻이 달라져 흐리게 표시됩니다.">변동</th></tr></thead>
+      <thead><tr><th>#</th><th>선수</th><th class="sortable mobile-optional" tabindex="0" data-col="grade">강화 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="salary">급여 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable mobile-metric" tabindex="0" data-col="save_pct" id="metricHdr">GSAx/100 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="secondary" id="secondaryHdr">선방률 <span class="arr"></span></th><th class="sortable mobile-matches" tabindex="0" data-col="matches">경기수 <span class="arr"></span></th><th class="mobile-optional" id="deltaHdr" title="약 1주 전 같은 창과 비교한 '선방률 순위' 변동. 지금 걸어둔 검색·필터 안에서 계산합니다. 각 뱃지에 마우스를 올리면 실제 비교 시점이 나옵니다. 다른 지표·정렬로 보는 중이면 뜻이 달라져 흐리게 표시됩니다.">변동</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -651,10 +652,11 @@ const D = JSON.parse(document.getElementById('gk-data').textContent);
 const PAGE=100;
 let sortCol='save_pct', sortDir='desc';
 let q='', limit=PAGE, minGate=500, gradeFilter='', natClubQ='', salMin=null, salMax=null;
-// "지표" 드롭다운 — 선방률 컬럼이 보여주고 정렬하는 값을 바꾼다. 기본 선방률.
-let metric='save_pct', valueBasis='gsax';   // valueBasis: 가성비 기준(gsax|save_pct)
+// "지표" 드롭다운 — 주 지표 컬럼이 보여주고 정렬하는 값을 바꾼다. 기본 GSAx/100.
+let metric='gsax', valueBasis='gsax';   // valueBasis: 가성비 기준(gsax|save_pct)
 const SIT_GATE=30;   // 상황별 정렬 표본 게이트(그 상황 슛 수)
 const METRICS={
+  gsax:{label:'GSAx/100',kind:'gsax'},
   save_pct:{label:'선방률',kind:'pct'},
   near:{label:'근거리(박스 안) 선방률',kind:'sit'}, mid:{label:'중거리(박스 밖) 선방률',kind:'sit'},
   oneone:{label:'1대1 선방률',kind:'sit'}, assisted:{label:'연계·컷백 선방률',kind:'sit'},
@@ -720,6 +722,7 @@ function deltaCell(c,dm){
 }
 // 현재 지표의 카드 값(정렬·표시 공통). 상황 표본 미달/급여 없음은 null.
 function metricVal(c){
+  if(metric==='gsax') return c.gsax_per_shot;
   if(metric==='save_pct') return c.save_pct;
   if(metric==='value'){
     const sal=c.info&&c.info.salary; if(sal==null) return null;
@@ -735,19 +738,20 @@ function metricEligible(c){
   if(metric==='value') return !!(c.info && c.info.salary!=null);
   return true;
 }
-// 선방률 컬럼 셀 — 지표에 따라 값·부가표기가 바뀐다.
+// 주 지표 컬럼 셀 — 지표에 따라 값·부가표기가 바뀐다.
 function metricCell(c){
+  if(metric==='gsax') return c.gsax_per_shot==null?'N/A':gps(c.gsax_per_shot);
   if(metric==='save_pct') return `${pct(c.save_pct)}<span class="ci">${ciText(c.saves,c.goals)}</span>`;
   if(metric==='value'){ const v=metricVal(c);
     return v==null ? '-' : `${(v*100).toFixed(2)}<span class="ci">${valueBasis==='gsax'?'급여당 GSAx':'급여당 선방률'}</span>`; }
   const s=(c.sit||{})[metric]||{};
   return `${pct(s.pct)}<span class="ci">${s.shots||0}슛</span>`;
 }
-// 컬럼 id → 정렬/표시 값. 급여·OVR 은 c.info 중첩, 선방률 컬럼은 지표 전환.
+// 컬럼 id → 정렬/표시 값. 보조 지표는 GSAx를 볼 때 선방률, 그 외에는 GSAx.
 function sortVal(c,col){
   if(col==='salary') return c.info&&c.info.salary;
   if(col==='ovr') return c.info&&c.info.ovr;
-  if(col==='gsax') return c.gsax_per_shot;
+  if(col==='secondary') return metric==='gsax'?c.save_pct:c.gsax_per_shot;
   if(col==='save_pct') return metricVal(c);   // 지표 드롭다운이 이 컬럼을 전환
   return c[col];   // grade, matches
 }
@@ -969,11 +973,12 @@ function render(){
     if(av==null&&bv==null)return 0; if(av==null)return 1; if(bv==null)return -1;
     return sortDir==='asc' ? av-bv : bv-av;
   });
-  if(!rows.length){tb.innerHTML='<tr><td colspan="10" class="empty">해당하는 카드가 없습니다.</td></tr>';updateHeaders();return;}
-  const mobileMetricLabels={save_pct:'선방률',near:'근거리',mid:'중거리',oneone:'1대1',assisted:'연계',value:'가성비'};
+  const mobileMetricLabels={gsax:'GSAx/100',save_pct:'선방률',near:'근거리',mid:'중거리',oneone:'1대1',assisted:'연계',value:'가성비'};
   document.getElementById('metricHdr').firstChild.textContent =
     (window.innerWidth<640?mobileMetricLabels[metric]:METRICS[metric].label) + ' ';
+  document.getElementById('secondaryHdr').firstChild.textContent = metric==='gsax'?'선방률 ':'GSAx/100 ';
   updateHeaders();
+  if(!rows.length){tb.innerHTML='<tr><td colspan="10" class="empty">해당하는 카드가 없습니다.</td></tr>';return;}
   // 검색 중(이름 또는 국가/클럽)이면 전체에서 찾도록 캡 무시, 아니면 상위 limit 장만(경량화)
   const searching = q || natClubQ;
   const vis = searching ? rows : rows.slice(0, limit);
@@ -998,7 +1003,7 @@ function render(){
       `<td class="num mobile-optional">${gradeBadge(c.grade)}</td>`+
       `<td class="num mobile-optional">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
       `<td class="num mobile-optional">${(c.info&&c.info.ovr!=null)?c.info.ovr:''}</td>`+
-      `<td class="pct">${metricCell(c)}</td><td class="num mobile-optional">${gps(c.gsax_per_shot)}</td>`+
+      `<td class="pct">${metricCell(c)}</td><td class="num mobile-optional">${metric==='gsax'?pct(c.save_pct):gps(c.gsax_per_shot)}</td>`+
       `<td class="num">${c.matches}</td>`+
       `<td class="num delta mobile-optional">${deltaCell(c,dmap)}</td>`;
     tr.onclick=e=>{if(!e.target.closest('button'))toggle(tr,c);};
@@ -1111,7 +1116,7 @@ document.querySelectorAll('#lb thead th.sortable').forEach(th=>th.onclick=()=>{
 document.querySelectorAll('#lb thead th.sortable').forEach(th=>th.onkeydown=e=>{
   if(e.key==='Enter'||e.key===' '){e.preventDefault();th.click();}
 });
-// "지표" 드롭다운 — 선방률 컬럼을 상황별 선방률/가성비로 전환하고 그 값으로 정렬(내림).
+// "지표" 드롭다운 — 주 지표를 전환하고 그 값으로 정렬(내림).
 const vbBtn=document.getElementById('valueBasis');
 function syncValueBasisBtn(){
   vbBtn.style.display = metric==='value' ? '' : 'none';
@@ -1138,11 +1143,11 @@ gateInput.addEventListener('keydown',e=>{
 document.getElementById('resetFilters').onclick=()=>{
   q=''; natClubQ=''; salMin=null; salMax=null; gradeFilter='';
   minGate=500; sortCol='save_pct'; sortDir='desc';
-  metric='save_pct'; valueBasis='gsax'; limit=PAGE;
+  metric='gsax'; valueBasis='gsax'; limit=PAGE;
   document.getElementById('search').value='';
   document.getElementById('natClubSearch').value='';
   document.getElementById('salMin').value=''; document.getElementById('salMax').value='';
-  gSel.value=''; document.getElementById('metricSel').value='save_pct';
+  gSel.value=''; document.getElementById('metricSel').value='gsax';
   gateInput.value=500;
   syncValueBasisBtn();
   render();
@@ -1241,9 +1246,9 @@ function renderChampions(L){
 }
 // 챔피언 클릭 → 그 분야 지표로 리더보드 전환 후 목록으로 스크롤
 function applyChampMetric(act){
-  metric=act==='gsax'?'save_pct':act;
+  metric=act;
   document.getElementById('metricSel').value=metric;
-  sortCol=act==='gsax'?'gsax':'save_pct';
+  sortCol='save_pct';
   sortDir='desc'; limit=PAGE; syncValueBasisBtn(); render();
   document.getElementById('lb').scrollIntoView({behavior:'smooth',block:'start'});
 }
