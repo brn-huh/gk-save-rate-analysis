@@ -1137,7 +1137,7 @@ document.getElementById('spSearch').oninput=spFilter;
 spFilter();
 
 // ── 명예의 전당: 분야별 챔피언 3인 ────────────────────────────────────────
-// 현재 검색·필터·최소 경기 수를 통과한 선수 중 선방률·가성비·1대1 각 분야 1위.
+// 현재 검색·필터·최소 경기 수를 통과한 선수 중 GSAx/100·가성비·1대1 각 분야 1위.
 // 카드 클릭 시 해당 지표의 내림차순으로 리더보드를 전환한다.
 // 같은 이름·강화라도 시즌이 다르면 다른 카드이므로 시즌 엠블럼을 함께 표기한다.
 function champCard(badge, sub, c, valHtml, unit, act){
@@ -1158,20 +1158,22 @@ function renderChampions(L){
   const el=document.getElementById('champions'); if(!el) return;
   if(!L || !L.length){ el.style.display='none'; return; }   // 필터 결과 없음 → 섹션 숨김
   el.style.display='';
-  const s=L.filter(c=>c.save_pct!=null).sort((a,b)=>b.save_pct-a.save_pct)[0];
+  const g=L.filter(c=>c.gsax_per_shot!=null).sort((a,b)=>b.gsax_per_shot-a.gsax_per_shot)[0];
   const v=L.filter(c=>c.gsax_per_shot!=null&&c.info&&c.info.salary)
            .sort((a,b)=>(b.gsax_per_shot/b.info.salary)-(a.gsax_per_shot/a.info.salary))[0];
   const o=L.filter(c=>{const s=c.sit&&c.sit.oneone; return s&&s.shots>=SIT_GATE&&s.pct!=null;})
            .sort((a,b)=>b.sit.oneone.pct-a.sit.oneone.pct)[0];
   el.innerHTML=
-    champCard('선방률 킹','선방률 1위', s, s?pct(s.save_pct):'-', '선방률', 'save_pct')+
+    champCard('GSAx 킹','난이도 보정 선방 1위', g, g?gps(g.gsax_per_shot):'-', 'GSAx/100', 'gsax')+
     champCard('가성비 킹','급여 대비 GSAx 1위', v, v?('+'+(v.gsax_per_shot/v.info.salary*100).toFixed(2)):'-', '100슛 GSAx ÷ 급여', 'value')+
     champCard('1대1 최강','1대1(무연계) 선방률 1위', o, o?pct(o.sit.oneone.pct):'-', o?(o.sit.oneone.shots+'슛'):'', 'oneone');
   el.querySelectorAll('.champ[data-act]').forEach(card=>card.onclick=()=>applyChampMetric(card.dataset.act));
 }
 // 챔피언 클릭 → 그 분야 지표로 리더보드 전환 후 목록으로 스크롤
 function applyChampMetric(act){
-  metric=act; document.getElementById('metricSel').value=act; sortCol='save_pct';
+  metric=act==='gsax'?'save_pct':act;
+  document.getElementById('metricSel').value=metric;
+  sortCol=act==='gsax'?'gsax':'save_pct';
   sortDir='desc'; limit=PAGE; syncValueBasisBtn(); render();
   document.getElementById('lb').scrollIntoView({behavior:'smooth',block:'start'});
 }
