@@ -472,11 +472,14 @@ _TEMPLATE = r"""<!doctype html>
     .controls .field:hover:not(:focus-within)::after{display:none}
     #lb{table-layout:fixed}
     #lb .mobile-optional{display:none}
-    #lb th:nth-child(1){width:38px}
+    #lb>thead>tr>th,#lb>tbody>tr.row>td{box-sizing:border-box;padding-left:4px;padding-right:4px}
+    #lb th:nth-child(1),#lb td.rank{width:36px;padding-left:2px;padding-right:2px}
     #lb th:nth-child(2){width:auto}
-    #lb th.mobile-metric{width:82px}
-    #lb th.mobile-matches{width:58px}
+    #lb th.mobile-metric{width:76px}
+    #lb th.mobile-matches{width:60px}
     #lb thead th{height:44px}
+    #lb .pcell{gap:4px}
+    #lb .pn-row{gap:3px}
     .hero{flex-direction:column;align-items:flex-start;gap:12px}
     .thumb{width:28px;height:28px}
     .pcell{gap:7px}
@@ -1204,8 +1207,8 @@ document.getElementById('spSearch').oninput=spFilter;
 spFilter();
 
 // ── 명예의 전당: 분야별 챔피언 3인 ────────────────────────────────────────
-// 리더보드 목록 위에 GSAx·가성비·1대1 각 분야 1위를 부각. 전체 데이터 기준으로
-// 고정(필터 무관)하고, 카드 클릭 시 그 지표로 리더보드를 전환해 전체 순위로 잇는다.
+// 현재 검색·필터·최소 경기 수를 통과한 선수 중 선방률·가성비·1대1 각 분야 1위.
+// 카드 클릭 시 해당 지표의 내림차순으로 리더보드를 전환한다.
 // 같은 이름·강화라도 시즌이 다르면 다른 카드이므로 시즌 엠블럼을 함께 표기한다.
 function champCard(badge, sub, c, valHtml, unit, act){
   if(!c) return `<div class="champ champ-empty"><div class="badge">${badge}</div>`+
@@ -1225,21 +1228,20 @@ function renderChampions(L){
   const el=document.getElementById('champions'); if(!el) return;
   if(!L || !L.length){ el.style.display='none'; return; }   // 필터 결과 없음 → 섹션 숨김
   el.style.display='';
-  const g=L.filter(c=>c.gsax_per_shot!=null).sort((a,b)=>b.gsax_per_shot-a.gsax_per_shot)[0];
+  const s=L.filter(c=>c.save_pct!=null).sort((a,b)=>b.save_pct-a.save_pct)[0];
   const v=L.filter(c=>c.gsax_per_shot!=null&&c.info&&c.info.salary)
            .sort((a,b)=>(b.gsax_per_shot/b.info.salary)-(a.gsax_per_shot/a.info.salary))[0];
   const o=L.filter(c=>{const s=c.sit&&c.sit.oneone; return s&&s.shots>=SIT_GATE&&s.pct!=null;})
            .sort((a,b)=>b.sit.oneone.pct-a.sit.oneone.pct)[0];
   el.innerHTML=
-    champCard('GSAx 킹','난이도 보정 방어 1위', g, g?gps(g.gsax_per_shot):'-', 'GSAx/100', 'gsax')+
+    champCard('선방률 킹','선방률 1위', s, s?pct(s.save_pct):'-', '선방률', 'save_pct')+
     champCard('가성비 킹','급여 대비 GSAx 1위', v, v?('+'+(v.gsax_per_shot/v.info.salary*100).toFixed(2)):'-', '100슛 GSAx ÷ 급여', 'value')+
     champCard('1대1 최강','1대1(무연계) 선방률 1위', o, o?pct(o.sit.oneone.pct):'-', o?(o.sit.oneone.shots+'슛'):'', 'oneone');
   el.querySelectorAll('.champ[data-act]').forEach(card=>card.onclick=()=>applyChampMetric(card.dataset.act));
 }
-// 챔피언 클릭 → 그 분야 지표로 리더보드 전환(gsax 킹은 GSAx 컬럼 정렬) 후 목록으로 스크롤
+// 챔피언 클릭 → 그 분야 지표로 리더보드 전환 후 목록으로 스크롤
 function applyChampMetric(act){
-  if(act==='gsax'){ metric='save_pct'; document.getElementById('metricSel').value='save_pct'; sortCol='gsax'; }
-  else { metric=act; document.getElementById('metricSel').value=act; sortCol='save_pct'; }
+  metric=act; document.getElementById('metricSel').value=act; sortCol='save_pct';
   sortDir='desc'; limit=PAGE; syncValueBasisBtn(); render();
   document.getElementById('lb').scrollIntoView({behavior:'smooth',block:'start'});
 }

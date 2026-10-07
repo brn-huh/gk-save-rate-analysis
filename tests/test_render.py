@@ -698,6 +698,45 @@ def test_grade_effect_survives_in_help_tab():
     assert "grade_effect" in html
 
 
+@requires_node
+def test_save_percentage_champion_selection_and_click():
+    html = render.build_html(_PAYLOAD)
+    champion_js = html.split("function renderChampions(L){", 1)[1].split("\nrender();", 1)[0]
+    js = """
+const cards=[], button={}, selector={};
+let metric='oneone', sortCol='matches', sortDir='asc', limit=200;
+let rendered=false, scrolled=false;
+const PAGE=100, SIT_GATE=30;
+const pct=v=>(v*100).toFixed(1)+'%';
+const el={style:{}, querySelectorAll:()=>[button]};
+const document={getElementById:id=>id==='champions'?el:
+  id==='metricSel'?selector:{scrollIntoView:()=>{scrolled=true;}}};
+function champCard(badge, sub, c, value, unit, act){
+  cards.push({badge, name:c?.player_name, value, act});
+  if(cards.length===1) button.dataset={act};
+  return '';
+}
+function syncValueBasisBtn(){}
+function render(){rendered=true;}
+""" + "function renderChampions(L){" + champion_js + """
+renderChampions([
+  {player_name:'보정 1위', save_pct:0.6, gsax_per_shot:0.2},
+  {player_name:'선방률 1위', save_pct:0.8, gsax_per_shot:null},
+  {player_name:'선방률 없음', save_pct:null, gsax_per_shot:0.3}
+]);
+button.onclick();
+"""
+    result = json.loads(_eval_js(
+        "JSON.stringify({card:cards[0], metric, selected:selector.value, sortCol, "
+        "sortDir, limit, rendered, scrolled})", js,
+    ))
+    assert result == {
+        "card": {"badge": "선방률 킹", "name": "선방률 1위", "value": "80.0%", "act": "save_pct"},
+        "metric": "save_pct", "selected": "save_pct", "sortCol": "save_pct",
+        "sortDir": "desc", "limit": 100, "rendered": True, "scrolled": True,
+    }
+
+
 def test_mobile_leaderboard_keeps_only_core_columns():
     html = render.build_html(_PAYLOAD)
     assert "#lb .mobile-optional{display:none}" in html

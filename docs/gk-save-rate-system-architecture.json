@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "GK 선방률 분석 시스템 구조",
+    "output": "gk-save-rate-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/brn-huh/gk-save-rate-analysis.git",
+      "provider": "github",
+      "revision": "f4f000571008c6547fd628197fe998f7ab2ae4cf"
+    },
+    "views": [
+      {
+        "id": "collection",
+        "label": "수집 경로",
+        "focus": ["automation", "nexon_api", "collector", "raw_store"],
+        "note": "닉네임 시드와 영속 frontier로 경기 상세를 증분 수집합니다."
+      },
+      {
+        "id": "transformation",
+        "label": "변환·분석 경로",
+        "focus": ["raw_store", "metadata_sources", "build_enrich", "analytics_store", "exporter"],
+        "note": "원본을 GK 출전·유효슛으로 정규화하고 보강한 뒤 지표를 집계합니다."
+      },
+      {
+        "id": "delivery",
+        "label": "게시·조회 경로",
+        "focus": ["exporter", "static_host", "browser"],
+        "note": "정적 HTML과 분리 JSON을 Vercel에서 브라우저로 전달합니다."
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [40, 80],
+    "cols": 8,
+    "gapX": 48,
+    "gapY": 90,
+    "cellW": 150,
+    "cellH": 72
+  },
+  "components": [
+    {
+      "id": "automation",
+      "type": "backend",
+      "label": "운영 스크립트·CLI",
+      "row": 1,
+      "col": 0,
+      "sources": [
+        { "path": "scripts/collect.sh", "line": 47, "end_line": 57, "label": "수집·후속 업데이트" },
+        { "path": "scripts/update.sh", "line": 1, "end_line": 25, "label": "빌드·보강·내보내기" },
+        { "path": "src/gksave/cli.py", "line": 37, "end_line": 118, "label": "명령 디스패치" }
+      ]
+    },
+    {
+      "id": "nexon_api",
+      "type": "external",
+      "label": "Nexon Open API",
+      "row": 0,
+      "col": 1,
+      "sources": [
+        { "path": "src/gksave/config.py", "line": 38, "end_line": 40, "label": "API 기준 URL" },
+        { "path": "src/gksave/api.py", "line": 34, "end_line": 64, "label": "사용 엔드포인트" }
+      ]
+    },
+    {
+      "id": "collector",
+      "type": "backend",
+      "label": "비동기 수집기",
+      "row": 1,
+      "col": 1,
+      "sources": [
+        { "path": "src/gksave/collect.py", "line": 301, "end_line": 502, "label": "스노우볼 파이프라인" },
+        { "path": "src/gksave/collect.py", "line": 505, "end_line": 568, "label": "수집 실행 경계" },
+        { "path": "src/gksave/http.py", "line": 217, "end_line": 296, "label": "동시성·재시도·429" }
+      ]
+    },
+    {
+      "id": "raw_store",
+      "type": "database",
+      "label": "DuckDB 수집 레이어",
+      "row": 1,
+      "col": 2,
+      "sources": [
+        { "path": "src/gksave/db.py", "line": 20, "end_line": 33, "label": "원본·frontier 스키마" },
+        { "path": "src/gksave/collect.py", "line": 281, "end_line": 299, "label": "원자적 원본 저장" },
+        { "path": "src/gksave/codec.py", "line": 21, "end_line": 33, "label": "zlib payload 코덱" }
+      ]
+    },
+    {
+      "id": "metadata_sources",
+      "type": "external",
+      "label": "메타데이터 소스",
+      "row": 2,
+      "col": 3,
+      "sources": [
+        { "path": "src/gksave/meta.py", "line": 49, "end_line": 58, "label": "Nexon 정적 메타" },
+        { "path": "src/gksave/playerinfo.py", "line": 24, "end_line": 40, "label": "fc-info 계약" },
+        { "path": "src/gksave/playerinfo.py", "line": 262, "end_line": 330, "label": "선수 정보 증분 수집" }
+      ]
+    },
+    {
+      "id": "build_enrich",
+      "type": "backend",
+      "label": "빌드·메타 보강",
+      "row": 1,
+      "col": 3,
+      "sources": [
+        { "path": "src/gksave/agg.py", "line": 49, "end_line": 118, "label": "증분 재빌드" },
+        { "path": "src/gksave/parse.py", "line": 91, "end_line": 151, "label": "GK·유효슛 파싱" },
+        { "path": "scripts/update.sh", "line": 9, "end_line": 23, "label": "빌드·보강 순서" }
+      ]
+    },
+    {
+      "id": "analytics_store",
+      "type": "database",
+      "label": "DuckDB 분석 레이어",
+      "row": 1,
+      "col": 4,
+      "sources": [
+        { "path": "src/gksave/db.py", "line": 35, "end_line": 134, "label": "분석·메타 테이블" },
+        { "path": "src/gksave/db.py", "line": 139, "end_line": 173, "label": "조회용 뷰" }
+      ]
+    },
+    {
+      "id": "exporter",
+      "type": "backend",
+      "label": "집계·정적 렌더러",
+      "row": 1,
+      "col": 5,
+      "sources": [
+        { "path": "src/gksave/agg.py", "line": 197, "end_line": 367, "label": "순위·추이·GSAx" },
+        { "path": "src/gksave/export.py", "line": 70, "end_line": 160, "label": "공개 payload" },
+        { "path": "src/gksave/export.py", "line": 163, "end_line": 223, "label": "파일 산출" }
+      ]
+    },
+    {
+      "id": "static_host",
+      "type": "cloud",
+      "label": "정적 사이트 배포",
+      "row": 1,
+      "col": 6,
+      "sources": [
+        { "path": "src/gksave/export.py", "line": 173, "end_line": 220, "label": "HTML·JSON·CSV" },
+        { "path": "vercel.json", "line": 1, "end_line": 42, "label": "정적 호스팅·보안 헤더" }
+      ]
+    },
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "분석 페이지",
+      "row": 1,
+      "col": 7,
+      "sources": [
+        { "path": "src/gksave/render.py", "line": 1, "end_line": 8, "label": "자기완결 UI" },
+        { "path": "src/gksave/render.py", "line": 130, "end_line": 154, "label": "HTML 생성" },
+        { "path": "src/gksave/render.py", "line": 894, "end_line": 915, "label": "상세 JSON 지연 로드" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "로컬 배치 파이프라인",
+      "wraps": ["automation", "collector", "raw_store", "build_enrich", "analytics_store", "exporter"]
+    }
+  ],
+  "connections": [
+    { "id": "run_collection", "from": "automation", "to": "collector", "label": "gksave collect 옵션", "variant": "emphasis", "labelDy": 54 },
+    { "id": "fetch_matches", "from": "nexon_api", "to": "collector", "label": "HTTPS JSON", "variant": "dashed", "labelDy": 24 },
+    { "id": "persist_raw", "from": "collector", "to": "raw_store", "label": "zlib 상세 + BFS 상태", "labelDy": 54 },
+    { "id": "read_unparsed", "from": "raw_store", "to": "build_enrich", "label": "미파싱 payload" },
+    { "id": "fetch_metadata", "from": "metadata_sources", "to": "build_enrich", "label": "정적 JSON·검색/상세 HTML", "variant": "dashed" },
+    { "id": "write_analysis", "from": "build_enrich", "to": "analytics_store", "label": "GK 출전·유효슛·메타 캐시", "labelDy": 54 },
+    { "id": "read_window", "from": "analytics_store", "to": "exporter", "label": "45일 창·표본 게이트", "labelDy": 54 },
+    { "id": "publish_files", "from": "exporter", "to": "static_host", "label": "index.html·JSON·CSV", "labelDy": 54 },
+    { "id": "serve_site", "from": "static_host", "to": "browser", "label": "HTTPS + details.json 지연 로드", "labelDy": 54 }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "수집",
+      "items": ["matchId와 OUID를 PK로 중복 제거", "429/5xx 재시도와 적응형 요청률 적용", "원본은 zlib BLOB로 보존해 재수집 없이 재파싱"]
+    },
+    {
+      "dot": "emerald",
+      "title": "변환·분석",
+      "items": ["GK 8~13강 출전과 상대 유효슛을 분리 저장", "선방률·GSAx·강화효과·롤링 순위 추이 계산", "Nexon/fc-info 메타는 실패해도 다음 실행에서 증분 보강"]
+    },
+    {
+      "dot": "violet",
+      "title": "게시",
+      "items": ["초기 데이터는 index.html에 임베드", "상세 데이터는 details.json으로 지연 로드", "Vercel 배포용 Git 반영은 자동화하지 않고 수동 수행"]
+    }
+  ]
+}
