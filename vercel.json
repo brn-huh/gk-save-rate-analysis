@@ -6,6 +6,11 @@
   "cleanUrls": true,
   "redirects": [
     {
+      "source": "/",
+      "destination": "https://gk-save.com/",
+      "permanent": true
+    },
+    {
       "source": "/:path*",
       "destination": "https://gk-save.com/:path*",
       "permanent": true
