@@ -3,10 +3,12 @@
 COLLECT_MIN_DATE("2026-03-26")는 죽은 설정이었다 — 실제 데이터는 6/1 부터이고
 지평선은 날짜가 아니라 user_pages=3(유저당 최근 300경기)이 정한다. 롤링 창으로 바꿨다.
 
-수집 창(50일)은 통계 창(45일)보다 넓어야 한다. 좁으면 창 경계에서 데이터가 빈다.
+수집 창(65일)은 통계 창(60일)보다 넓어야 한다. 좁으면 창 경계에서 데이터가 빈다.
 """
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import re
 
 from gksave import config
 from gksave.collect import _default_since
@@ -17,8 +19,10 @@ def test_dead_min_date_config_is_gone():
 
 
 def test_collect_window_is_wider_than_stats_window():
-    # update.sh 는 export --days 45 를 쓴다. 수집 창은 그보다 넓어야 한다.
-    assert config.COLLECT_WINDOW_DAYS > 45
+    script = (Path(__file__).parents[1] / "scripts/update.sh").read_text()
+    export_days = int(re.search(r"gksave export[^\n]*--days (\d+)", script).group(1))
+    assert export_days == 60
+    assert config.COLLECT_WINDOW_DAYS > export_days
 
 
 def test_default_since_is_rolling_from_now():
