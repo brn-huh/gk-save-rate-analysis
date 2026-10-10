@@ -42,7 +42,7 @@ API_KEY_ENV = "NEXON_API_KEY"
 # ── 공개 배포 주소 ───────────────────────────────────────────────
 # canonical/og:url/sitemap 이 공유한다. 커스텀 도메인을 붙이면 여기만 바꾸면 된다
 # (robots.txt 의 Sitemap: 줄은 out/robots.txt 가 손으로 유지하므로 같이 고칠 것).
-SITE_URL = "https://gk-save.vercel.app/"
+SITE_URL = "https://gk-save.com/"
 
 # ── fc-info 조회 기록(negative cache) ────────────────────────────
 # "받아봤지만 저장할 게 없더라"(미등재 카드·특성 0개)를 기억해 재조회를 막는다.

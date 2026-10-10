@@ -11,6 +11,8 @@ export 페이로드를 자기완결형 HTML 한 장으로 렌더. CSS/JS 는 전
 from __future__ import annotations
 
 import json
+import re
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -127,6 +129,37 @@ function ciText(s,g){
 """
 
 
+def _initial_rows(cards: list[dict[str, Any]]) -> str:
+    # JS render()의 기본 화면: 500경기 이상, GSAx 내림차순, 결측값 마지막, 100장.
+    rows = sorted(
+        (c for c in cards if c["matches"] >= 500),
+        key=lambda c: (c.get("gsax_per_shot") is None, -(c.get("gsax_per_shot") or 0)),
+    )[:100]
+    html = []
+    for rank, card in enumerate(rows, 1):
+        info = card.get("info") or {}
+        name = card.get("player_name") or f"spId {card['gk_sp_id']}"
+        label = f"{card.get('season_name') or ''} {name} {card['grade']}강".strip()
+        gsax = card.get("gsax_per_shot")
+        save_pct = card.get("save_pct")
+        cells = [
+            ("rank", rank),
+            ("", label),
+            ("num mobile-optional", card["grade"]),
+            ("num mobile-optional", info.get("salary")),
+            ("num mobile-optional", info.get("ovr")),
+            ("pct", "" if gsax is None else f"{gsax * 100:+.1f}"),
+            ("num mobile-optional", "N/A" if save_pct is None else f"{save_pct * 100:.1f}%"),
+            ("num", card["matches"]),
+            ("num delta mobile-optional", ""),
+        ]
+        html.append("<tr>" + "".join(
+            f'<td class="{cls}">{escape(str(value)) if value is not None else ""}</td>'
+            for cls, value in cells
+        ) + "</tr>")
+    return "\n".join(html) or '<tr><td colspan="9" class="empty">해당하는 카드가 없습니다.</td></tr>'
+
+
 def build_html(payload: dict[str, Any]) -> str:
     page = {
         "generated_at": str(payload.get("generated_at", "")),
@@ -143,15 +176,23 @@ def build_html(payload: dict[str, Any]) -> str:
     }
     # <script> 탈출 방지: '<' → <
     data_json = json.dumps(page, ensure_ascii=False).replace("<", "\\u003c")
-    return (
-        _TEMPLATE.replace("__SITE_URL__", SITE_URL)
-        .replace("__FAVICON__", FAVICON)
-        .replace("__PLATINUM__", PLATINUM)
-        .replace("__IMAGE_JS__", IMAGE_JS)
-        .replace("__FILTER_JS__", FILTER_JS)
-        .replace("__STATS_JS__", STATS_JS)
-        .replace("__DATA__", data_json)
-    )
+    dates = page["date_range"] or {}
+    period = f"기간 {dates['min']} ~ {dates['max']} · " if dates.get("min") and dates.get("max") else ""
+    total = page["total_collected_matches"] or 0
+    meta = escape(f"{period}총 경기 {total:,}건")
+    values = {
+        "__SITE_URL__": SITE_URL,
+        "__FAVICON__": FAVICON,
+        "__PLATINUM__": PLATINUM,
+        "__IMAGE_JS__": IMAGE_JS,
+        "__FILTER_JS__": FILTER_JS,
+        "__STATS_JS__": STATS_JS,
+        "__INITIAL_META__": meta,
+        "__INITIAL_ROWS__": _initial_rows(page["leaderboard"]),
+        "__DATA__": data_json,
+    }
+    # 외부 데이터에 플레이스홀더 문자열이 있어도 다시 치환하지 않는다.
+    return re.sub(r"__[A-Z_]+__", lambda m: values.get(m[0], m[0]), _TEMPLATE)
 
 
 _TEMPLATE = r"""<!doctype html>
@@ -488,7 +529,7 @@ _TEMPLATE = r"""<!doctype html>
   }
 </style></head><body>
 <h1><span class="star">★</span><span class="t">FC온라인 GK 선방률 순위</span></h1>
-<p class="meta" id="meta"></p>
+<p class="meta" id="meta">__INITIAL_META__</p>
 
 <div class="tabs">
   <button class="tab active" data-tab="lb">리더보드</button>
@@ -545,7 +586,7 @@ _TEMPLATE = r"""<!doctype html>
   <div class="tw">
     <table id="lb">
       <thead><tr><th>#</th><th>선수</th><th class="sortable mobile-optional" tabindex="0" data-col="grade">강화 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="salary">급여 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable mobile-metric" tabindex="0" data-col="save_pct" id="metricHdr">GSAx/100 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="secondary" id="secondaryHdr">선방률 <span class="arr"></span></th><th class="sortable mobile-matches" tabindex="0" data-col="matches">경기수 <span class="arr"></span></th><th class="mobile-optional" id="deltaHdr" title="약 1주 전 같은 창과 비교한 '선방률 순위' 변동. 지금 걸어둔 검색·필터 안에서 계산합니다. 각 뱃지에 마우스를 올리면 실제 비교 시점이 나옵니다. 다른 지표·정렬로 보는 중이면 뜻이 달라져 흐리게 표시됩니다.">변동</th></tr></thead>
-      <tbody></tbody>
+      <tbody>__INITIAL_ROWS__</tbody>
     </table>
   </div>
   <div class="more" id="more"></div>
@@ -978,7 +1019,7 @@ function render(){
     (window.innerWidth<640?mobileMetricLabels[metric]:METRICS[metric].label) + ' ';
   document.getElementById('secondaryHdr').firstChild.textContent = metric==='gsax'?'선방률 ':'GSAx/100 ';
   updateHeaders();
-  if(!rows.length){tb.innerHTML='<tr><td colspan="10" class="empty">해당하는 카드가 없습니다.</td></tr>';return;}
+  if(!rows.length){tb.innerHTML='<tr><td colspan="9" class="empty">해당하는 카드가 없습니다.</td></tr>';return;}
   // 검색 중(이름 또는 국가/클럽)이면 전체에서 찾도록 캡 무시, 아니면 상위 limit 장만(경량화)
   const searching = q || natClubQ;
   const vis = searching ? rows : rows.slice(0, limit);

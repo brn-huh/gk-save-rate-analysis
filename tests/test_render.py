@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -82,6 +83,40 @@ def test_empty_leaderboard_ok():
     html = render.build_html(payload)
     assert _embedded(html)["leaderboard"] == []
     assert html.startswith("<!doctype html>")
+
+
+def test_initial_table_matches_default_gate_and_gsax_order():
+    card = _PAYLOAD["leaderboard"][0]
+    payload = {**_PAYLOAD, "leaderboard": [
+        {**card, "player_name": "미달", "matches": 499, "gsax_per_shot": 1},
+        {**card, "player_name": "결측", "matches": 500, "gsax_per_shot": None},
+        {**card, "player_name": "음수", "matches": 500, "gsax_per_shot": -0.01},
+        {**card, "player_name": "공동1", "matches": 500, "gsax_per_shot": 0.05},
+        {**card, "player_name": "공동2", "matches": 500, "gsax_per_shot": 0.05},
+    ]}
+    html = render.build_html(payload)
+    table = re.search(r"<tbody>(.*?)</tbody>", html, re.S)[1]
+    assert "미달" not in table
+    assert table.index("공동1") < table.index("공동2") < table.index("음수") < table.index("결측")
+    assert "+5.0" in table and "-1.0" in table and "75.0%" in table
+    assert table.count("<tr>") == 4
+    assert table.count("<td ") == 4 * 9
+    assert _embedded(html)["leaderboard"] == payload["leaderboard"]
+
+
+def test_initial_table_caps_rows_and_escapes_external_text():
+    name = '<img src=x onerror="alert(1)">__DATA__ & __INITIAL_ROWS__'
+    card = {**_PAYLOAD["leaderboard"][0], "matches": 500, "player_name": name}
+    payload = {**_PAYLOAD, "leaderboard": [card] * 101,
+               "date_range": {"min": "2026-08-12", "max": "2026-10-10"},
+               "total_collected_matches": 1234}
+    html = render.build_html(payload)
+    table = re.search(r"<tbody>(.*?)</tbody>", html, re.S)[1]
+    assert table.count("<tr>") == 100
+    assert '<img src=x' not in table
+    assert '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;__DATA__ &amp; __INITIAL_ROWS__' in table
+    assert '<p class="meta" id="meta">기간 2026-08-12 ~ 2026-10-10 · 총 경기 1,234건</p>' in html
+    assert _embedded(html)["leaderboard"][0]["player_name"] == name
 
 
 # ── 선수 이미지 ────────────────────────────────────────────────────────────
@@ -251,9 +286,11 @@ def test_main_list_and_compare_have_salary_column():
     assert 'data-col="salary">급여' in html       # 메인 목록(정렬 헤더)
     assert "<th>급여</th>" in html                # 동일선수 mini 표
     assert "c.info" in html                       # 메인 행이 급여를 그림
-    # 상세 행 colspan 은 컬럼 수(OVR 9 → 순위 변동 추가로 10)와 맞아야
-    assert 'colspan="10"' in html
-    assert 'colspan="9"' not in html
+    # 빈 목록도 실제 리더보드의 9개 열에 맞춰야 한다.
+    head = re.search(r"<thead>(.*?)</thead>", html, re.S)[1]
+    assert len(re.findall(r"<th(?:\s|>)", head)) == 9
+    assert 'colspan="9"' in html
+    assert 'colspan="10"' not in html
 
 
 def test_hero_shows_player_info_chips_when_present():
@@ -299,6 +336,10 @@ def test_seo_meta_points_at_the_deployed_url():
     assert f'<meta property="og:url" content="{SITE_URL}">' in html
     desc = re.search(r'<meta name="description" content="([^"]+)"', html)
     assert desc and 50 <= len(desc.group(1)) <= 160   # 검색결과 스니펫 길이
+    assert SITE_URL == "https://gk-save.com/"
+    out = Path(__file__).resolve().parents[1] / "out"
+    assert f"Sitemap: {SITE_URL}sitemap.xml" in (out / "robots.txt").read_text()
+    assert f"<loc>{SITE_URL}</loc>" in (out / "sitemap.xml").read_text()
 
 
 def test_image_src_attributes_are_escaped():
