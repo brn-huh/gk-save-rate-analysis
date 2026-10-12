@@ -130,10 +130,10 @@ function ciText(s,g){
 
 
 def _initial_rows(cards: list[dict[str, Any]]) -> str:
-    # JS render()의 기본 화면: 500경기 이상, GSAx 내림차순, 결측값 마지막, 100장.
+    # JS render()의 기본 화면: 500경기 이상, 선방률 내림차순, 결측값 마지막, 100장.
     rows = sorted(
         (c for c in cards if c["matches"] >= 500),
-        key=lambda c: (c.get("gsax_per_shot") is None, -(c.get("gsax_per_shot") or 0)),
+        key=lambda c: (c.get("save_pct") is None, -(c.get("save_pct") or 0)),
     )[:100]
     html = []
     for rank, card in enumerate(rows, 1):
@@ -148,8 +148,8 @@ def _initial_rows(cards: list[dict[str, Any]]) -> str:
             ("num mobile-optional", card["grade"]),
             ("num mobile-optional", info.get("salary")),
             ("num mobile-optional", info.get("ovr")),
-            ("pct", "" if gsax is None else f"{gsax * 100:+.1f}"),
-            ("num mobile-optional", "N/A" if save_pct is None else f"{save_pct * 100:.1f}%"),
+            ("pct", "N/A" if save_pct is None else f"{save_pct * 100:.1f}%"),
+            ("num", "" if gsax is None else f"{gsax * 100:+.1f}"),
             ("num", card["matches"]),
             ("num delta mobile-optional", ""),
         ]
@@ -514,13 +514,18 @@ _TEMPLATE = r"""<!doctype html>
     #lb{table-layout:fixed}
     #lb .mobile-optional{display:none}
     #lb>thead>tr>th,#lb>tbody>tr.row>td{box-sizing:border-box;padding-left:4px;padding-right:4px}
-    #lb th:nth-child(1),#lb td.rank{width:36px;padding-left:2px;padding-right:2px}
+    #lb th:nth-child(1),#lb td.rank{width:32px;padding-left:2px;padding-right:2px}
     #lb th:nth-child(2){width:auto}
-    #lb th.mobile-metric{width:76px}
+    #lb th.mobile-metric{width:72px}
+    #lb th.mobile-secondary{width:72px}
     #lb th.mobile-matches{width:60px}
-    #lb thead th{height:44px}
-    #lb .pcell{gap:4px}
-    #lb .pn-row{gap:3px}
+    #lb thead th{height:44px;white-space:normal}
+    #lb .thumb,#lb .lb-trait-w{display:none}
+    #lb .pcell{display:grid;grid-template-columns:1fr auto;gap:3px 4px}
+    #lb .ptext,#lb .pn-row{display:contents}
+    #lb .pn{grid-column:1/-1;white-space:normal;overflow-wrap:anywhere}
+    #lb .season-ico{grid-row:2}
+    #lb .grade-badge{grid-row:2;justify-self:end}
     .hero{flex-direction:column;align-items:flex-start;gap:12px}
     .thumb{width:28px;height:28px}
     .pcell{gap:7px}
@@ -559,8 +564,8 @@ _TEMPLATE = r"""<!doctype html>
     <div class="controls">
     <label class="lab" for="metricSel">지표</label>
     <select id="metricSel">
-      <option value="gsax">GSAx/100</option>
       <option value="save_pct">선방률</option>
+      <option value="gsax">GSAx/100</option>
       <optgroup label="거리별 선방률">
         <option value="near">근거리 (박스 안)</option><option value="mid">중거리 (박스 밖)</option>
       </optgroup>
@@ -585,7 +590,7 @@ _TEMPLATE = r"""<!doctype html>
   <p class="muted leaderboard-tip"><b>컬럼 제목</b>을 클릭하면 그 항목으로 정렬됩니다(다시 누르면 오름/내림 전환). 행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
   <div class="tw">
     <table id="lb">
-      <thead><tr><th>#</th><th>선수</th><th class="sortable mobile-optional" tabindex="0" data-col="grade">강화 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="salary">급여 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable mobile-metric" tabindex="0" data-col="save_pct" id="metricHdr">GSAx/100 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="secondary" id="secondaryHdr">선방률 <span class="arr"></span></th><th class="sortable mobile-matches" tabindex="0" data-col="matches">경기수 <span class="arr"></span></th><th class="mobile-optional" id="deltaHdr" title="약 1주 전 같은 창과 비교한 '선방률 순위' 변동. 지금 걸어둔 검색·필터 안에서 계산합니다. 각 뱃지에 마우스를 올리면 실제 비교 시점이 나옵니다. 다른 지표·정렬로 보는 중이면 뜻이 달라져 흐리게 표시됩니다.">변동</th></tr></thead>
+      <thead><tr><th>#</th><th>선수</th><th class="sortable mobile-optional" tabindex="0" data-col="grade">강화 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="salary">급여 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable mobile-metric" tabindex="0" data-col="save_pct" id="metricHdr">선방률 <span class="arr"></span></th><th class="sortable mobile-secondary" tabindex="0" data-col="secondary" id="secondaryHdr">GSAx/100 <span class="arr"></span></th><th class="sortable mobile-matches" tabindex="0" data-col="matches">경기수 <span class="arr"></span></th><th class="mobile-optional" id="deltaHdr" title="약 1주 전 같은 창과 비교한 '선방률 순위' 변동. 지금 걸어둔 검색·필터 안에서 계산합니다. 각 뱃지에 마우스를 올리면 실제 비교 시점이 나옵니다. 다른 지표·정렬로 보는 중이면 뜻이 달라져 흐리게 표시됩니다.">변동</th></tr></thead>
       <tbody>__INITIAL_ROWS__</tbody>
     </table>
   </div>
@@ -693,8 +698,8 @@ const D = JSON.parse(document.getElementById('gk-data').textContent);
 const PAGE=100;
 let sortCol='save_pct', sortDir='desc';
 let q='', limit=PAGE, minGate=500, gradeFilter='', natClubQ='', salMin=null, salMax=null;
-// "지표" 드롭다운 — 주 지표 컬럼이 보여주고 정렬하는 값을 바꾼다. 기본 GSAx/100.
-let metric='gsax', valueBasis='gsax';   // valueBasis: 가성비 기준(gsax|save_pct)
+// "지표" 드롭다운 — 주 지표 컬럼이 보여주고 정렬하는 값을 바꾼다. 기본 선방률.
+let metric='save_pct', valueBasis='gsax';   // valueBasis: 가성비 기준(gsax|save_pct)
 const SIT_GATE=30;   // 상황별 정렬 표본 게이트(그 상황 슛 수)
 const METRICS={
   gsax:{label:'GSAx/100',kind:'gsax'},
@@ -987,7 +992,7 @@ function toggle(tr,c){
   if(nx&&nx.classList.contains('detail')){nx.remove();btn.setAttribute('aria-expanded','false');return;}
   btn.setAttribute('aria-expanded','true');
   const d=document.createElement('tr'); d.className='detail'; tr.after(d);
-  const detailColspan=window.innerWidth<=640?4:9;
+  const detailColspan=window.innerWidth<=640?5:9;
   if(c.zones){ d.innerHTML=`<td colspan="${detailColspan}">${detailHtml(c)}</td>`; return; }  // 이미 병합됨
   d.innerHTML=`<td colspan="${detailColspan}" class="detail-loading">상세 불러오는 중…</td>`;
   loadDetails().then(det=>{
@@ -1044,7 +1049,7 @@ function render(){
       `<td class="num mobile-optional">${gradeBadge(c.grade)}</td>`+
       `<td class="num mobile-optional">${(c.info&&c.info.salary!=null)?c.info.salary:''}</td>`+
       `<td class="num mobile-optional">${(c.info&&c.info.ovr!=null)?c.info.ovr:''}</td>`+
-      `<td class="pct">${metricCell(c)}</td><td class="num mobile-optional">${metric==='gsax'?pct(c.save_pct):gps(c.gsax_per_shot)}</td>`+
+      `<td class="pct">${metricCell(c)}</td><td class="num">${metric==='gsax'?pct(c.save_pct):gps(c.gsax_per_shot)}</td>`+
       `<td class="num">${c.matches}</td>`+
       `<td class="num delta mobile-optional">${deltaCell(c,dmap)}</td>`;
     tr.onclick=e=>{if(!e.target.closest('button'))toggle(tr,c);};
@@ -1184,11 +1189,11 @@ gateInput.addEventListener('keydown',e=>{
 document.getElementById('resetFilters').onclick=()=>{
   q=''; natClubQ=''; salMin=null; salMax=null; gradeFilter='';
   minGate=500; sortCol='save_pct'; sortDir='desc';
-  metric='gsax'; valueBasis='gsax'; limit=PAGE;
+  metric='save_pct'; valueBasis='gsax'; limit=PAGE;
   document.getElementById('search').value='';
   document.getElementById('natClubSearch').value='';
   document.getElementById('salMin').value=''; document.getElementById('salMax').value='';
-  gSel.value=''; document.getElementById('metricSel').value='gsax';
+  gSel.value=''; document.getElementById('metricSel').value='save_pct';
   gateInput.value=500;
   syncValueBasisBtn();
   render();

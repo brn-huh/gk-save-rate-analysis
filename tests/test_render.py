@@ -85,19 +85,19 @@ def test_empty_leaderboard_ok():
     assert html.startswith("<!doctype html>")
 
 
-def test_initial_table_matches_default_gate_and_gsax_order():
+def test_initial_table_matches_default_gate_and_save_pct_order():
     card = _PAYLOAD["leaderboard"][0]
     payload = {**_PAYLOAD, "leaderboard": [
-        {**card, "player_name": "미달", "matches": 499, "gsax_per_shot": 1},
-        {**card, "player_name": "결측", "matches": 500, "gsax_per_shot": None},
-        {**card, "player_name": "음수", "matches": 500, "gsax_per_shot": -0.01},
-        {**card, "player_name": "공동1", "matches": 500, "gsax_per_shot": 0.05},
-        {**card, "player_name": "공동2", "matches": 500, "gsax_per_shot": 0.05},
+        {**card, "player_name": "미달", "matches": 499, "save_pct": 1},
+        {**card, "player_name": "결측", "matches": 500, "save_pct": None},
+        {**card, "player_name": "하위", "matches": 500, "save_pct": 0.5, "gsax_per_shot": -0.01},
+        {**card, "player_name": "공동1", "matches": 500, "save_pct": 0.75},
+        {**card, "player_name": "공동2", "matches": 500, "save_pct": 0.75},
     ]}
     html = render.build_html(payload)
     table = re.search(r"<tbody>(.*?)</tbody>", html, re.S)[1]
     assert "미달" not in table
-    assert table.index("공동1") < table.index("공동2") < table.index("음수") < table.index("결측")
+    assert table.index("공동1") < table.index("공동2") < table.index("하위") < table.index("결측")
     assert "+5.0" in table and "-1.0" in table and "75.0%" in table
     assert table.count("<tr>") == 4
     assert table.count("<td ") == 4 * 9
@@ -410,14 +410,14 @@ def test_metric_dropdown_and_value_toggle_present():
 
 
 @requires_node
-def test_default_and_reset_sort_by_gsax():
+def test_default_and_reset_sort_by_save_pct():
     html = render.build_html(_PAYLOAD)
-    assert re.search(r'<select id="metricSel">\s*<option value="gsax">GSAx/100</option>', html)
+    assert re.search(r'<select id="metricSel">\s*<option value="save_pct">선방률</option>', html)
     initial = html.split("const PAGE=", 1)[1].split("// ── 순위 추이", 1)[0]
     helpers = html.split("function metricVal(c){", 1)[1].split("const esc=", 1)[0]
     sorting = html.split("  let rows=pool.filter", 1)[1].split("  const mobileMetricLabels=", 1)[0]
     reset = html.split("document.getElementById('resetFilters').onclick=()=>{", 1)[1].split("\n};", 1)[0]
-    js = "const PAGE=" + initial + "function metricVal(c){" + helpers + """
+    js = render.STATS_JS + "const PAGE=" + initial + "function metricVal(c){" + helpers + """
 const pool=[
   {name:'선방률 1위',save_pct:0.8,gsax_per_shot:-0.01},
   {name:'보정 1위',save_pct:0.5,gsax_per_shot:0.06},
@@ -433,17 +433,18 @@ const document={getElementById:id=>fields[id]||(fields[id]={})};
 const gSel={}, gateInput={};
 function syncValueBasisBtn(){}
 function render(){}
-metric='save_pct'; sortCol='matches'; sortDir='asc';
+metric='gsax'; sortCol='matches'; sortDir='asc';
 """ + reset
     result = json.loads(_eval_js(
         "JSON.stringify({first, reset:snapshot(), selected:fields.metricSel.value})", js,
     ))
     expected = {
-        "metric": "gsax", "sortDir": "desc",
-        "order": ["보정 1위", "선방률 1위", "보정 없음"],
-        "value": "+6.0", "secondary": 0.5, "missing": "N/A",
+        "metric": "save_pct", "sortDir": "desc",
+        "order": ["보정 없음", "선방률 1위", "보정 1위"],
+        "value": '90.0%<span class="ci"></span>', "secondary": None,
+        "missing": '90.0%<span class="ci"></span>',
     }
-    assert result == {"first": expected, "reset": expected, "selected": "gsax"}
+    assert result == {"first": expected, "reset": expected, "selected": "save_pct"}
 
 
 @requires_node
@@ -819,7 +820,12 @@ def test_mobile_leaderboard_keeps_only_core_columns():
     html = render.build_html(_PAYLOAD)
     assert "#lb .mobile-optional{display:none}" in html
     assert 'class="sortable mobile-metric"' in html
+    assert 'class="sortable mobile-secondary"' in html
     assert 'class="sortable mobile-matches"' in html
+    headers = html.split('<table id="lb">', 1)[1].split('</thead>', 1)[0]
+    assert headers.index('>선방률 ') < headers.index('>GSAx/100 ') < headers.index('>경기수 ')
+    row = html.split('tr.innerHTML=', 1)[1].split('tr.onclick=', 1)[0]
+    assert '<td class="num">${metric===\'gsax\'?pct(c.save_pct):gps(c.gsax_per_shot)}</td>' in row
     assert "window.innerWidth<640?mobileMetricLabels[metric]" in html
 
 
@@ -833,6 +839,16 @@ def test_mobile_header_meta_and_collapsible_controls():
     assert '<div class="reading-note" id="warn"></div>' in html
     assert 'id="advancedFilters"' in html
     assert "window.matchMedia('(min-width:641px)').matches" in html
+
+
+def test_mobile_names_have_their_own_line_and_metric_headers_can_wrap():
+    html = render.build_html(_PAYLOAD)
+    assert '#lb .thumb,#lb .lb-trait-w{display:none}' in html
+    assert '#lb .ptext,#lb .pn-row{display:contents}' in html
+    assert '#lb .pn{grid-column:1/-1;white-space:normal;overflow-wrap:anywhere}' in html
+    assert '#lb .season-ico{grid-row:2}' in html
+    assert '#lb .grade-badge{grid-row:2;justify-self:end}' in html
+    assert '#lb thead th{height:44px;white-space:normal}' in html
 
 
 def test_mobile_filter_priority_and_champion_card_meta():
@@ -859,7 +875,7 @@ def test_mobile_touch_targets_and_row_keyboard_support():
 
 def test_mobile_detail_row_spans_only_visible_columns():
     html = render.build_html(_PAYLOAD)
-    assert "const detailColspan=window.innerWidth<=640?4:9;" in html
+    assert "const detailColspan=window.innerWidth<=640?5:9;" in html
     assert 'colspan="${detailColspan}"' in html
 
 
