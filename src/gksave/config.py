@@ -44,9 +44,9 @@ API_KEY_ENV = "NEXON_API_KEY"
 # (robots.txt 의 Sitemap: 줄은 out/robots.txt 가 손으로 유지하므로 같이 고칠 것).
 SITE_URL = "https://gk-save.com/"
 
-# ── fc-info 조회 기록(negative cache) ────────────────────────────
+# ── 선수 정보 조회 기록(negative cache) ──────────────────────────
 # "받아봤지만 저장할 게 없더라"(미등재 카드·특성 0개)를 기억해 재조회를 막는다.
-# 다만 fc-info 는 신규 카드를 늦게 올리므로 영구 차단은 위험 — 이 기간이 지나면 다시 본다.
+# 출처에 아직 없는 카드는 영구 차단하지 않고 이 기간이 지나면 다시 확인한다.
 FC_RECHECK_DAYS = 30
 
 # ── 분석 스코프 (설계 결정) ──────────────────────────────────────
@@ -55,6 +55,7 @@ GK_POSITION = 0                  # spposition에서 GK=0
 SPGRADE_MIN = 8                  # 측정 강화단계 하한
 SPGRADE_MAX = 13                 # 측정 강화단계 상한
 MIN_MATCHES_GATE = 50            # 카드(시즌×선수) 리더보드 최소 표본 경기수
+MAX_USER_MATCH_PERCENT = 35      # 한 유저의 경기 비중이 이 값 이상이면 순위 제외
 
 # 수집 롤링 창(일). 오늘-N일 이전 매치는 수집에서 제외한다.
 # 통계 창(60일)보다 5일 넉넉히 잡아, reached_old 조기중단으로 요청을 아끼면서도
@@ -64,7 +65,7 @@ MIN_MATCHES_GATE = 50            # 카드(시즌×선수) 리더보드 최소 �
 # 아니라 user_pages=3(유저당 최근 300경기)이 정하고, 수집된 데이터는 6/1 부터다.
 COLLECT_WINDOW_DAYS = 65
 
-# 신규특성(금색 배경 아이콘) 트레잇 코드 집합. fc-info 트레잇 아이콘(traits/trait_icon_{code}.png)
+# 신규특성(금색 배경 아이콘) 트레잇 코드 집합. 넥슨 CDN 트레잇 아이콘(traits/trait_icon_{code}.png)
 # 전체를 배경색(금/회)으로 1회 분류해 확정 — 금색=코드 50~68 구간. 새 게임 특성이 추가돼
 # 금색 코드가 늘면 여기를 갱신한다. player_trait.is_new = trait_code in NEW_TRAIT_CODES.
 NEW_TRAIT_CODES = frozenset({50, 51, 52, 53, 54, 55, 56, 57, 59, 60, 62, 63, 64, 65, 66, 67, 68})

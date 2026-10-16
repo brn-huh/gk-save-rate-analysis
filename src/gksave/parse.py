@@ -51,6 +51,7 @@ class Appearance:
     pass_success: int | None = None
     aerial_try: int | None = None
     aerial_success: int | None = None
+    back_four: tuple[int, ...] | None = None  # CB 두 장(정렬), LB, RB의 (spId, 강화)
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,25 @@ def extract_gk(match_info: dict[str, Any]) -> dict[str, Any] | None:
     return gks[0]
 
 
+def extract_back_four(match_info: dict[str, Any]) -> tuple[int, ...] | None:
+    """명단상 CB 2명 + LB/RB 각 1명. 교체 시점·실제 동시 출전은 알 수 없다."""
+    defenders = [p for p in match_info.get("player", [])
+                 if p.get("spPosition") in range(1, 9)]
+    cbs = [p for p in defenders if p.get("spPosition") in (4, 5, 6)]
+    lbs = [p for p in defenders if p.get("spPosition") == 7]
+    rbs = [p for p in defenders if p.get("spPosition") == 3]
+    if len(defenders) != 4 or len(cbs) != 2 or len(lbs) != 1 or len(rbs) != 1:
+        return None
+    for p in defenders:
+        if (type(p.get("spId")) is not int or p["spId"] <= 0
+                or type(p.get("spGrade")) is not int or not 1 <= p["spGrade"] <= 13):
+            return None
+    if len({p["spId"] for p in defenders}) != 4:
+        return None
+    cbs.sort(key=lambda p: (p["spId"], p["spGrade"]))
+    return tuple(v for p in cbs + lbs + rbs for v in (p["spId"], p["spGrade"]))
+
+
 def parse_match(
     detail: dict[str, Any], stats: ParseStats | None = None
 ) -> tuple[list[Appearance], list[ShotRow]]:
@@ -122,6 +142,7 @@ def parse_match(
             sp_rating=stt.get("spRating"),
             pass_try=stt.get("passTry"), pass_success=stt.get("passSuccess"),
             aerial_try=stt.get("aerialTry"), aerial_success=stt.get("aerialSuccess"),
+            back_four=extract_back_four(me),
         ))
         st.appearances += 1
 

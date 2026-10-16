@@ -1,66 +1,58 @@
-"""선수 부가정보(급여·기본OVR·키·몸무게·체형) 수집.
+"""공식 데이터센터와 fc-info의 선수 부가정보 수집.
 
-출처는 fc-info.com 의 GK 검색 API. 이 값들은 넥슨 FC 온라인 게임 데이터이고
-fc-info 는 집계 사이트다. **우리가 이미 가진 GK spid 만, 카드당 한 번만** 받고
-캐시(player_info)에 없는 것만 채운다 — 반복 수집하지 않는다.
-
-per-spid 조회 엔드포인트가 없어(전부 404) GK 목록을 position=20 으로 커서 페이지네이션
-하며 한 번 훑고, 우리 spid 에 해당하는 것만 upsert 한다. 페이지 사이 지연으로 예의를 지킨다.
+GK와 선택 시 센터백 카드 ID만 조회하며 기존 캐시는 보존한다.
+playerinfo는 fc-info만 사용하며 요청 간격은 기본 3초(최소 1초)다.
+특성·국가·클럽은 공식 데이터센터에서 조회한다.
 """
 
 from __future__ import annotations
 
 import re
+import math
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from html import unescape
 from typing import Any, Callable
 
 import duckdb
 import httpx
 
 from .config import FC_RECHECK_DAYS, NEW_TRAIT_CODES
+from .progress import log as _log
 
+DATACENTER_BASE = "https://fconline.nexon.com"
 FCINFO_BASE = "https://fc-info.com"
-_SEARCH_PATH = "/local-api/v2/players/search"
-_GK_POSITION = 20
-
-# 국가·클럽은 검색 API 에 없고 상세페이지 HTML 에만 있다. per-spid 상세페이지를 받아 파싱한다.
-# 정규식은 fc-info 의 Next.js 마크업에 의존 → 클래스 해시가 아니라 안정적 모듈명 접두사로만 매칭.
-# nation_code 는 넥슨 CDN 국기 URL 기반이라 가장 견고(1차 키), 국가명·클럽은 부가.
-_NAT_CODE = re.compile(r"countries/smallflags/(\d+)\.png")
-_NAT_NAME = re.compile(r'alt="nationality"/><span>([^<]+)</span>')
-# 클럽 경력 전체는 __next_f 스트리밍 JSON 에 있다(백슬래시 이스케이프). SSR div
-# (PlayerClubHistory_year)엔 '더보기' 이전 최근 3개만 렌더되므로 JSON 을 파싱해 전부 가져온다.
-# 항목: {"id":N,"club":{"id":M,"name":"클럽","img":..,"league":{..}},"startYear":YYYY,..}
-_CLUB = re.compile(
-    r'\\"id\\":\d+,\\"club\\":\{\\"id\\":\d+,\\"name\\":\\"([^"\\]+)\\".*?\\"startYear\\":(\d+)'
-)
-# 특성(트레잇): 상세페이지에만 있고 카드(spid)별로 다르다. 아이콘 URL 의 코드 + alt 의 이름.
+_ABILITY_PATH = "/datacenter/PlayerAbility"
+_INFO_PATH = "/DataCenter/PlayerInfo"
 _TRAIT = re.compile(r'traits/trait_icon_(\d+)\.png" alt="([^"]+)"')
 
 
+def _element_html(html: str, classes: str) -> str | None:
+    checks = "".join(r"(?=[^\"']*(?<![\w-])" + re.escape(c) + r"(?![\w-]))" for c in classes.split())
+    pattern = r"<(?P<tag>div|span)\b[^>]*\bclass=[\"']" + checks + r"[^\"']*[\"'][^>]*>(.*?)</(?P=tag)>"
+    match = re.search(pattern, html, re.S)
+    return match.group(2) if match else None
+
+
+def _text(html: str | None) -> str | None:
+    return " ".join(unescape(re.sub(r"<[^>]*>", " ", html)).split()) if html is not None else None
+
+
 def parse_traits(html: str) -> list[tuple[int, str]]:
-    """상세페이지 HTML → [(trait_code, trait_name), ...] 표기순."""
-    return [(int(code), name) for code, name in _TRAIT.findall(html)]
+    """공식 데이터센터 특성 아이콘에서 코드와 이름을 읽는다."""
+    return list(dict.fromkeys((int(code), unescape(name)) for code, name in _TRAIT.findall(html)))
 
 
 def parse_bio(html: str) -> tuple[int | None, str | None, list[str]]:
-    """상세페이지 HTML → (국가코드, 국가명, 클럽명들). 클럽은 최신순(startYear 내림), 중복 제거.
-
-    클럽은 __next_f JSON 에서 전부 파싱하므로 '더보기'로 감춰진 과거 클럽까지 누락 없이 담긴다.
-    """
-    m_code = _NAT_CODE.search(html)
-    m_name = _NAT_NAME.search(html)
-    code = int(m_code.group(1)) if m_code else None
-    name = m_name.group(1) if m_name else None
-    items = _CLUB.findall(html)                          # [(클럽명, startYear), ...]
-    items.sort(key=lambda t: int(t[1]), reverse=True)   # 최신 소속부터
-    clubs: list[str] = []
-    for club, _year in items:
-        if club not in clubs:      # 임대 복귀 등으로 같은 클럽이 두 번 → 최신 등장만
-            clubs.append(club)
-    return code, name, clubs
+    """공식 능력치의 국적과 상세페이지의 클럽 경력(최신순)을 읽는다."""
+    nation = _element_html(html, "etc nation") or ""
+    code = re.search(r"countries/smallflags/(\d+)\.png", nation)
+    name = _text(_element_html(nation, "txt"))
+    clubs = [_text(c) for c in re.findall(r'<div\b[^>]*class="td club"[^>]*>(.*?)</div>', html, re.S)]
+    return int(code[1]) if code else None, name, list(dict.fromkeys(c for c in clubs if c))
 
 
 @dataclass(frozen=True)
@@ -74,22 +66,35 @@ class PlayerInfo:
     body_type: str | None = None
 
 
-def parse_player(item: dict[str, Any]) -> PlayerInfo | None:
-    """fc-info 검색 응답의 선수 1건 → PlayerInfo. id 없으면 None."""
-    spid = item.get("id")
-    if spid is None:
+def parse_player(html: str, spid: int) -> PlayerInfo | None:
+    """1강·적응도 0 응답의 카드 ID와 기본 필드를 확인한다."""
+    try:
+        return _parse_player(html, spid)
+    except ValueError:
         return None
-    positions = item.get("positions") or []
-    ovr = positions[0].get("ovr") if positions else None
-    return PlayerInfo(
-        spid=int(spid),
-        name=item.get("name"),
-        salary=item.get("salary"),
-        ovr=ovr,
-        height=item.get("height"),
-        weight=item.get("weight"),
-        body_type=item.get("bodyType"),
-    )
+
+
+def _parse_player(html: str, spid: int) -> PlayerInfo:
+    identity = re.search(r"var\s+playerData\s*=\s*\{\s*spid:\s*(\d+),.*?strong:\s*(\d+)\s*\}", html, re.S)
+    if not identity:
+        raise ValueError("playerData.spid/strong 식별 정보 누락 또는 형식 변경")
+    if int(identity[1]) != spid:
+        raise ValueError(f"카드 ID 불일치: 요청 {spid}, 응답 {identity[1]}")
+    if int(identity[2]) != 1:
+        raise ValueError(f"강화 단계 불일치: 요청 1강, 응답 {identity[2]}강")
+    def number(classes: str) -> int | None:
+        text = _text(_element_html(html, classes))
+        match = re.fullmatch(r"(\d+)(?:cm|kg)?", text or "")
+        return int(match[1]) if match else None
+    name = _text(_element_html(html, "name"))
+    salary, ovr = number("pay_side"), number("ovr value")
+    invalid = [label for label, valid in (("선수명(name)", bool(name)),
+               ("급여(pay_side)", salary is not None), ("기본 OVR(ovr value)", ovr is not None)) if not valid]
+    if invalid:
+        raise ValueError("필수 항목 누락 또는 잘못된 값: " + ", ".join(invalid))
+    return PlayerInfo(spid=spid, name=name, salary=salary, ovr=ovr,
+                      height=number("etc height"), weight=number("etc weight"),
+                      body_type=_text(_element_html(html, "etc physical")))
 
 
 def _pid_of(spid: int) -> int:
@@ -102,10 +107,10 @@ def season_of(spid: int) -> int:
     return int(str(spid)[:3])
 
 
-def season_img_url(item: dict[str, Any]) -> str | None:
-    """fc-info classImg = 넥슨 CDN 의 시즌 엠블럼 URL. 그대로 쓴다(이미지는 넥슨에서 로드)."""
-    ci = item.get("classImg")
-    return ci or None
+def season_img_url(html: str) -> str | None:
+    season = _element_html(html, "season") or ""
+    match = re.search(r'<img\b[^>]*src="(https://ssl\.nexon\.com/[^"<>]+)"', season)
+    return unescape(match[1]) if match else None
 
 
 def attach_season_img(con: duckdb.DuckDBPyConnection, cards: list[dict[str, Any]]) -> None:
@@ -142,191 +147,271 @@ def attach_info(con: duckdb.DuckDBPyConnection, leaderboard: list[dict[str, Any]
         }
 
 
-def _fetched_recently(con: duckdb.DuckDBPyConnection, kind: str) -> set[int]:
+def _fetched_recently(con: duckdb.DuckDBPyConnection, kind: str, *, source: str = "nexon") -> set[int]:
     """FC_RECHECK_DAYS 안에 조회해 본 spid. 결과가 비어 있어도 다시 안 받게 하는 게 목적."""
     return {r[0] for r in con.execute(
         "SELECT spid FROM fc_fetch_log WHERE kind = ? "
-        "AND fetched_at > now() - INTERVAL (?) DAY", [kind, FC_RECHECK_DAYS]).fetchall()}
+        "AND fetched_at > now() - INTERVAL (?) DAY", [source + "-" + kind, FC_RECHECK_DAYS]).fetchall()}
 
 
-def _record_fetch(con: duckdb.DuckDBPyConnection, kind: str, spids: Iterable[int]) -> None:
+def _record_fetch(con: duckdb.DuckDBPyConnection, kind: str, spids: Iterable[int], *, source: str = "nexon") -> None:
     """조회 성공을 기록. 재조회 때 시각이 갱신되도록 upsert."""
     for spid in spids:
         con.execute(
             "INSERT INTO fc_fetch_log (kind, spid, fetched_at) VALUES (?, ?, now()) "
-            "ON CONFLICT (kind, spid) DO UPDATE SET fetched_at = now()", [kind, spid])
-
-
-def _search_names(
-    client: httpx.Client,
-    names: list[str],
-    *,
-    page_delay: float,
-    sleep: Callable[[float], None],
-) -> list[dict[str, Any]]:
-    """이름 배열(≤10)의 모든 GK 검색 페이지를 호출 간 지연을 두고 가져온다."""
-    items: list[dict[str, Any]] = []
-    cursor: str | None = None
-    while True:
-        if cursor is not None:
-            sleep(page_delay)
-        body: dict[str, Any] = {"positionIds": [_GK_POSITION], "names": names}
-        if cursor:
-            body["cursor"] = cursor
-        resp = client.post(_SEARCH_PATH, json=body)
-        resp.raise_for_status()
-        data = resp.json()
-        items.extend(data.get("items", []))
-        next_cursor = data.get("nextCursor")
-        if not data.get("hasNext") or not next_cursor or next_cursor == cursor:
-            return items
-        cursor = next_cursor
-
-
-def _record_season_img(con: duckdb.DuckDBPyConnection, item: dict[str, Any]) -> None:
-    """카드 하나에서 season_id→엠블럼 URL 을 season_img 에 남긴다(이미 있으면 무시)."""
-    spid, url = item.get("id"), season_img_url(item)
-    if spid is None or not url:
-        return
-    con.execute(
-        "INSERT INTO season_img (season_id, img) VALUES (?, ?) ON CONFLICT DO NOTHING",
-        [season_of(spid), url],
-    )
+            "ON CONFLICT (kind, spid) DO UPDATE SET fetched_at = now()", [source + "-" + kind, spid])
 
 
 def _new_client() -> httpx.Client:
-    return httpx.Client(
-        base_url=FCINFO_BASE, timeout=20,
-        headers={"User-Agent": "gk-save-rate-analysis", "Content-Type": "application/json",
-                 "Referer": f"{FCINFO_BASE}/player/search/result?positionIds={_GK_POSITION}",
-                 "Origin": FCINFO_BASE},
-    )
+    return httpx.Client(base_url=DATACENTER_BASE, timeout=30, follow_redirects=True,
+                        headers={"User-Agent": "gk-save-rate-analysis", "Referer": DATACENTER_BASE + "/datacenter"})
+
+
+def fcinfo_client() -> httpx.Client:
+    return httpx.Client(base_url=FCINFO_BASE, timeout=30, follow_redirects=True,
+                        headers={"User-Agent": "gk-save-rate-analysis", "Referer": FCINFO_BASE + "/player/search/result"})
+
+
+def _safe_error_text(message: str) -> str:
+    def strip_url(match):
+        try:
+            return str(httpx.URL(match[0]).copy_with(username="", password="", query=None, fragment=""))
+        except (httpx.InvalidURL, ValueError):
+            return "<URL 생략>"
+    message = re.sub(r'https?://[^\s<>"\']+', strip_url, message)
+    message = re.sub(r'''(?i)\b(ouid|api[_-]?key|token|authorization|cookie|password|secret)\b["']?\s*[:=]\s*["']?(?:Bearer\s+|Basic\s+)?[^\s,;"']+''', r'\1=<REDACTED>', message)
+    return " ".join(re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", message).split())[:300]
+
+
+class ResponseValidationError(ValueError):
+    def __init__(self, message: str, response: httpx.Response):
+        super().__init__(message)
+        self.response = response
+        self.request = response.request
+
+
+def describe_error(error: BaseException) -> str:
+    """요청 헤더·쿼리·응답 본문을 노출하지 않고 실제 상태와 예외 원인을 표시한다."""
+    parts = []
+    try:
+        request = error.request if isinstance(error, (httpx.HTTPError, ResponseValidationError)) else None
+    except RuntimeError:
+        request = None
+    if isinstance(error, (httpx.HTTPStatusError, ResponseValidationError)):
+        response = error.response
+        parts.append(f"HTTP {response.status_code} {_safe_error_text(response.reason_phrase)}")
+    elif isinstance(error, httpx.TransportError):
+        status = request.extensions.get("datacenter_http_status") if request else None
+        parts.append(f"HTTP {status} (헤더 수신 후 통신 오류)" if status is not None else "HTTP 상태: 미확인 (상태 코드를 받지 못함)")
+    if request is not None:
+        parts.append(f"요청: {request.method} {request.url.path}")
+    if isinstance(error, ResponseValidationError):
+        response = error.response
+        parts.append(f"Content-Type: {_safe_error_text(response.headers.get('Content-Type', '미지정'))}")
+        parts.append(f"응답 크기: {len(response.content):,} bytes")
+        title = re.search(r"<title\b[^>]*>(.*?)</title>", response.text, re.I | re.S)
+        parts.append(f"응답 제목: {_safe_error_text(_text(title[1]) or '') if title else '없음'}")
+    cause = error
+    seen = set()
+    while cause is not None and id(cause) not in seen and len(seen) < 4:
+        seen.add(id(cause))
+        message = _safe_error_text(str(cause))
+        parts.append(f"{type(cause).__name__}: {message or '원본 메시지 없음'}")
+        cause = cause.__cause__ or cause.__context__
+    return " · ".join(parts)
+
+
+def _request(client: httpx.Client, method: str, path: str, *, delay: float,
+             sleep: Callable[[float], None], log: Callable[[str], None], **kwargs) -> httpx.Response:
+    source = "fc-info" if client.base_url.host == "fc-info.com" else "공식 데이터센터"
+    for attempt in range(4):
+        sleep(max(1.0, delay))
+        response = None
+        try:
+            with client.stream(method, path, **kwargs) as response:
+                if response.status_code != 429 or attempt == 3:
+                    response.raise_for_status()
+                    response.read()
+                    return response
+        except httpx.TransportError as error:
+            if response is not None:
+                error.request.extensions["datacenter_http_status"] = response.status_code
+            if attempt == 3:
+                raise
+            cooldown = 5.0 * 2 ** attempt
+            log(f"{source} 통신 오류 — {describe_error(error)} — {cooldown:.0f}초 대기 후 재시도 ({attempt + 1}/3)")
+            sleep(cooldown)
+            continue
+        cooldown = 60.0 * 2 ** attempt
+        retry_after = response.headers.get("Retry-After")
+        if retry_after:
+            try:
+                seconds = float(retry_after)
+                if math.isfinite(seconds):
+                    cooldown = max(cooldown, seconds)
+            except ValueError:
+                try:
+                    retry_at = parsedate_to_datetime(retry_after)
+                    cooldown = max(cooldown, (retry_at - datetime.now(timezone.utc)).total_seconds())
+                except (TypeError, ValueError, OverflowError):
+                    pass
+        log(f"{source} 요청 제한 — HTTP {response.status_code} {_safe_error_text(response.reason_phrase)} · 요청: {method} {path} — {cooldown:.0f}초 대기 후 재시도 ({attempt + 1}/3)")
+        sleep(cooldown)
+    raise AssertionError("unreachable")
+
+
+def _ability(client, spid, *, delay, sleep, log) -> str:
+    response = _request(client, "POST", _ABILITY_PATH, delay=delay, sleep=sleep, log=log,
+                    data={"spid": spid, "n1Strong": 1, "n1Grow": 0,
+                          "n4TeamColorId": 0, "n4TeamColorLv": 0,
+                          "n4TeamColorId_Enhance": 0, "n4TeamColorLv_Enhance": 0,
+                          "n4TeamColorId_Feature": 0, "n1Change": 0})
+    try:
+        _parse_player(response.text, spid)
+    except ValueError as error:
+        raise ResponseValidationError(f"공식 데이터센터 선수 정보 검증 실패 (요청 카드 {spid})", response) from error
+    return response.text
+
+
+def _detail(client, spid, *, delay, sleep, log) -> str:
+    ability = _ability(client, spid, delay=delay, sleep=sleep, log=log)
+    page = _request(client, "GET", _INFO_PATH, delay=delay, sleep=sleep, log=log,
+                    params={"spid": spid, "n1Strong": 1})
+    if "data_detail_club" not in page.text:
+        raise ResponseValidationError("공식 데이터센터 클럽 경력 영역(data_detail_club) 누락", page)
+    return ability + page.text
+
+
+def _our_cards(con: duckdb.DuckDBPyConnection, include_defenders: bool = False) -> set[int]:
+    ours = {r[0] for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()}
+    if include_defenders:
+        ours.update(r[0] for r in con.execute(
+            "SELECT cb1_sp_id FROM defense_match UNION SELECT cb2_sp_id FROM defense_match"
+        ).fetchall() if r[0] is not None)
+    return ours
+
+
+def _fcinfo_cards(client, name, *, delay, sleep, log) -> dict[int, tuple[PlayerInfo, str | None]]:
+    """이름 검색 전체 페이지를 재사용하되 카드 ID·1강·기본 능력치를 검증한다."""
+    import json
+
+    cards, cursors = {}, set()
+    cursor = None
+    while True:
+        body = {"names": [name]}
+        if cursor:
+            body["cursor"] = cursor
+        response = _request(client, "POST", "/local-api/v2/players/search",
+                        delay=delay, sleep=sleep, log=log, json=body)
+        try:
+            data = json.loads(response.text)
+        except ValueError:
+            raise ResponseValidationError("fc-info 검색 응답이 JSON이 아닙니다", response) from None
+        if not isinstance(data, dict) or not isinstance(data.get("items"), list):
+            raise ResponseValidationError("fc-info 검색 응답의 items 배열 누락 또는 형식 변경", response)
+        for item in data["items"]:
+            if not isinstance(item, dict) or item.get("grade") != 1:
+                continue
+            positions = item.get("positions")
+            if not isinstance(positions, list):
+                continue
+            ovr = positions[0].get("ovr") if positions and isinstance(positions[0], dict) else None
+            if not all(type(v) is int and v > 0 for v in (item.get("id"), item.get("salary"), ovr)) or not isinstance(item.get("name"), str):
+                continue
+            p = PlayerInfo(item["id"], item["name"], item["salary"], ovr,
+                           item.get("height") if type(item.get("height")) is int else None,
+                           item.get("weight") if type(item.get("weight")) is int else None,
+                           item.get("bodyType") if isinstance(item.get("bodyType"), str) else None)
+            url = item.get("classImg")
+            cards[p.spid] = (p, url if isinstance(url, str) and url.startswith("https://ssl.nexon.com/") else None)
+        if not data.get("hasNext"):
+            return cards
+        cursor = data.get("nextCursor")
+        if not isinstance(cursor, str) or not cursor or cursor in cursors:
+            raise ResponseValidationError("fc-info 검색 페이지 커서가 누락되거나 반복됩니다", response)
+        cursors.add(cursor)
 
 
 def sync_season_img(
-    con: duckdb.DuckDBPyConnection,
-    *,
-    client: httpx.Client | None = None,
-    page_delay: float = 1.0,
-    max_pages: int = 60,
-    sleep: Callable[[float], None] = time.sleep,
-    log: Callable[[str], None] = print,
+    con: duckdb.DuckDBPyConnection, *, client: httpx.Client | None = None, page_delay: float = 3.0,
+    include_defenders: bool = False, sleep: Callable[[float], None] = time.sleep,
+    log: Callable[[str], None] = _log,
 ) -> dict[str, int]:
-    """우리 리더보드 시즌 중 season_img 에 없는 것을 채운다.
-
-    per-season 조회가 없어 GK 목록을 커서로 훑되, 필요한 시즌이 다 채워지면 조기중단.
-    시즌은 목록 곳곳에 등장해 몇 페이지면 대부분 덮인다.
-    """
-    ours = {season_of(r[0]) for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()}
+    names = dict(con.execute("SELECT sp_id,name FROM meta_spid WHERE name IS NOT NULL").fetchall())
+    representatives = {}
+    for spid in sorted(_our_cards(con, include_defenders)):
+        if names.get(spid):
+            representatives.setdefault(season_of(spid), spid)
     have = {r[0] for r in con.execute("SELECT season_id FROM season_img").fetchall()}
-    # 카탈로그에 없는 시즌이 하나라도 남으면 매 실행마다 목록을 max_pages 까지 훑게 된다.
-    # 훑어본 시즌은 기록해 건너뛴다(spid 칸에 season_id 를 넣는다).
-    need = ours - have - _fetched_recently(con, "season")
+    need = set(representatives) - have - _fetched_recently(con, "season", source="fc-info")
     if not need:
-        log(f"season_img: 우리 시즌 {len(ours)} 전부 있음 — 호출 없음")
-        return {"seasons": len(ours), "need": 0, "new": 0}
-
+        log("season_img: 조회할 시즌 없음 — fc-info 호출 없음")
+        return {"seasons": len(representatives), "need": 0, "new": 0}
     owns = client is None
-    client = client or _new_client()
-    before = len(have)
-    searched = set(need)
-    cursor: str | None = None
+    client = client or fcinfo_client()
+    new, catalog = 0, {}
     try:
-        for page in range(max_pages):
-            if page > 0:
-                sleep(page_delay)
-            body: dict[str, Any] = {"positionIds": [_GK_POSITION]}
-            if cursor:
-                body["cursor"] = cursor
-            resp = client.post(_SEARCH_PATH, json=body)
-            resp.raise_for_status()
-            data = resp.json()
-            for item in data.get("items", []):
-                _record_season_img(con, item)
-                if item.get("id"):
-                    need.discard(season_of(item["id"]))
-            if not need:
-                break
-            cursor = data.get("nextCursor")
-            if not data.get("hasNext") or not cursor:
-                break
+        for sid in sorted(need):
+            spid = representatives[sid]
+            name = names[spid]
+            if name not in catalog:
+                catalog[name] = _fcinfo_cards(client, name, delay=page_delay, sleep=sleep, log=log)
+            result = catalog[name].get(spid)
+            if result and result[1]:
+                con.execute("INSERT INTO season_img (season_id,img) VALUES (?,?) ON CONFLICT DO NOTHING", [sid, result[1]])
+                new += 1
+            _record_fetch(con, "season", [sid], source="fc-info")
     finally:
         if owns:
             client.close()
-    _record_fetch(con, "season", searched)   # 훑기를 끝냈다 — 못 찾은 시즌도 기록
-    now = con.execute("SELECT count(*) FROM season_img").fetchone()[0]
-    log(f"season_img: 우리 시즌 {len(ours)} · 신규 {now - before} · 미확보 {len(need)}")
-    return {"seasons": len(ours), "need": len(need), "new": now - before}
+    log(f"season_img: 우리 시즌 {len(representatives)} · 신규 {new} · 미확보 {len(need) - new}")
+    return {"seasons": len(representatives), "need": len(need) - new, "new": new}
 
 
 def sync_player_info(
-    con: duckdb.DuckDBPyConnection,
-    *,
-    client: httpx.Client | None = None,
-    batch_delay: float = 1.0,
-    name_batch: int = 1,
-    retry_missing: bool = False,
-    sleep: Callable[[float], None] = time.sleep,
-    log: Callable[[str], None] = print,
+    con: duckdb.DuckDBPyConnection, *, client: httpx.Client | None = None, batch_delay: float = 3.0,
+    retry_missing: bool = False, include_defenders: bool = False,
+    sleep: Callable[[float], None] = time.sleep, log: Callable[[str], None] = _log,
 ) -> dict[str, int]:
-    """우리 gk_match 에 있는 spid 중 player_info 에 없는 것만 fc-info 에서 채운다.
-
-    per-spid 조회가 없어(404) 검색 API 의 names 필터(배열, ≤10)로 **우리 선수 이름만**
-    콕 집어 조회한다 — 전체 목록을 훑지 않는다. 이름당 여러 시즌 카드가 오므로 그 중
-    우리 need 에 든 spid 만 upsert. 배치 사이 지연으로 예의.
-
-    반환: {'ours','already','need','new'} 카운트.
-    """
-    ours = {r[0] for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()}
+    ours = _our_cards(con, include_defenders)
     have = {r[0] for r in con.execute("SELECT spid FROM player_info").fetchall()}
-    # fc-info 에 없는 카드는 저장할 행이 없어 have 에 안 들어간다 → 조회 기록으로도 걸러야
-    # 매 실행마다 같은 이름을 다시 물어보지 않는다.
-    recent = set() if retry_missing else _fetched_recently(con, "info")
-    need = ours - have - recent
+    recent = set() if retry_missing else _fetched_recently(con, "info", source="fc-info")
+    need = sorted(ours - have - recent)
     if not need:
-        log(f"player_info: 우리 GK {len(ours):,} 전부 캐시됨 — fc-info 호출 없음")
+        log(f"player_info: 우리 카드 {len(ours):,} 전부 캐시됨 — 외부 호출 없음")
         return {"ours": len(ours), "already": len(have & ours), "need": 0, "new": 0}
-
-    # need 에 든 spid 의 이름만 추려 fc-info 에 물어본다 (이름으로만 조회 가능).
-    name_by_spid = {r[0]: r[1] for r in con.execute(
-        "SELECT sp_id, name FROM meta_spid WHERE name IS NOT NULL").fetchall()}
-    # 이름 → 그 이름으로 물어볼 spid 들. 조회 뒤 "답이 없던" spid 까지 기록하려면 역방향이 필요하다.
-    spids_by_name: dict[str, list[int]] = {}
-    for s in need:
-        if s in name_by_spid:
-            spids_by_name.setdefault(name_by_spid[s], []).append(s)
-    need_names = sorted(spids_by_name)
-
-    owns_client = client is None
-    client = client or _new_client()
-    new = 0
-    inserted: set[int] = set()
+    names = dict(con.execute("SELECT sp_id,name FROM meta_spid WHERE name IS NOT NULL").fetchall())
+    owns = client is None
+    client = client or fcinfo_client()
+    new, catalog = 0, {}
+    log(f"player_info: fc-info에서 미수집 카드 {len(need):,}장 조회 시작 (요청 간 최소 {max(1.0, batch_delay):g}초)")
     try:
-        for i in range(0, len(need_names), name_batch):
-            if i > 0:
-                sleep(batch_delay)
-            batch = need_names[i:i + name_batch]
-            for item in _search_names(
-                client, batch, page_delay=batch_delay, sleep=sleep,
-            ):
-                _record_season_img(con, item)   # 본 카드마다 시즌 엠블럼도 채운다(무료 부산물)
-                p = parse_player(item)
-                if p is None or p.spid not in need or p.spid in inserted:
-                    continue
-                con.execute(
-                    "INSERT INTO player_info (spid, name, salary, ovr, height, weight, body_type) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
-                    [p.spid, p.name, p.salary, p.ovr, p.height, p.weight, p.body_type],
-                )
-                inserted.add(p.spid)
-                new += 1
-            # 이 배치는 물어봤다 — 답이 없던 spid 도 기록해 다음 실행에서 건너뛴다.
-            _record_fetch(con, "info", [s for nm in batch for s in spids_by_name[nm]])
+        for i, spid in enumerate(need):
+            name = names.get(spid)
+            if not name:
+                log(f"  카드 {spid}: 넥슨 메타 캐시에 이름 매핑 없음 — 이름이 필요한 fc-info 검색 건너뜀 (메타 갱신 후에도 공식 목록에 없으면 동일)")
+                continue
+            if name not in catalog:
+                catalog[name] = _fcinfo_cards(client, name, delay=batch_delay, sleep=sleep, log=log)
+            result = catalog[name].get(spid)
+            if result is None:
+                _record_fetch(con, "info", [spid], source="fc-info")
+                log(f"  카드 {spid}: fc-info에 없음")
+                continue
+            p, url = result
+            con.execute("INSERT INTO player_info (spid,name,salary,ovr,height,weight,body_type) "
+                        "VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING",
+                        [p.spid,p.name,p.salary,p.ovr,p.height,p.weight,p.body_type])
+            if url:
+                con.execute("INSERT INTO season_img (season_id,img) VALUES (?,?) ON CONFLICT DO NOTHING", [season_of(spid), url])
+            _record_fetch(con, "info", [spid], source="fc-info")
+            new += 1
+            if (i + 1) % 20 == 0 or i + 1 == len(need):
+                log(f"player_info: 조회 {i+1:,}/{len(need):,} · 신규 {new:,} (fc-info)")
     finally:
-        if owns_client:
+        if owns:
             client.close()
-    log(f"player_info: 우리 GK {len(ours):,} · 이미 {len(have & ours):,} · "
-        f"이름 {len(need_names):,}개 조회 · 신규 {new:,}")
+    log(f"player_info: 우리 카드 {len(ours):,} · 이미 {len(have & ours):,} · 신규 {new:,}")
     return {"ours": len(ours), "already": len(have & ours), "need": len(need), "new": new}
 
 
@@ -359,18 +444,19 @@ def sync_player_detail(
     con: duckdb.DuckDBPyConnection,
     *,
     client: httpx.Client | None = None,
-    delay: float = 1.0,
+    delay: float = 2.0,
     limit: int | None = None,
     sleep: Callable[[float], None] = time.sleep,
-    log: Callable[[str], None] = print,
+    log: Callable[[str], None] = _log,
 ) -> dict[str, int]:
-    """우리 GK 카드(spid)의 상세를 fc-info 에서 한 번에 받아 특성 + 국가·클럽을 채운다.
+    """우리 GK 카드(spid)의 상세를 공식 데이터센터에서 능력치와 상세페이지를 받아 특성 + 국가·클럽을 채운다.
 
     특성은 시즌(카드)별이라 spid 당 1회 받는다. 국가·클럽은 선수(pid) 불변이라 그 상세페이지에서
     부수적으로 뽑아 pid 가 아직 없을 때만 저장한다 — 두 종류를 한 패스(per-spid)로 수집.
     player_trait 에 없는 spid 만(증분), 요청 사이 delay 로 예의. spid 별 커밋이라 중단해도 안전.
     limit 지정 시 그만큼만(소량 시험용). 반환: {'spids','already','need','new','failed','bio_new'}.
     """
+    log("player_detail: 조회할 카드·캐시 확인 중")
     ours = [r[0] for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()]
     have = {r[0] for r in con.execute("SELECT DISTINCT spid FROM player_trait").fetchall()}
     have_bio = {r[0] for r in con.execute("SELECT pid FROM player_bio").fetchall()}
@@ -392,24 +478,24 @@ def sync_player_detail(
     if limit is not None:
         need = need[:limit]
     if not need:
-        log(f"player_detail: 우리 카드 {len(ours):,} 전부 캐시됨 — fc-info 호출 없음")
+        log(f"player_detail: 우리 카드 {len(ours):,} 전부 캐시됨 — 공식 데이터센터 호출 없음")
         return {"spids": len(ours), "already": len(have & set(ours)),
                 "need": 0, "new": 0, "failed": 0, "bio_new": 0}
 
     owns = client is None
     client = client or _new_client()
     new = failed = bio_new = 0
+    log(f"player_detail: 공식 데이터센터 조회 시작 · 대상 {len(need):,}장")
     try:
         for i, spid in enumerate(need):
-            if i > 0:
-                sleep(delay)
+            log(f"player_detail: {i+1:,}/{len(need):,} 카드 {spid} 조회 중 · 신규 {new:,} · 실패 {failed:,}")
             try:
-                resp = client.get(f"/player/{spid}?grade=1")
-                resp.raise_for_status()
-                html = resp.text
+                html = _detail(client, spid, delay=delay, sleep=sleep, log=log)
             except Exception as e:   # 개별 실패는 건너뛰고 다음 실행에서 재시도(증분)
+                if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:
+                    raise
                 failed += 1
-                log(f"  spid {spid} 실패: {type(e).__name__}: {e}")
+                log(f"  spid {spid} 실패: {describe_error(e)}")
                 continue
             if spid not in have:              # 특성 미보유 카드만 저장(bio 재방문은 특성 스킵)
                 _store_traits(con, spid, html)
@@ -420,6 +506,7 @@ def sync_player_detail(
                 have_bio.add(pid); bio_new += 1
             # 성공한 조회만 기록한다 — 실패는 남기지 않아 다음 실행에서 재시도된다.
             _record_fetch(con, "detail", [spid])
+            log(f"player_detail: {i+1:,}/{len(need):,} 완료 · 신규 {new:,} · 국가·클럽 신규 {bio_new:,} · 실패 {failed:,}")
     finally:
         if owns:
             client.close()
@@ -434,13 +521,13 @@ def resync_bio(
     con: duckdb.DuckDBPyConnection,
     *,
     client: httpx.Client | None = None,
-    delay: float = 1.0,
+    delay: float = 2.0,
     sleep: Callable[[float], None] = time.sleep,
-    log: Callable[[str], None] = print,
+    log: Callable[[str], None] = _log,
 ) -> dict[str, int]:
     """모든 우리 카드 spid 페이지를 받아 선수(pid)별 국가 다수결·최다 클럽으로 재작성.
 
-    fc-info 는 같은 선수라도 특정 시즌 카드의 국적을 잘못 등록하기도 한다(예: 멘디 HOT=프랑스).
+    선수별로 여러 시즌 카드의 국적 응답을 모아 기존 캐시를 교정한다.
     pid 당 여러 시즌 카드의 국가를 모아 최빈값을 쓰면 개별 카드 오류에 휘둘리지 않는다.
     클럽은 시즌 간 같아야 하나 카드별 렌더 편차가 있어 가장 많이 담긴 카드를 채택한다.
     전량 조회(증분 아님) 뒤 한 번에 재작성하므로, 중간 중단 시 DB 는 이전 상태를 유지한다.
@@ -455,15 +542,13 @@ def resync_bio(
     got = failed = 0
     try:
         for i, spid in enumerate(ours):
-            if i:
-                sleep(delay)
             try:
-                resp = client.get(f"/player/{spid}?grade=1")
-                resp.raise_for_status()
-                html = resp.text
+                html = _detail(client, spid, delay=delay, sleep=sleep, log=log)
             except Exception as e:
+                if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:
+                    raise
                 failed += 1
-                log(f"  spid {spid} 실패: {type(e).__name__}: {e}")
+                log(f"  spid {spid} 실패: {describe_error(e)}")
                 continue
             got += 1
             code, name, clubs = parse_bio(html)
@@ -476,6 +561,8 @@ def resync_bio(
     finally:
         if owns:
             client.close()
+    if failed:
+        raise ValueError("국가·클럽 재수집 실패가 있어 기존 캐시를 보존합니다")
     # 다수결 결과로 player_bio·player_club 을 전면 재작성(부분 조회로 덮어쓰지 않도록 마지막에)
     con.execute("DELETE FROM player_bio")
     con.execute("DELETE FROM player_club")

@@ -11,12 +11,12 @@ import csv
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import duckdb
 
 from . import agg, meta, playerinfo, render
-from .config import MIN_MATCHES_GATE, SITE_URL
+from .config import MAX_USER_MATCH_PERCENT, MIN_MATCHES_GATE, SITE_URL
 
 # 드릴다운 전용(행 클릭 시에만 쓰는) 카드 상세 필드. index.html 초기 임베드에서 빼고
 # details.json 으로 분리해 첫 화면 전송량을 줄인다(render 가 클릭 때 fetch).
@@ -64,6 +64,7 @@ WARNING = (
     "카드 성능뿐 아니라 그 카드를 쓴 유저의 실력·수비 라인·상대 슛 난이도가 섞여 있다. "
     "따라서 카드 순위가 아니라 참고용 지표로 볼 것. 강화 자체의 효과는 grade_effect(유저 내 비교)를 볼 것. "
     "각 순위에는 표본 경기수(matches)를 함께 표기한다."
+    f" 같은 집계 기간·선수·시즌·강화에서 한 유저의 경기 비중이 {MAX_USER_MATCH_PERCENT}% 이상이면 순위에서 제외한다."
 )
 
 
@@ -72,9 +73,15 @@ def build_payload(
     *,
     gate: int = MIN_MATCHES_GATE,
     since: datetime | None = None,
+    log: Callable[[str], None] | None = None,
 ) -> dict:
+    log = log or (lambda _: None)
+    log(f"export: 선방률·사용자 비중 집계 중 (한 유저 {MAX_USER_MATCH_PERCENT}% 이상 제외)")
     # (선수×시즌×강화단계) 단위 — 강화를 퉁치지 않는다
-    leaderboard = agg.grade_leaderboard(con, gate=gate, since=since)
+    leaderboard = [c for c in agg.grade_leaderboard(con, gate=gate, since=since)
+                   if c["rank_eligible"]]
+    eligible_keys = {(c["gk_sp_id"], c["grade"]) for c in leaderboard}
+    log(f"export: 순위 대상 {len(leaderboard):,}장 · 집계 기간·유저 내 강화효과 계산 중")
 
     # 집계에 실제로 쓰인 창을 그대로 보여준다. since 를 빼먹으면 페이지가
     # '데이터 기간 6/1~7/10' 이라 써놓고 6/10 부터만 집계하게 된다.
@@ -111,11 +118,27 @@ def build_payload(
     else:
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         payload["trend"] = agg.rank_timeseries(
-            con, gate=gate, window_days=(now - since).days, end=now
+            con, gate=gate, window_days=(now - since).days, end=now, log=log,
         )
+        eligible_trend_keys = {f"{sp_id}_{grade}" for sp_id, grade in eligible_keys}
+        payload["trend"]["cards"] = {
+            k: v for k, v in payload["trend"]["cards"].items()
+            if k in eligible_trend_keys
+        }
     # GSAx(난이도 보정)
-    gsax = agg.gsax_leaderboard(con, gate=gate, since=since)
+    log("export: GSAx 슛 난이도 보정 집계 중")
+    gsax = [c for c in agg.gsax_leaderboard(con, gate=gate, since=since)
+            if (c["gk_sp_id"], c["grade"]) in eligible_keys]
     payload["gsax"] = gsax
+    log("export: 센터백 듀오 집계 중")
+    payload["defense"] = {
+        "generated_at": payload["generated_at"],
+        "date_range": date_range,
+        "gate_min_matches": gate,
+        "min_users": 5,
+        "combinations": [r for r in agg.defense_combinations(con, gate=gate, since=since)
+                         if (r["gk_sp_id"], r["grade"]) in eligible_keys],
+    }
 
     # 리더보드 카드에 GSAx 붙이기 (같은 (sp_id, 강화) 키로) → 동일선수·페이지에서도 반영
     gsax_by = {(g["gk_sp_id"], g["grade"]): g for g in gsax}
@@ -125,8 +148,11 @@ def build_payload(
         c["gsax_per_shot"] = gk["gsax_per_shot"] if gk else None
 
     # 카드별 거리 존별·타입별 (대량 집계 2쿼리) → 각 카드에 첨부(페이지 드릴다운용)
+    log("export: 거리 구간별 선방률 집계 중")
     zones_all = agg.zone_breakdown_all(con, since=since)
+    log("export: 슛 타입별 선방률 집계 중")
     types_all = agg.type_breakdown_all(con, since=since)
+    log("export: 상황별 선방률·추가 통계 집계 중")
     extras_all = agg.card_extras_all(con, since=since)
     for c in leaderboard:
         key = (c["gk_sp_id"], c["grade"])
@@ -135,6 +161,7 @@ def build_payload(
         c["extras"] = extras_all.get(key, {})
 
     # 선수 부가정보(급여·기본OVR·키·몸무게·체형)와 시즌 엠블럼 붙이기 — 있는 카드만
+    log("export: 선수·시즌·수비수 정보 연결 중")
     playerinfo.attach_info(con, leaderboard)
     playerinfo.attach_season_img(con, leaderboard)
     playerinfo.attach_bio(con, leaderboard)   # 국가·클럽 (pid 매칭)
@@ -152,6 +179,16 @@ def build_payload(
         playerinfo.attach_season_img(con, sp_cards)
         playerinfo.attach_bio(con, sp_cards)
         playerinfo.attach_trait(con, sp_cards)
+    defense_ids = {r[k] for r in payload["defense"]["combinations"]
+                   for k in ("cb1_sp_id", "cb2_sp_id")}
+    defenders = [{"gk_sp_id": sp_id} for sp_id in sorted(defense_ids)]
+    meta.enrich(con, defenders)
+    playerinfo.attach_info(con, defenders)
+    playerinfo.attach_season_img(con, defenders)
+    payload["defense"]["defenders"] = {
+        str(c["gk_sp_id"]): {k: c[k] for k in ("player_name", "season_id", "season_name", "season_img", "info")}
+        for c in defenders
+    }
     return payload
 
 
@@ -161,9 +198,12 @@ def export(
     *,
     gate: int = MIN_MATCHES_GATE,
     since: datetime | None = None,
+    log: Callable[[str], None] | None = None,
 ) -> dict:
+    log = log or (lambda _: None)
     out_dir.mkdir(parents=True, exist_ok=True)
-    payload = build_payload(con, gate=gate, since=since)
+    payload = build_payload(con, gate=gate, since=since, log=log)
+    log("export: JSON·CSV 파일 저장 중")
 
     # 데이터 export(전체, 다운로드용) — 페이지가 로드하는 파일은 아니다.
     (out_dir / "leaderboard.json").write_text(
@@ -179,6 +219,11 @@ def export(
         json.dumps(details, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
     )
     slim = dict(payload)
+    (out_dir / "defense.json").write_text(
+        json.dumps(_round(payload["defense"]), ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    slim.pop("defense")
     slim["leaderboard"] = _round([
         {**{k: v for k, v in c.items() if k not in _DETAIL_FIELDS}, "sit": _sit_summary(c)}
         for c in payload["leaderboard"]
@@ -200,6 +245,7 @@ def export(
 
     # 공개용 정적 HTML — slim(상세 제외) 임베드. 드릴다운 상세는 details.json 을 클릭 시 fetch.
     # (file:// 직접 열기는 fetch 차단 → 로컬 확인은 `python3 -m http.server` 로.)
+    log("export: HTML 생성·저장 중")
     (out_dir / "index.html").write_text(render.build_html(slim), encoding="utf-8")
 
     # sitemap — 페이지가 한 장뿐이라 URL 도 하나다. lastmod 를 export 시각으로 갱신해
@@ -215,4 +261,5 @@ def export(
         encoding="utf-8",
     )
 
+    log(f"export: 산출물 저장 완료 · 순위 대상 {payload['leaderboard_count']:,}장")
     return payload

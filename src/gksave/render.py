@@ -16,7 +16,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from .config import SITE_URL
+from .config import MAX_USER_MATCH_PERCENT, SITE_URL
 
 IMAGE_CDN = "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common"
 
@@ -128,11 +128,25 @@ function ciText(s,g){
 }
 """
 
+DEFENSE_JS = r"""
+function filterDefenseRows(rows, gkKey, gate, metric){
+  const ascending=metric==='shots_per_match'||metric==='goals_per_match';
+  return rows.filter(r=>`${r.gk_sp_id}_${r.grade}`===gkKey&&r.matches>=gate).sort((a,b)=>{
+    const av=a[metric], bv=b[metric];
+    if(av==null&&bv!=null) return 1;
+    if(bv==null&&av!=null) return -1;
+    return (av==null?0:(ascending?av-bv:bv-av)) || b.matches-a.matches ||
+      a.cb1_sp_id-b.cb1_sp_id || a.cb1_grade-b.cb1_grade ||
+      a.cb2_sp_id-b.cb2_sp_id || a.cb2_grade-b.cb2_grade;
+  });
+}
+"""
+
 
 def _initial_rows(cards: list[dict[str, Any]]) -> str:
     # JS render()의 기본 화면: 500경기 이상, 선방률 내림차순, 결측값 마지막, 100장.
     rows = sorted(
-        (c for c in cards if c["matches"] >= 500),
+        (c for c in cards if c["matches"] >= 500 and c.get("rank_eligible", True)),
         key=lambda c: (c.get("save_pct") is None, -(c.get("save_pct") or 0)),
     )[:100]
     html = []
@@ -182,11 +196,13 @@ def build_html(payload: dict[str, Any]) -> str:
     meta = escape(f"{period}총 경기 {total:,}건")
     values = {
         "__SITE_URL__": SITE_URL,
+        "__MAX_USER_MATCH_PERCENT__": str(MAX_USER_MATCH_PERCENT),
         "__FAVICON__": FAVICON,
         "__PLATINUM__": PLATINUM,
         "__IMAGE_JS__": IMAGE_JS,
         "__FILTER_JS__": FILTER_JS,
         "__STATS_JS__": STATS_JS,
+        "__DEFENSE_JS__": DEFENSE_JS,
         "__INITIAL_META__": meta,
         "__INITIAL_ROWS__": _initial_rows(page["leaderboard"]),
         "__DATA__": data_json,
@@ -413,8 +429,50 @@ _TEMPLATE = r"""<!doctype html>
   .tab:hover{color:var(--text)}
   .tab.active{color:#1a1405;background:linear-gradient(180deg,var(--gold),var(--gold2));
         border-color:var(--gold)}
+  .tab-new{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+        color:var(--gold);border-color:rgba(240,209,122,.4);background:rgba(240,209,122,.07);overflow:hidden}
+  .tab-new-badge{padding:3px 5px;border-radius:5px;background:var(--gold);color:#1a1405;
+        font-size:.62rem;font-weight:800;line-height:1;letter-spacing:.04em}
+  .tab-new.active .tab-new-badge{background:#1a1405;color:var(--gold)}
+  .tab-new::after{content:'';position:absolute;inset:0;pointer-events:none;
+        background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.28) 50%,transparent 65%);
+        transform:translateX(-140%);animation:duo-tab-shine 5s ease-in-out 3}
+  @keyframes duo-tab-shine{
+    0%,65%{transform:translateX(-140%)}
+    90%,100%{transform:translateX(140%)}
+  }
+  @media(prefers-reduced-motion:reduce){.tab-new::after{animation:none;display:none}}
   .panel{display:none}
   .panel.active{display:block}
+  .defense-results{display:grid;gap:12px;margin-top:16px}
+  .defense-result{padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+  .defense-result h3{margin:0 0 12px;font-size:1rem;line-height:1.6;overflow-wrap:anywhere}
+  .defense-pair{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;align-items:center;margin-bottom:16px;padding:12px;background:var(--panel2);border-radius:12px}
+  .defense-pair-plus{color:var(--mut);font-size:1.25rem}
+  .defense-player{display:flex;align-items:center;gap:12px;min-width:0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+  .defense-pair .defense-player{padding:0;border:0;background:transparent;align-self:start}
+  .defense-player .hero-img{width:80px;height:80px;max-width:100%}
+  .defense-player-meta{min-width:0;overflow-wrap:anywhere}
+  .defense-player-name{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-weight:700}
+  .defense-player-season{display:flex;align-items:center;gap:6px;margin:5px 0;color:var(--mut);font-size:.8rem}
+  .defense-player-info{margin:0;color:var(--mut);font-size:.8rem;line-height:1.6}
+  .defense-player-info-extra{margin-top:3px;font-size:.75rem}
+  #defenseSelected{margin-top:16px}
+  #defenseSelected:empty{display:none}
+  .defense-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:0}
+  .defense-stats dt{color:var(--mut);font-size:.8rem}
+  .defense-stats dd{margin:5px 0 0;font-variant-numeric:tabular-nums;line-height:1.5}
+  .defense-stats>div{padding:10px 8px;border:1px solid transparent;border-radius:8px;min-width:0}
+  .defense-stats>.defense-stat-current{background:var(--panel2);border-color:var(--gold)}
+  .defense-stat-current dt{color:var(--gold)}
+  .defense-stat-current dd{font-size:1.25rem;font-weight:700;color:var(--gold)}
+  .defense-stats .ci{display:block;margin-top:3px;color:var(--mut);font-size:.75rem;line-height:1.5}
+  .defense-stat-current .ci{font-weight:400}
+  #panel-defense .controls label{display:flex;flex-direction:column;gap:6px;color:var(--mut);font-size:.85rem}
+  #panel-defense .controls select,#panel-defense .controls input{min-height:44px;max-width:100%;min-width:0}
+  #panel-defense .defense-gk{flex:1;min-width:200px}
+  #panel-defense .defense-search{flex-basis:100%}
+  #defenseGate{width:100px}
   /* 더보기 */
   .more{display:flex;gap:8px;justify-content:center;margin:16px 0 4px}
   .more button{padding:8px 18px;border:1px solid var(--line);background:var(--panel);color:var(--gold2);
@@ -496,7 +554,16 @@ _TEMPLATE = r"""<!doctype html>
   @media(max-width:640px){
     body{padding:18px 12px 48px}
     h1{font-size:1.45rem}
-    .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;flex-wrap:nowrap}
+    .tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;flex-wrap:nowrap}
+    .defense-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .defense-pair{gap:8px;padding:10px}
+    .defense-pair .defense-player{flex-direction:column;align-items:center;gap:8px;text-align:center}
+    .defense-pair .hero-img{width:64px;height:64px}
+    .defense-pair .defense-player-name,.defense-pair .defense-player-season{justify-content:center}
+    .defense-result{padding:12px}
+    .defense-stats{gap:6px}
+    .defense-stats>div{padding:8px 5px}
+    #panel-defense .defense-gk{flex-basis:100%;min-width:0}
     .tab{min-height:48px;padding:8px 5px;font-size:.8rem;line-height:1.25}
     .controls input,.controls select,button.sort,.controls .icon-btn,.more button,
     .recent-pick,.recent-remove,.recent-clear{min-height:44px;font-size:1rem;touch-action:manipulation}
@@ -537,9 +604,10 @@ _TEMPLATE = r"""<!doctype html>
 <p class="meta" id="meta">__INITIAL_META__</p>
 
 <div class="tabs">
-  <button class="tab active" data-tab="lb">리더보드</button>
-  <button class="tab" data-tab="sp">동일 선수 비교</button>
-  <button class="tab" data-tab="help">지표 설명 · 사용법</button>
+  <button class="tab active" data-tab="lb" aria-pressed="true">리더보드</button>
+  <button class="tab tab-new" data-tab="defense" aria-pressed="false" aria-label="센터백 듀오, 베타"><span>센터백 듀오</span><span class="tab-new-badge" aria-hidden="true">Beta</span></button>
+  <button class="tab" data-tab="sp" aria-pressed="false">동일 선수 비교</button>
+  <button class="tab" data-tab="help" aria-pressed="false">지표 설명 · 사용법</button>
 </div>
 
 <!-- 탭 1: 리더보드 -->
@@ -588,6 +656,7 @@ _TEMPLATE = r"""<!doctype html>
   </script>
   <div class="champions" id="champions"></div>
   <p class="muted leaderboard-tip"><b>컬럼 제목</b>을 클릭하면 그 항목으로 정렬됩니다(다시 누르면 오름/내림 전환). 행을 클릭하면 그 카드의 <b>거리 구간별·슛 타입별</b> 선방률이 펼쳐집니다. 선방률 옆 <b>±%p</b>는 표본에서 온 95% 신뢰구간. 용어가 낯설면 <b>지표 설명</b> 탭을 보세요.</p>
+  <p class="muted">같은 기간·선수·시즌·강화에서 한 유저의 경기 비중이 __MAX_USER_MATCH_PERCENT__% 이상이면 순위에서 제외합니다.</p>
   <div class="tw">
     <table id="lb">
       <thead><tr><th>#</th><th>선수</th><th class="sortable mobile-optional" tabindex="0" data-col="grade">강화 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="salary">급여 <span class="arr"></span></th><th class="sortable mobile-optional" tabindex="0" data-col="ovr">OVR <span class="arr"></span></th><th class="sortable mobile-metric" tabindex="0" data-col="save_pct" id="metricHdr">선방률 <span class="arr"></span></th><th class="sortable mobile-secondary" tabindex="0" data-col="secondary" id="secondaryHdr">GSAx/100 <span class="arr"></span></th><th class="sortable mobile-matches" tabindex="0" data-col="matches">경기수 <span class="arr"></span></th><th class="mobile-optional" id="deltaHdr" title="약 1주 전 같은 창과 비교한 '선방률 순위' 변동. 지금 걸어둔 검색·필터 안에서 계산합니다. 각 뱃지에 마우스를 올리면 실제 비교 시점이 나옵니다. 다른 지표·정렬로 보는 중이면 뜻이 달라져 흐리게 표시됩니다.">변동</th></tr></thead>
@@ -608,7 +677,45 @@ _TEMPLATE = r"""<!doctype html>
   <p class="empty" id="spEmpty" style="display:none">해당하는 선수가 없습니다.</p>
 </div>
 
-<!-- 탭 3: 지표 설명 · 사용법 -->
+<!-- 탭 3: 센터백 듀오 -->
+<div class="panel" id="panel-defense">
+  <h2>골키퍼 × 센터백 듀오</h2>
+  <p class="muted">골키퍼를 검색하고 시즌·강화를 선택해, 센터백 듀오의 선방률·실점을 비교해 보세요.</p>
+  <p class="muted">유저·전술 등의 영향이 남는 관찰 통계로, 듀오의 성능 향상을 입증하지 않습니다.</p>
+  <div class="controls">
+    <label class="defense-search" for="defenseSearch">1. 골키퍼 찾기
+      <input id="defenseSearch" type="search" placeholder="골키퍼 이름·시즌 검색 (예: 노이어 또는 ICON)" disabled>
+    </label>
+    <label class="defense-gk" for="defenseGk">2. 시즌·강화 선택
+      <select id="defenseGk" disabled><option value="">데이터를 불러오면 선택할 수 있습니다</option></select>
+    </label>
+    <label for="defenseGate">최소 경기수
+      <input id="defenseGate" type="number" inputmode="numeric" min="50" max="50000" step="1" value="100" disabled>
+    </label>
+    <label for="defenseSort">정렬
+      <select id="defenseSort" disabled>
+        <option value="save_pct">선방률 높은 순</option>
+        <option value="gsax_per_shot">GSAx/100 높은 순</option>
+        <option value="shots_per_match">경기당 유효슛 적은 순</option>
+        <option value="goals_per_match">경기당 실점 적은 순</option>
+        <option value="matches">경기수 많은 순</option>
+      </select>
+    </label>
+  </div>
+  <p class="muted" id="defenseStatus" role="status" aria-live="polite" aria-atomic="true">센터백 듀오 탭을 열면 데이터를 불러옵니다.</p>
+  <div id="defenseSelected"></div>
+  <div class="defense-results" id="defenseResults"></div>
+  <div class="more"><button id="defenseMore" type="button" hidden>더 보기</button><button id="defenseRetry" type="button" hidden>다시 불러오기</button><button id="defenseReload" type="button" hidden>새로고침</button></div>
+  <details class="help"><summary>듀오 통계의 집계 기준 · 읽는 법</summary>
+    <p>같은 골키퍼의 시즌·강화를 고정하고, 경기 명단에 센터백 2명과 좌우 풀백이 기록된 경기를 비교합니다. 센터백의 시즌·강화도 구분하며, 좌우 배치가 바뀐 같은 두 카드는 하나의 듀오로 묶습니다. 풀백이 다른 경기도 센터백 쌍이 같으면 함께 집계합니다.</p>
+    <p>선방률은 PK·자책골을 제외한 선방 ÷ (선방 + 실점)입니다. 경기당 유효슛과 실점도 같은 제외 기준을 씁니다. 유효슛이 없던 경기도 경기수에 포함합니다.</p>
+    <p>GSAx는 전체 집계 기간의 슛 타입 × 거리 구간 평균으로 기대선방을 계산합니다. 좌표가 있는 유효슛만 계산하며, 좌표 표본 비율을 각 조합에 표시합니다. 유저 실력·전술·풀백·상대 수준의 차이는 보정하지 않습니다.</p>
+    <p>명단에 SW·윙백이 있거나 CB가 3명 이상인 경기는 제외합니다. API에 교체 시점이나 포지션 변경 이력이 없어, 각 슛 순간의 실제 동시 출전을 확인한 통계는 아닙니다.</p>
+    <p>선방률 옆 ±%p는 슛 표본의 Wilson 95% 구간 반폭입니다. 같은 경기·유저의 슛은 서로 독립적이지 않아 불확실성을 작게 표시할 수 있습니다. 표본 기준을 통과해도 특정 유저의 영향이 남으며, 높은 기록이 조합의 성능 향상을 입증하지는 않습니다.</p>
+  </details>
+</div>
+
+<!-- 지표 설명 · 사용법 -->
 <div class="panel help" id="panel-help">
   <h2>이 페이지 사용법</h2>
   <ol class="usage">
@@ -810,7 +917,7 @@ __IMAGE_JS__
 __FILTER_JS__
 __STATS_JS__
 // 썸네일은 얼굴 → 플레이스홀더 2단. 히어로는 액션샷 → 얼굴 → 플레이스홀더 3단(data-fb).
-// src 도 escAttr 로 감싼다. spid·시즌이미지·국가코드는 전부 외부(넥슨 API·fc-info 스크래핑)
+// src 도 escAttr 로 감싼다. spid·시즌이미지·국가코드는 전부 외부(넥슨 API·공식 데이터센터)
 // 출처라, 따옴표가 섞여 들어오면 속성을 탈출해 이벤트 핸들러를 붙일 수 있다.
 const thumbImg=(spid,name)=>spid==null?'':
   `<img class="thumb" src="${escAttr(thumbUrl(spid))}" alt="${escAttr(name||'')}" width="36" height="36" `+
@@ -1008,7 +1115,7 @@ function render(){
   const more=document.getElementById('more'); more.innerHTML='';
   // 지표 무관 공통 필터(검색·강화·국가/클럽·급여·경기수 게이트). 명예의 전당(챔피언)도
   // 이 풀에서 뽑아 검색·필터·게이트 변경이 그대로 반영되게 한다.
-  const pool=D.leaderboard.filter(c=>matchNames(c.player_name,q) && c.matches>=minGate &&
+  const pool=D.leaderboard.filter(c=>c.rank_eligible!==false && matchNames(c.player_name,q) && c.matches>=minGate &&
     (!gradeFilter || c.grade===+gradeFilter) && matchTeamColor(c,natClubQ) &&
     matchSalary(c.info&&c.info.salary,salMin,salMax));
   renderChampions(pool);
@@ -1200,11 +1307,128 @@ document.getElementById('resetFilters').onclick=()=>{
 };
 // 탭 전환
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(x=>{x.classList.remove('active');x.setAttribute('aria-pressed','false');});
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
+  t.setAttribute('aria-pressed','true');
   document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+  if(t.dataset.tab==='defense') loadDefense();
 });
+
+__DEFENSE_JS__
+let defenseData=null, defenseLoading=false, defenseLimit=50, defenseCards=[];
+const defenseSearch=document.getElementById('defenseSearch');
+const defenseGk=document.getElementById('defenseGk');
+const defenseGate=document.getElementById('defenseGate');
+const defenseSort=document.getElementById('defenseSort');
+const defenseStatus=document.getElementById('defenseStatus');
+const defenseMore=document.getElementById('defenseMore');
+const defenseRetry=document.getElementById('defenseRetry');
+const defenseReload=document.getElementById('defenseReload');
+defenseReload.onclick=()=>location.reload();
+function defensePlayer(c,id,grade,role){
+  const name=c.player_name||('선수 '+id), season=(c.season_name||'').split(' (')[0];
+  const info=c.info||{};
+  const brief=[info.salary==null?'':'급여 '+info.salary,info.height==null?'':info.height+'cm'].filter(Boolean);
+  const details=[info.ovr==null?'':'기본 OVR '+info.ovr,
+    info.weight==null?'':info.weight+'kg',info.body_type||''].filter(Boolean);
+  return `<div class="defense-player">${heroImg(id,name)}<div class="defense-player-meta">`+
+    (role?`<span class="muted">${esc(role)}</span>`:'')+`<div class="defense-player-name">${esc(name)}${gradeBadge(grade)}</div>`+
+    `<p class="defense-player-season">${seasonIcon(c.season_img,season)}${esc(season)} · ${esc(grade)}강</p>`+
+    (brief.length?`<p class="defense-player-info">${brief.map(esc).join(' · ')}</p>`:'')+
+    (details.length?`<p class="defense-player-info defense-player-info-extra">${details.map(esc).join(' · ')}</p>`:'')+'</div></div>';
+}
+async function loadDefense(){
+  if(defenseData||defenseLoading) return;
+  defenseLoading=true; defenseRetry.hidden=true; defenseReload.hidden=true;
+  defenseStatus.textContent='센터백 듀오 데이터를 불러오는 중입니다.';
+  try{
+    const response=await fetch('defense.json',{cache:'no-cache'});
+    if(!response.ok) throw new Error('센터백 듀오 데이터를 불러오지 못했습니다.');
+    const data=await response.json();
+    if(!Array.isArray(data.combinations)||!data.defenders) throw new Error('센터백 듀오 데이터 형식을 확인해 주세요.');
+    if(data.generated_at!==D.generated_at){
+      defenseSearch.disabled=true;
+      defenseGk.disabled=true;
+      defenseGate.disabled=true; defenseSort.disabled=true;
+      document.getElementById('defenseResults').innerHTML='';
+      document.getElementById('defenseSelected').innerHTML='';
+      defenseMore.hidden=true;
+      defenseStatus.textContent='화면과 센터백 듀오 데이터의 버전이 다릅니다. 새로고침해 최신 통계를 확인해 주세요.';
+      defenseReload.hidden=false;
+      return;
+    }
+    defenseData=data;
+    const keys=new Set(data.combinations.map(r=>`${r.gk_sp_id}_${r.grade}`));
+    defenseCards=D.leaderboard.filter(c=>keys.has(`${c.gk_sp_id}_${c.grade}`)).sort((a,b)=>
+      String(a.player_name||'').localeCompare(String(b.player_name||''),'ko')||
+      String(a.season_name||'').localeCompare(String(b.season_name||''),'ko',{numeric:true})||b.grade-a.grade||a.gk_sp_id-b.gk_sp_id);
+    defenseSearch.disabled=!defenseCards.length;
+    defenseGate.min=Math.max(50,data.gate_min_matches);
+    defenseGate.value=Math.max(100,Number(defenseGate.min));
+    renderDefenseGkOptions();
+  }catch(error){
+    defenseData=null;
+    defenseStatus.textContent='센터백 듀오 데이터를 불러오지 못했습니다. 다시 불러오기를 눌러 주세요.';
+    defenseRetry.hidden=false;
+  }finally{defenseLoading=false;}
+}
+function renderDefenseGkOptions(){
+  const previous=defenseGk.value, query=defenseSearch.value.trim();
+  const cards=defenseCards.filter(c=>matchName(`${c.player_name||''} ${c.season_name||''}`,query));
+  defenseGk.innerHTML='';
+  const placeholder=document.createElement('option'); placeholder.value='';
+  placeholder.textContent=cards.length?'골키퍼의 시즌·강화를 선택하세요':'검색 결과가 없습니다';
+  defenseGk.appendChild(placeholder);
+  cards.forEach(c=>{
+    const option=document.createElement('option'); option.value=`${c.gk_sp_id}_${c.grade}`;
+    option.textContent=`${(c.season_name||'').split(' (')[0]} ${c.player_name||('선수 '+c.gk_sp_id)} ${c.grade}강`;
+    defenseGk.appendChild(option);
+  });
+  defenseGk.disabled=!cards.length;
+  defenseGk.value=cards.some(c=>`${c.gk_sp_id}_${c.grade}`===previous)?previous:'';
+  defenseLimit=50;
+  renderDefense();
+}
+function renderDefense(){
+  if(!defenseData) return;
+  const floor=Number(defenseGate.min);
+  const gate=Math.min(50000,Math.max(floor,Math.trunc(Number(defenseGate.value))||floor));
+  defenseGate.value=gate;
+  const gk=D.leaderboard.find(c=>`${c.gk_sp_id}_${c.grade}`===defenseGk.value);
+  defenseGate.disabled=!gk; defenseSort.disabled=!gk;
+  document.getElementById('defenseSelected').innerHTML=gk?defensePlayer(gk,gk.gk_sp_id,gk.grade,'선택한 골키퍼'):'';
+  if(!gk){
+    defenseMore.hidden=true;
+    defenseStatus.textContent=!defenseCards.length?
+      `경기수 ${floor} 이상·사용자 ${defenseData.min_users}명 이상인 듀오가 아직 없습니다.`:
+      defenseGk.disabled?'일치하는 골키퍼가 없습니다. 이름이나 시즌을 바꿔 검색해 보세요.':
+      '골키퍼를 검색한 뒤 비교할 시즌·강화를 선택해 주세요.';
+    document.getElementById('defenseResults').innerHTML='';
+    return;
+  }
+  const rows=filterDefenseRows(defenseData.combinations,defenseGk.value,gate,defenseSort.value);
+  defenseStatus.textContent=`선택한 골키퍼 기준 · 듀오 ${rows.length.toLocaleString('ko-KR')}개 · ${gate.toLocaleString('ko-KR')}경기 이상 · 사용자 ${defenseData.min_users}명 이상 · ${defenseSort.options[defenseSort.selectedIndex]?.textContent||'선방률 높은 순'}`;
+  const stat=(key,label,value)=>`<div${key===defenseSort.value?' class="defense-stat-current"':''}><dt>${label}</dt><dd>${value}</dd></div>`;
+  document.getElementById('defenseResults').innerHTML=rows.slice(0,defenseLimit).map((r,i)=>
+    `<article class="defense-result"><h3>이 골키퍼의 듀오 ${i+1}위</h3><div class="defense-pair">`+
+    defensePlayer(defenseData.defenders[String(r.cb1_sp_id)]||{},r.cb1_sp_id,r.cb1_grade,'')+
+    '<span class="defense-pair-plus" aria-hidden="true">+</span>'+
+    defensePlayer(defenseData.defenders[String(r.cb2_sp_id)]||{},r.cb2_sp_id,r.cb2_grade,'')+'</div><dl class="defense-stats">'+
+    stat('save_pct','선방률',`${pct(r.save_pct)}<span class="ci">${ciText(r.saves,r.goals)}</span>`)+
+    stat('gsax_per_shot','GSAx/100',`${gps(r.gsax_per_shot)}<span class="ci">좌표 ${r.gsax_shots.toLocaleString('ko-KR')} / ${r.shots.toLocaleString('ko-KR')}슛</span>`)+
+    stat('shots_per_match','경기당 유효슛',r.shots_per_match.toFixed(2))+
+    stat('goals_per_match','경기당 실점',r.goals_per_match.toFixed(2))+
+    stat('matches','경기수',r.matches.toLocaleString('ko-KR'))+
+    stat('users','사용자 수',r.users.toLocaleString('ko-KR')+'명')+'</dl></article>'
+  ).join('') || '<p class="empty">표본 기준을 충족하는 듀오가 없습니다. 골키퍼를 바꾸거나 최소 경기수를 낮춰 보세요.</p>';
+  defenseMore.hidden=rows.length<=defenseLimit;
+}
+[defenseGk,defenseSort].forEach(el=>el.onchange=()=>{defenseLimit=50;renderDefense();});
+defenseSearch.oninput=renderDefenseGkOptions;
+defenseGate.onchange=()=>{defenseLimit=50;renderDefense();};
+defenseMore.onclick=()=>{defenseLimit+=50;renderDefense();};
+defenseRetry.onclick=loadDefense;
 
 // 강화 효과는 귀무 결과다(신뢰구간이 0 포함). 상단 배너에 상시 고정하면 '카드 추천 아님'
 // 경고의 주목도를 갉아먹어, 지표 설명 탭에서만 전문을 보여준다.

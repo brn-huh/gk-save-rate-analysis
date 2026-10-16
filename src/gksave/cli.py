@@ -12,13 +12,15 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import httpx
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import agg, collect, export as export_mod, meta, playerinfo, spike
+from . import agg, collect, defense, export as export_mod, meta, playerinfo, spike
 from .config import DEFAULT, MIN_MATCHES_GATE, ZONE_CUTS_M
 from .db import DbLockedError, connect, raw_match_count
 from .http import ResilientClient
+from .progress import progress
 
 
 def _resolve_since(args) -> datetime | None:
@@ -52,7 +54,8 @@ def _cmd_collect(args) -> None:
 def _cmd_build(args) -> None:
     con = connect(DEFAULT)
     try:
-        stats = agg.rebuild(con, full=getattr(args, "full", False))
+        with progress("경기 파싱·집계"):
+            stats = agg.rebuild(con, full=getattr(args, "full", False))
         mode = "전체 재빌드" if getattr(args, "full", False) else "증분 빌드"
         print(
             f"[{mode}] raw_match {raw_match_count(con)}건 → 파싱: 매치 {stats.matches}, "
@@ -65,11 +68,23 @@ def _cmd_build(args) -> None:
         con.close()
 
 
+def _cmd_build_defense(args) -> None:
+    con = connect(DEFAULT)
+    try:
+        counts = defense.rebuild(
+            con, since=_resolve_since(args), log=lambda message: print(message, flush=True),
+        )
+        print(f"[수비 명단 추가 파싱] 경기 {counts['matches']:,}건, 4백 명단 {counts['lineups']:,}건")
+    finally:
+        con.close()
+
+
 def _cmd_meta(_args) -> None:
     con = connect(DEFAULT)
     try:
-        with ResilientClient(DEFAULT) as client:
-            n_sp, n_se = meta.refresh(con, client)
+        with progress("넥슨 선수명·시즌 메타 갱신"):
+            with ResilientClient(DEFAULT) as client:
+                n_sp, n_se = meta.refresh(con, client)
         print(f"메타 캐시 갱신: 선수 {n_sp}, 시즌 {n_se}")
     finally:
         con.close()
@@ -78,10 +93,12 @@ def _cmd_meta(_args) -> None:
 def _cmd_playerinfo(args) -> None:
     con = connect(DEFAULT)
     try:
-        playerinfo.sync_player_info(
-            con, batch_delay=args.delay, retry_missing=args.retry_missing,
-        )
-        playerinfo.sync_season_img(con)
+        with progress("fc-info 카드정보·시즌 이미지 갱신") as log, playerinfo.fcinfo_client() as fc_client:
+            playerinfo.sync_player_info(
+                con, batch_delay=args.delay, retry_missing=args.retry_missing,
+                include_defenders=args.defenders, client=fc_client, log=log,
+            )
+            playerinfo.sync_season_img(con, client=fc_client, page_delay=args.delay, include_defenders=args.defenders, log=log)
     finally:
         con.close()
 
@@ -89,7 +106,8 @@ def _cmd_playerinfo(args) -> None:
 def _cmd_playerdetail(args) -> None:
     con = connect(DEFAULT)
     try:
-        playerinfo.sync_player_detail(con, delay=args.delay, limit=args.limit)
+        with progress("공식 데이터센터 선수 상세 갱신") as log:
+            playerinfo.sync_player_detail(con, delay=args.delay, limit=args.limit, log=log)
     finally:
         con.close()
 
@@ -105,7 +123,8 @@ def _cmd_resyncbio(args) -> None:
 def _cmd_export(args) -> None:
     con = connect(DEFAULT, read_only=True)
     try:
-        payload = export_mod.export(con, Path(args.out), gate=args.gate, since=_resolve_since(args))
+        with progress("통계 export") as log:
+            payload = export_mod.export(con, Path(args.out), gate=args.gate, since=_resolve_since(args), log=log)
         span = f" (since {payload['since']})" if payload.get("since") else ""
         print(f"리더보드 {payload['leaderboard_count']}장{span} → "
               f"{args.out}/leaderboard.{{json,csv}} + index.html")
@@ -122,6 +141,7 @@ def _cmd_leaderboard(args) -> None:
     con = connect(DEFAULT, read_only=True)
     try:
         lb = agg.grade_leaderboard(con, gate=args.gate, since=_resolve_since(args))
+        lb = [c for c in lb if c["rank_eligible"]]
         if meta.has_meta(con):
             meta.enrich(con, lb)
         print(f"# 리더보드 (선수×시즌×강화, 게이트 {args.gate}경기, 상위 {args.top})")
@@ -141,6 +161,7 @@ def _cmd_gsax(args) -> None:
     try:
         min_d = ZONE_CUTS_M[0] if args.exclude_shortest else 0.0
         lb = agg.gsax_leaderboard(con, gate=args.gate, since=_resolve_since(args), min_dist_m=min_d)
+        lb = [c for c in lb if c["rank_eligible"]]
         if meta.has_meta(con):
             meta.enrich(con, lb)
         tag = " · 초근거리(<5m) 제외" if args.exclude_shortest else ""
@@ -211,12 +232,18 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--full", action="store_true", help="전체 재파싱 (파싱 로직 바꿨을 때)")
     b.set_defaults(func=_cmd_build)
 
+    bd = sub.add_parser("build-defense", help="기존 파싱 경기의 수비 명단만 추가 (중단 후 재개 가능)")
+    bd.add_argument("--since", help="이 날짜 이후 경기만 (YYYY-MM-DD)")
+    bd.add_argument("--days", type=int, help="최근 N일 경기만")
+    bd.set_defaults(func=_cmd_build_defense)
+
     sub.add_parser("meta", help="선수명·시즌 메타 캐시 갱신").set_defaults(func=_cmd_meta)
 
     pi = sub.add_parser(
-        "playerinfo", help="선수 급여·기본OVR·키·몸무게·체형 캐시 (fc-info, 우리 GK만·1회)"
+        "playerinfo", help="선수 급여·기본OVR·체격·시즌 이미지 캐시 (fc-info)"
     )
-    pi.add_argument("--delay", type=float, default=1.0, help="fc-info 요청 사이 지연(초)")
+    pi.add_argument("--delay", type=float, default=3.0, help="요청 사이 지연(초, 기본 3초, 최소 1초)")
+    pi.add_argument("--defenders", action="store_true", help="수비 조합에 등장한 센터백 카드도 수집")
     pi.add_argument(
         "--retry-missing", action="store_true",
         help="기존 조회 기록을 이번 실행에서만 무시하고 누락 카드를 다시 확인",
@@ -225,9 +252,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     pd = sub.add_parser(
         "playerdetail",
-        help="선수 특성 + 국가·클럽 캐시 (fc-info 상세, 우리 GK 카드당·1회 통합)",
+        help="선수 특성 + 국가·클럽 캐시 (공식 데이터센터, 우리 GK 카드당·1회)",
     )
-    pd.add_argument("--delay", type=float, default=1.0, help="상세요청 사이 지연(초)")
+    pd.add_argument("--delay", type=float, default=2.0, help="상세요청 사이 지연(초, 기본 2초, 최소 1초)")
     pd.add_argument("--limit", type=int, help="이번에 받을 카드 수 상한(소량 시험용)")
     pd.set_defaults(func=_cmd_playerdetail)
 
@@ -235,7 +262,7 @@ def build_parser() -> argparse.ArgumentParser:
         "resyncbio",
         help="국가·클럽 전면 재수집 — 선수(pid)별 여러 시즌 카드 국적 다수결로 오류 교정",
     )
-    rb.add_argument("--delay", type=float, default=1.0, help="상세요청 사이 지연(초)")
+    rb.add_argument("--delay", type=float, default=2.0, help="상세요청 사이 지연(초, 기본 2초, 최소 1초)")
     rb.set_defaults(func=_cmd_resyncbio)
 
     e = sub.add_parser("export", help="JSON/CSV/HTML 산출")
@@ -278,6 +305,18 @@ def main(argv: list[str] | None = None) -> None:
     except DbLockedError as e:
         # 락 충돌은 사용자가 고칠 수 있는 상황이다. 트레이스백을 띄우지 않는다.
         raise SystemExit(f"\n{e}")
+    except httpx.HTTPStatusError as e:
+        sources = {"fconline.nexon.com": "공식 데이터센터", "fc-info.com": "fc-info"}
+        source = sources.get(e.request.url.host)
+        if source is None:
+            raise
+        if e.response.status_code == 429:
+            raise SystemExit(f"{source}의 요청 제한이 지속돼 수집을 중단했습니다.\n{playerinfo.describe_error(e)}\n저장된 정보는 유지됩니다. 시간을 두고 재실행해 주세요.")
+        raise SystemExit(f"{source} 응답 오류로 수집을 중단했습니다.\n{playerinfo.describe_error(e)}\n저장된 정보는 유지됩니다. 나중에 재실행해 주세요.")
+    except (httpx.TransportError, ValueError) as e:
+        if args.cmd not in ("playerinfo", "playerdetail", "resyncbio"):
+            raise
+        raise SystemExit(f"선수 부가정보 수집을 중단했습니다.\n{playerinfo.describe_error(e)}\n저장된 정보는 유지됩니다. 나중에 재실행해 주세요.")
     except RuntimeError as e:
         raise SystemExit(str(e))
 

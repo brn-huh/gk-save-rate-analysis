@@ -47,6 +47,89 @@ def _embedded(html):
     return json.loads(m.group(1))
 
 
+@requires_node
+def test_defense_filters_exact_gk_and_grade_and_sorts_missing_last():
+    rows = [
+        {"gk_sp_id": 1, "grade": 10, "cb1_sp_id": 10, "cb1_grade": 8,
+         "cb2_sp_id": 20, "cb2_grade": 8, "matches": 100, "save_pct": None, "goals_per_match": 0},
+        {"gk_sp_id": 1, "grade": 10, "cb1_sp_id": 11, "cb1_grade": 8,
+         "cb2_sp_id": 20, "cb2_grade": 8, "matches": 200, "save_pct": 0.7, "goals_per_match": 1},
+        {"gk_sp_id": 1, "grade": 10, "cb1_sp_id": 12, "cb1_grade": 8,
+         "cb2_sp_id": 20, "cb2_grade": 8, "matches": 80, "save_pct": 0.9, "goals_per_match": 2},
+        {"gk_sp_id": 1, "grade": 11, "cb1_sp_id": 13, "cb1_grade": 8,
+         "cb2_sp_id": 20, "cb2_grade": 8, "matches": 300, "save_pct": 1.0, "goals_per_match": 0},
+    ]
+    source = render.DEFENSE_JS + "\nconst rows=" + json.dumps(rows) + ";"
+    assert _eval_js("filterDefenseRows(rows,'1_10',100,'save_pct').map(r=>r.cb1_sp_id).join(',')", source) == "11,10"
+    assert _eval_js("filterDefenseRows(rows,'1_10',50,'goals_per_match').map(r=>r.cb1_sp_id).join(',')", source) == "10,11,12"
+    assert _eval_js("rows[0].cb1_sp_id", source) == "10"
+
+
+@requires_node
+@pytest.mark.parametrize("version", ["2026-07-04T00:00:00Z", "new-version", None])
+def test_defense_version_mismatch_blocks_results_and_offers_reload(version):
+    html = render.build_html(_PAYLOAD)
+    source = html.split("function filterDefenseRows(", 1)[1].split("defenseRetry.onclick=loadDefense;", 1)[0]
+    source = "function filterDefenseRows(" + source + "defenseRetry.onclick=loadDefense;"
+    data = {"generated_at": version, "gate_min_matches": 50, "min_users": 5,
+            "defenders": {}, "combinations": [{"gk_sp_id": 101190053, "grade": 10}]}
+    script = """
+const fields={};
+const document={getElementById:id=>fields[id]||(fields[id]={value:'',options:[],hidden:true,
+  appendChild(option){this.options.push(option);}}),createElement:()=>({})};
+const location={reload:()=>{fields.reloaded=true;}};
+const esc=String,pct=String,gps=String,ciText=()=>'';
+""" + "\nconst D=" + json.dumps(_PAYLOAD) + ";\nconst incoming=" + json.dumps(data) + ";\n"
+    script += "const fetch=async()=>({ok:true,json:async()=>incoming});\n" + render.FILTER_JS + source
+    script += """
+loadDefense().then(()=>{
+  const blocked=defenseData===null;
+  if(blocked) fields.defenseReload.onclick();
+  process.stdout.write(JSON.stringify({blocked,reloadVisible:!fields.defenseReload.hidden,
+    reloaded:!!fields.reloaded,status:fields.defenseStatus.textContent,
+    selected:fields.defenseGk.value,firstOption:fields.defenseGk.options[0]?.value,
+    options:fields.defenseGk.options.length,gateDisabled:fields.defenseGate.disabled}));
+});
+"""
+    result = subprocess.run([_NODE, "-e", script], capture_output=True, text=True, check=True)
+    state = json.loads(result.stdout)
+    assert state["blocked"] == (version != _PAYLOAD["generated_at"])
+    assert state["reloadVisible"] == state["blocked"]
+    assert state["reloaded"] == state["blocked"]
+    if state["blocked"]:
+        assert "새로고침" in state["status"]
+    else:
+        assert state["options"] == 2 and state["firstOption"] == ""
+        assert state["selected"] == "" and state["gateDisabled"]
+        assert "선택" in state["status"]
+
+
+@requires_node
+def test_defense_player_uses_card_images_and_escapes_metadata_with_missing_info():
+    html = render.build_html(_PAYLOAD)
+    image_helpers = 'const thumbImg=' + html.split('const thumbImg=', 1)[1].split('const dr=', 1)[0]
+    player_helper = 'function defensePlayer(' + html.split('function defensePlayer(', 1)[1].split('async function loadDefense', 1)[0]
+    source = "const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\n"
+    source += "const escAttr=s=>esc(s).replace(/\"/g,'&quot;');\n" + render.IMAGE_JS + image_helpers + player_helper
+    card = {"player_name": '<img src=x onerror="alert(1)">', "season_name": 'TEST',
+            "season_img": 'https://example.test/season.png',
+            "info": {"salary": 25, "ovr": 110, "height": 190, "body_type": '<script>'}}
+    output = _eval_js('defensePlayer(' + json.dumps(card) + ',300000010,8,"센터백")', source)
+    assert '/playersAction/p300000010.png' in output
+    assert '/players/p10.png' in output and 'onerror="imgFallback(this)"' in output
+    assert 'https://example.test/season.png' in output
+    assert '급여 25' in output and '기본 OVR 110' in output and '190cm' in output
+    assert '<img src=x' not in output and '<script>' not in output
+    assert '&lt;img' in output and '&lt;script&gt;' in output
+    brief, detail = output.split('<p class="defense-player-info defense-player-info-extra">', 1)
+    assert '급여 25' in brief and '190cm' in brief
+    assert '기본 OVR 110' not in brief and '기본 OVR 110' in detail
+    assert '<details' not in output and '<summary' not in output
+    missing = _eval_js('defensePlayer({},300000020,8,"센터백")', source)
+    assert '선수 300000020' in missing and 'undefined' not in missing
+    assert 'defense-player-info' not in missing
+
+
 def test_html_structure_and_data():
     html = render.build_html(_PAYLOAD)
     assert html.startswith("<!doctype html>")
@@ -89,6 +172,8 @@ def test_initial_table_matches_default_gate_and_save_pct_order():
     card = _PAYLOAD["leaderboard"][0]
     payload = {**_PAYLOAD, "leaderboard": [
         {**card, "player_name": "미달", "matches": 499, "save_pct": 1},
+        {**card, "player_name": "편중", "matches": 500, "save_pct": 1,
+         "rank_eligible": False, "max_user_share": 0.35},
         {**card, "player_name": "결측", "matches": 500, "save_pct": None},
         {**card, "player_name": "하위", "matches": 500, "save_pct": 0.5, "gsax_per_shot": -0.01},
         {**card, "player_name": "공동1", "matches": 500, "save_pct": 0.75},
@@ -97,6 +182,7 @@ def test_initial_table_matches_default_gate_and_save_pct_order():
     html = render.build_html(payload)
     table = re.search(r"<tbody>(.*?)</tbody>", html, re.S)[1]
     assert "미달" not in table
+    assert "편중" not in table
     assert table.index("공동1") < table.index("공동2") < table.index("하위") < table.index("결측")
     assert "+5.0" in table and "-1.0" in table and "75.0%" in table
     assert table.count("<tr>") == 4
@@ -117,6 +203,24 @@ def test_initial_table_caps_rows_and_escapes_external_text():
     assert '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;__DATA__ &amp; __INITIAL_ROWS__' in table
     assert '<p class="meta" id="meta">기간 2026-08-12 ~ 2026-10-10 · 총 경기 1,234건</p>' in html
     assert _embedded(html)["leaderboard"][0]["player_name"] == name
+
+
+@requires_node
+def test_render_excludes_concentrated_cards_from_shared_ranking_pool():
+    html = render.build_html(_PAYLOAD)
+    start = html.split("function render(){", 1)[1].split("renderChampions(pool);", 1)[0]
+    source = render.FILTER_JS + """
+const document={querySelector:()=>({}),getElementById:()=>({})};
+const q='',minGate=500,gradeFilter='',natClubQ='',salMin=null,salMax=null;
+const D={leaderboard:[
+ {player_name:'편중',matches:1000,rank_eligible:false},
+ {player_name:'통과',matches:500,rank_eligible:true},
+ {player_name:'미달',matches:499,rank_eligible:true}
+]};
+function poolNames(){
+""" + start + "return pool.map(c=>c.player_name).join(',');}"
+    assert _eval_js("poolNames()", source) == "통과"
+    assert "35% 이상이면 순위에서 제외" in html
 
 
 # ── 선수 이미지 ────────────────────────────────────────────────────────────

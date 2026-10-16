@@ -1,8 +1,4 @@
-"""fc-info 선수 정보 파싱·적재.
-
-fc-info.com 의 GK 검색 API 응답에서 우리가 쓸 필드(급여·기본OVR·키·몸무게·체형)만
-뽑아 player_info 에 캐시한다. 우리가 이미 가진 GK spid 만, 카드당 한 번만 받는다.
-"""
+"""공식 데이터센터 선수 정보 파싱·적재 및 기존 캐시/export 회귀 검증."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -12,6 +8,7 @@ import pytest
 from gksave.config import FC_RECHECK_DAYS
 from gksave.db import connect_memory
 from gksave.playerinfo import (
+    DATACENTER_BASE,
     FCINFO_BASE,
     PlayerInfo,
     attach_bio,
@@ -39,59 +36,73 @@ _ITEM = {
 }
 
 
+def _ability_html(item):
+    from html import escape
+    positions=item.get('positions') or []
+    ovr=positions[0].get('ovr') if positions else None
+    e=lambda value:escape(str(value),quote=True)
+    return f"""<div class="ovr value">{e(ovr)}</div><div class="pay_side">{e(item.get('salary'))}</div>
+<div class="name">{e(item.get('name','테스트 선수'))}</div>
+<span class="etc height">{e(item.get('height',''))}cm</span><span class="etc weight">{e(item.get('weight',''))}kg</span>
+<span class="etc physical">{e(item.get('bodyType',''))}</span>
+<div class="season"><img src="{e(item.get('classImg',''))}"></div>
+<script>var playerData = {{spid: {item.get('id',0)}, strong: 1}};</script>"""
+
+
+def _seed_export_matches(con, detail):
+    """카드마다 세 유저로 분산해 35% 편중 기준을 통과하는 export 표본."""
+    from copy import deepcopy
+    from gksave import agg
+    from gksave.codec import encode_payload
+
+    for i in range(3):
+        match = deepcopy(detail)
+        match["matchId"] = f"{detail['matchId']}-{i}"
+        for team, info in enumerate(match["matchInfo"]):
+            info["ouid"] = f"synthetic-export-{i}-{team}"
+        con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)",
+                    [match["matchId"], encode_payload(match)])
+    agg.rebuild(con)
+
+
 def test_parse_extracts_wanted_fields():
-    p = parse_player(_ITEM)
-    assert p == PlayerInfo(
-        spid=825192448, name="M. 테어슈테겐", salary=24,
-        ovr=113, height=187, weight=85, body_type="보통",
-    )
+    p=parse_player(_ability_html(_ITEM),_ITEM['id'])
+    assert p == PlayerInfo(spid=825192448,name="M. 테어슈테겐",salary=24,ovr=113,height=187,weight=85,body_type="보통")
 
 
-def test_ovr_comes_from_first_position():
-    p = parse_player(_ITEM)
-    assert p.ovr == 113
-
-
-def test_missing_id_returns_none():
-    assert parse_player({**_ITEM, "id": None}) is None
-    item = dict(_ITEM); del item["id"]
-    assert parse_player(item) is None
+def test_missing_or_wrong_card_id_returns_none():
+    assert parse_player(_ability_html(_ITEM),300000010) is None
+    assert parse_player('<html>점검 중</html>',_ITEM['id']) is None
 
 
 def test_missing_physical_is_tolerated_as_none():
-    # 급여/체격이 빠진 카드도 크래시 없이 부분 저장 (있는 것만)
-    p = parse_player({"id": 1, "name": "x", "positions": [{"ovr": 90}]})
-    assert p.spid == 1 and p.ovr == 90
-    assert p.salary is None and p.height is None and p.body_type is None
+    p=parse_player(_ability_html({'id':1,'name':'x','salary':5,'positions':[{'ovr':90}]}),1)
+    assert p.spid==1 and p.ovr==90 and p.height is None
 
 
-def test_empty_positions_leaves_ovr_none():
-    p = parse_player({**_ITEM, "positions": []})
-    assert p.ovr is None
-    assert p.salary == 24        # 나머지는 그대로
+def test_missing_base_ovr_is_not_cached():
+    assert parse_player(_ability_html({**_ITEM,'positions':[]}),_ITEM['id']) is None
 
 
-def test_non_gk_position_ovr_still_taken_from_first():
-    # 검색을 GK(20)로 걸었으므로 positions[0] 이 GK. 그대로 신뢰.
-    p = parse_player({**_ITEM, "positions": [{"positionId": 20, "ovr": 120}]})
-    assert p.ovr == 120
+def test_non_gk_card_uses_primary_base_ovr():
+    assert parse_player(_ability_html({**_ITEM,'positions':[{'positionId':4,'ovr':120}]}),_ITEM['id']).ovr==120
 
 
-# ── sync_player_info: 우리 spid만 · 카드당 한 번 · 반복 안 함 ─────────────────
-
-def _mock_by_name(catalog):
-    """catalog: {name: [player dict, ...]}. names 배열 요청에 매칭 카드를 돌려주는 목."""
-    import json as _json
-    calls = {"n": 0, "names": [], "batches": []}
-
+def _mock_cards(catalog):
+    import json
+    calls = {'n': 0, 'names': []}
     def handler(request):
-        calls["n"] += 1
-        names = _json.loads(request.content).get("names", [])
-        calls["names"].extend(names)
-        calls["batches"].append(names)
-        items = [p for nm in names for p in catalog.get(nm, [])]
-        return httpx.Response(200, json={"items": items, "nextCursor": None, "hasNext": False})
-
+        assert request.url.host == 'fc-info.com'
+        assert request.url.path == '/local-api/v2/players/search'
+        calls['n'] += 1
+        name = json.loads(request.content)['names'][0]
+        calls['names'].append(name)
+        items = [{'name': name, 'salary': 5, 'positions': [{'ovr': 90}], 'grade': 1, **p}
+                 for p in catalog.get(name, [])]
+        for item in items:
+            if not item['positions']:
+                item['positions'] = [{'ovr': 90}]
+        return httpx.Response(200, json={'items': items, 'hasNext': False})
     client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
     client._calls = calls
     return client
@@ -104,85 +115,37 @@ def _seed_gk(con, spid, name):
                 [spid, name])
 
 
-def test_searches_by_our_player_names_and_stores_matches():
-    con = connect_memory()
-    _seed_gk(con, 100, "가")
-    _seed_gk(con, 200, "나")
-    client = _mock_by_name({
-        "가": [{"id": 100, "name": "가", "salary": 5, "height": 190, "weight": 80,
-                "bodyType": "보통", "positions": [{"ovr": 100}]},
-               {"id": 999, "name": "가", "salary": 9, "positions": [{"ovr": 130}]}],  # 우리 것 아님
-        "나": [{"id": 200, "name": "나", "salary": 7, "positions": [{"ovr": 110}]}],
-    })
-    delays = []
-    r = sync_player_info(con, client=client, sleep=delays.append, log=lambda _m: None)
-    rows = con.execute("SELECT spid, salary FROM player_info ORDER BY spid").fetchall()
-    assert rows == [(100, 5), (200, 7)]          # 999(우리 것 아님)는 저장 안 됨
-    assert r["new"] == 2
-    assert set(client._calls["names"]) == {"가", "나"}   # 우리 이름만 물어봄
-    assert client._calls["batches"] == [["가"], ["나"]]  # 기본은 한 이름씩
-    assert delays == [1.0]                                 # 이름 사이에도 지연
-
-
-def test_follows_name_search_pagination_with_delay():
-    import json as _json
-
-    con = connect_memory()
-    _seed_gk(con, 100, "가")
-    calls = []
-    delays = []
-
-    def handler(request):
-        body = _json.loads(request.content)
-        calls.append(body.get("cursor"))
-        if "cursor" not in body:
-            return httpx.Response(200, json={
-                "items": [{"id": 999, "salary": 9, "positions": []}],
-                "nextCursor": "next-page",
-                "hasNext": True,
-            })
-        return httpx.Response(200, json={
-            "items": [
-                {"id": 100, "salary": 5, "positions": [{"ovr": 90}]},
-                {"id": 100, "salary": 5, "positions": [{"ovr": 90}]},
-            ],
-            "nextCursor": None,
-            "hasNext": False,
-        })
-
-    client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
-    r = sync_player_info(
-        con, client=client, batch_delay=2.0, sleep=delays.append, log=lambda _m: None,
-    )
-
-    assert calls == [None, "next-page"]
-    assert delays == [2.0]
-    assert r["new"] == 1
-    assert con.execute("SELECT salary FROM player_info WHERE spid=100").fetchone()[0] == 5
+def test_searches_names_and_stores_only_our_exact_card_ids():
+    con=connect_memory()
+    _seed_gk(con,100,'가');_seed_gk(con,200,'나')
+    client=_mock_cards({'가':[{'id':100,'salary':5},{'id':999,'salary':9}], '나':[{'id':200,'salary':7}]})
+    delays=[]
+    assert sync_player_info(con,client=client,sleep=delays.append,log=lambda _:None)['new']==2
+    assert con.execute('SELECT spid,salary FROM player_info ORDER BY spid').fetchall()==[(100,5),(200,7)]
+    assert client._calls['names']==['가','나'] and delays==[3.0,3.0]
 
 
 def test_skips_already_cached_and_short_circuits_network():
-    con = connect_memory()
-    _seed_gk(con, 100, "가")
-    con.execute("INSERT INTO player_info (spid, salary) VALUES (100, 5)")   # 이미 있음
-    client = _mock_by_name({"가": [{"id": 100, "salary": 999, "positions": []}]})
-    r = sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert client._calls["n"] == 0               # 채울 게 없으니 fc-info 호출 0
-    assert r["new"] == 0
-    assert con.execute("SELECT salary FROM player_info WHERE spid=100").fetchone()[0] == 5
+    con=connect_memory();_seed_gk(con,100,'가')
+    con.execute('INSERT INTO player_info (spid,salary) VALUES (100,5)')
+    client=_mock_cards({'가':[{'id':100,'salary':999}]})
+    assert sync_player_info(con,client=client,sleep=lambda _:None,log=lambda _:None)['new']==0
+    assert client._calls['n']==0 and con.execute('SELECT salary FROM player_info WHERE spid=100').fetchone()[0]==5
 
 
-def test_batches_names_max_10_per_request():
-    con = connect_memory()
-    cat = {}
-    for i in range(23):
-        _seed_gk(con, 1000 + i, f"p{i}")
-        cat[f"p{i}"] = [{"id": 1000 + i, "salary": i, "positions": [{"ovr": 90}]}]
-    client = _mock_by_name(cat)
-    r = sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None,
-                         name_batch=10)
-    assert r["new"] == 23
-    assert client._calls["n"] == 3               # 23개 이름 → 10,10,3 → 3 요청
+def test_defender_collection_caches_only_our_cards_once():
+    con=connect_memory();_seed_gk(con,300000001,'골키퍼')
+    con.execute('INSERT INTO player_info (spid) VALUES (300000001)')
+    con.execute("INSERT INTO defense_match (match_id,gk_ouid,cb1_sp_id,cb2_sp_id) VALUES ('synthetic','synthetic-user',300000010,300000020)")
+    for spid in (300000010,300000020):
+        con.execute("INSERT INTO meta_spid (sp_id,name) VALUES (?, '센터백')", [spid])
+    client=_mock_cards({'센터백':[{'id':s,'salary':20,'classImg':'https://ssl.nexon.com/season.png'} for s in [300000010,300000020,300000999]]})
+    assert sync_player_info(con,client=client,sleep=lambda _:None,log=lambda _:None)['new']==0
+    assert sync_player_info(con,client=client,include_defenders=True,sleep=lambda _:None,log=lambda _:None)['new']==2
+    assert client._calls['names']==['센터백']
+    assert con.execute('SELECT img FROM season_img WHERE season_id=300').fetchone()[0].endswith('season.png')
+    assert sync_player_info(con,client=client,include_defenders=True,sleep=lambda _:None,log=lambda _:None)['new']==0
+    assert client._calls['n']==1
 
 
 def test_season_of_is_first_three_digits():
@@ -190,25 +153,21 @@ def test_season_of_is_first_three_digits():
     assert season_of(100238380) == 100      # ICON 100...
 
 
-def test_season_img_url_from_classimg():
-    # fc-info classImg 에서 시즌 엠블럼 URL 을 그대로 뽑는다(넥슨 CDN).
-    it = {"id": 861048940, "classImg":
-          "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/WG.png"}
-    assert season_img_url(it) == \
-        "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/WG.png"
+def test_season_img_url_from_official_markup():
+    url='https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/WG.png'
+    assert season_img_url(_ability_html({**_ITEM,'classImg':url}))==url
 
 
 def test_season_img_url_none_when_missing():
-    assert season_img_url({"id": 1}) is None
-    assert season_img_url({"id": 1, "classImg": ""}) is None
+    assert season_img_url(_ability_html(_ITEM)) is None
+    assert season_img_url('<html>점검</html>') is None
 
 
 def test_export_attaches_player_info_by_spid():
-    from gksave import agg, export
+    from gksave import export
 
     con = connect_memory()
     # 카드 하나(spid 500, 10강)를 게이트 통과시킬 만큼 넣는다
-    from gksave.codec import encode_payload
     detail = {
         "matchId": "e1", "matchType": 50, "matchDate": "2026-06-20T00:00:00",
         "matchInfo": [
@@ -217,8 +176,7 @@ def test_export_attaches_player_info_by_spid():
              "shootDetail": [{"result": 1, "type": 1, "x": 0.9, "y": 0.5}]},
         ],
     }
-    con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)", ["e1", encode_payload(detail)])
-    agg.rebuild(con)
+    _seed_export_matches(con, detail)
     con.execute("INSERT INTO player_info (spid, salary, ovr, height, weight, body_type) "
                 "VALUES (500, 24, 113, 187, 85, '보통')")
 
@@ -233,8 +191,7 @@ def test_export_splits_detail_into_details_json(tmp_path):
     """페이지 경량화: index.html 엔 상세(zones/types/extras) 없이 slim, details.json 에 분리."""
     import json as _json
 
-    from gksave import agg, export
-    from gksave.codec import encode_payload
+    from gksave import export
 
     con = connect_memory()
     detail = {
@@ -245,8 +202,7 @@ def test_export_splits_detail_into_details_json(tmp_path):
              "shootDetail": [{"result": 1, "type": 1, "x": 0.9, "y": 0.5}]},
         ],
     }
-    con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)", ["e1", encode_payload(detail)])
-    agg.rebuild(con)
+    _seed_export_matches(con, detail)
 
     export.export(con, tmp_path, gate=1)
 
@@ -280,8 +236,7 @@ def test_export_splits_detail_into_details_json(tmp_path):
 
 
 def test_export_attaches_season_img():
-    from gksave import agg, export
-    from gksave.codec import encode_payload
+    from gksave import export
 
     con = connect_memory()
     detail = {
@@ -292,8 +247,7 @@ def test_export_attaches_season_img():
              "shootDetail": [{"result": 1, "type": 1, "x": 0.9, "y": 0.5}]},
         ],
     }
-    con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)", ["s1", encode_payload(detail)])
-    agg.rebuild(con)
+    _seed_export_matches(con, detail)
     con.execute("INSERT INTO season_img (season_id, img) VALUES (861, 'https://x/WG.png')")
 
     c = export.build_payload(con, gate=1)["leaderboard"][0]
@@ -305,8 +259,7 @@ def test_export_backfills_physical_by_pid():
 
     급여·OVR 은 카드별이라 역채움하지 않는다.
     """
-    from gksave import agg, export
-    from gksave.codec import encode_payload
+    from gksave import export
 
     con = connect_memory()
     # 우리 카드: spid 846193080 (pid 193080). player_info 엔 다른 시즌 카드 231193080 만 있음.
@@ -318,8 +271,7 @@ def test_export_backfills_physical_by_pid():
              "shootDetail": [{"result": 1, "type": 1, "x": 0.9, "y": 0.5}]},
         ],
     }
-    con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)", ["e2", encode_payload(detail)])
-    agg.rebuild(con)
+    _seed_export_matches(con, detail)
     con.execute("INSERT INTO player_info (spid, salary, ovr, height, weight, body_type) "
                 "VALUES (231193080, 30, 125, 192, 76, '보통')")
 
@@ -334,7 +286,7 @@ def test_export_backfills_physical_by_pid():
 def test_salary_and_all_fields_persisted():
     con = connect_memory()
     _seed_gk(con, 825192448, "M. 테어슈테겐")
-    client = _mock_by_name({"M. 테어슈테겐": [{
+    client = _mock_cards({"M. 테어슈테겐": [{
         "id": 825192448, "name": "M. 테어슈테겐", "salary": 24,
         "height": 187, "weight": 85, "bodyType": "보통",
         "positions": [{"ovr": 113}],
@@ -346,23 +298,13 @@ def test_salary_and_all_fields_persisted():
     assert row == (24, 113, 187, 85, "보통")     # 급여 포함 전부 저장
 
 
-# ── 국가·클럽 파싱 (fc-info 상세페이지 HTML) ─────────────────────────────────
+# ── 국가·클럽 파싱 (공식 데이터센터 상세페이지 HTML) ─────────────────────────────────
 
-def _detail_html(nation_code, nation_name, clubs):
-    """실제 fc-info 상세페이지의 국가·클럽 마크업을 최소 재현한 HTML.
-
-    클럽 경력은 실제처럼 __next_f 스트리밍 JSON(백슬래시 이스케이프)으로 재현한다.
-    startYear 를 내림차순으로 줘 clubs 입력 순서가 그대로 최신순 출력이 되게 한다.
-    league 를 중첩해 클럽명만(리그명 아님) 잡히는지도 함께 검증한다.
-    """
-    flag = (f'<img src="https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/'
-            f'countries/smallflags/{nation_code}.png" alt="nationality"/>'
-            f'<span>{nation_name}</span>') if nation_code is not None else ''
-    items = ','.join(
-        f'\\"id\\":{100 + i},\\"club\\":{{\\"id\\":{i},\\"name\\":\\"{c}\\",'
-        f'\\"league\\":{{\\"id\\":1,\\"name\\":\\"어떤리그\\"}}}},\\"startYear\\":{2020 - i}'
-        for i, c in enumerate(clubs))
-    return f'<div>{flag}</div><div>클럽 경력 [{items}]</div>'
+def _detail_html(nation_code,nation_name,clubs):
+    from html import escape
+    nation=(f'<div class="etc nation"><span class="img"><img src="https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/countries/smallflags/{nation_code}.png"></span><span class="txt">{escape(nation_name)}</span></div>') if nation_code is not None else ''
+    history=''.join(f'<div class="td club">{escape(c)}</div>' for c in clubs)
+    return f'{nation}<div class="content data_detail_club">{history}</div>'
 
 
 def test_parse_bio_single_club():
@@ -389,17 +331,19 @@ def test_parse_bio_missing_nation_keeps_code_none_but_clubs():
 # ── sync_player_detail: per-spid 단일 패스로 특성 + 국가·클럽 통합 수집 ────────
 
 def _mock_full(by_spid):
-    """{spid: (code, name, [clubs], [traits])} → /player/{spid} 에 국가·클럽+특성 HTML."""
-    calls = {"paths": []}
-
+    from urllib.parse import parse_qs
+    calls={'paths':[], 'detail_paths':[]}
     def handler(request):
-        calls["paths"].append(request.url.path)
-        spid = int(request.url.path.rsplit("/", 1)[-1])
-        code, name, clubs, traits = by_spid.get(spid, (None, None, [], []))
-        return httpx.Response(200, text=_detail_html(code, name, clubs) + _trait_html(traits))
-
-    client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
-    client._calls = calls
+        spid=int(parse_qs(request.content.decode())['spid'][0]) if request.method=='POST' else int(request.url.params['spid'])
+        code,name,clubs,traits=by_spid.get(spid,(None,None,[],[]))
+        if request.method=='POST':
+            calls['paths'].append(f'{request.url.path}?spid={spid}')
+            html=_ability_html({'id':spid,'salary':5,'positions':[{'ovr':90}]})+_detail_html(code,name,[])+_trait_html(traits)
+        else:
+            calls['detail_paths'].append(f'{request.url.path}?spid={spid}')
+            html=_detail_html(None,None,clubs)
+        return httpx.Response(200,text=html)
+    client=httpx.Client(base_url=DATACENTER_BASE,transport=httpx.MockTransport(handler));client._calls=calls
     return client
 
 
@@ -411,8 +355,12 @@ def test_sync_detail_stores_traits_and_bio_in_one_pass():
         100238380: (40, "러시아", ["디나모 모스크바"], [(60, "GK 공중볼 장악"), (20, "GK 능숙한 펀칭")]),
         100001179: (27, "이탈리아", ["유벤투스"], [(43, "스위퍼 키퍼")]),
     })
-    r = sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
+    logs = []
+    r = sync_player_detail(con, client=client, sleep=lambda _x: None, log=logs.append)
     assert r["new"] == 2 and r["bio_new"] == 2 and r["failed"] == 0
+    assert any("대상 2장" in line for line in logs)
+    assert any("1/2 카드" in line and "조회 중" in line for line in logs)
+    assert any("2/2 완료" in line for line in logs)
     # 특성(spid별, is_new 코드 판별)
     traits = con.execute(
         "SELECT spid, trait_code, is_new FROM player_trait ORDER BY spid, ord").fetchall()
@@ -461,7 +409,7 @@ def test_sync_detail_revisits_for_missing_bio_only():
     # player_bio 는 비어 있음 → 특성 캐시됐어도 bio 때문에 재방문해야 한다
     client = _mock_full({100238380: (40, "러시아", ["디나모 모스크바", "스파르타크"], [(99, "무시")])})
     r = sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert client._calls["paths"] == ["/player/100238380"]       # 재방문함
+    assert client._calls["paths"] == ["/datacenter/PlayerAbility?spid=100238380"]       # 재방문함
     assert r["new"] == 0 and r["bio_new"] == 1                    # 특성 신규 아님, bio 신규
     assert con.execute(                                          # 특성은 원래 것 유지(99 로 안 덮음)
         "SELECT trait_code FROM player_trait WHERE spid=100238380").fetchall() == [(60,)]
@@ -472,7 +420,7 @@ def test_sync_detail_revisits_for_missing_bio_only():
 
 
 def test_resync_bio_uses_majority_nation():
-    # 같은 선수(pid 234642)의 여러 시즌 카드 국적이 세네갈 3 vs 프랑스 1(fc-info 오류) →
+    # 같은 선수(pid 234642)의 여러 시즌 카드 국적이 세네갈 3 vs 프랑스 1(공식 데이터센터 오류) →
     # 다수결로 세네갈 채택. 클럽은 가장 많이 담긴 카드(3개)를 채택.
     con = connect_memory()
     for spid in (216234642, 260234642, 502234642, 845234642):
@@ -502,8 +450,7 @@ def test_sync_detail_limit_caps_requests():
 
 
 def test_export_attaches_bio_by_pid():
-    from gksave import agg, export
-    from gksave.codec import encode_payload
+    from gksave import export
 
     con = connect_memory()
     # 카드 spid 846193080 (pid 193080). bio 는 pid 193080 로 저장.
@@ -515,8 +462,7 @@ def test_export_attaches_bio_by_pid():
              "shootDetail": [{"result": 1, "type": 1, "x": 0.9, "y": 0.5}]},
         ],
     }
-    con.execute("INSERT INTO raw_match (match_id, payload) VALUES (?, ?)", ["b1", encode_payload(detail)])
-    agg.rebuild(con)
+    _seed_export_matches(con, detail)
     con.execute("INSERT INTO player_bio (pid, nation_code, nation_name) VALUES (193080, 21, '독일')")
     con.execute("INSERT INTO player_club (pid, ord, club_name) VALUES (193080, 0, '바이에른 뮌헨')")
 
@@ -536,7 +482,7 @@ def test_attach_bio_none_when_absent():
 # ── 특성(트레잇): 파싱 · is_new · per-spid 수집 · attach ─────────────────────
 
 def _trait_html(traits):
-    """fc-info 상세페이지 특성 마크업 최소 재현. traits = [(code, name), ...]."""
+    """공식 데이터센터 상세페이지 특성 마크업 최소 재현. traits = [(code, name), ...]."""
     items = ''.join(
         f'<div class="PlayerSkills_tooltip__VemEh">'
         f'<img class="PlayerSkills_skillImg___uM3S" src="https://fco.dn.nexoncdn.co.kr/'
@@ -569,13 +515,13 @@ def test_attach_trait_by_spid():
 
 
 # ── 조회 기록(negative cache): "받아봤지만 없더라" 를 기억해 재조회를 막는다 ──────
-# fc-info 에 없는 카드(이름 미등재)나 특성이 0개인 카드는 저장할 행이 없어서, 증분 판정을
+# 공식 데이터센터 에 없는 카드(이름 미등재)나 특성이 0개인 카드는 저장할 행이 없어서, 증분 판정을
 # "결과 테이블에 행이 있냐" 로만 하면 매 실행마다 다시 조회된다. 조회 시도 자체를 기록한다.
 
 def test_sync_info_remembers_attempt_when_player_not_found():
     con = connect_memory()
     _seed_gk(con, 100, "없는선수")
-    client = _mock_by_name({})                    # fc-info 가 아무것도 안 돌려줌
+    client = _mock_cards({})                    # 공식 데이터센터 가 아무것도 안 돌려줌
     sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
     assert client._calls["n"] == 1                # 1회는 물어봤다
     sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
@@ -588,9 +534,9 @@ def test_sync_detail_remembers_fetch_of_traitless_card():
     # 페이지는 정상인데 특성이 0개 → player_trait 에 남는 행이 없다
     client = _mock_full({100238380: (40, "러시아", ["디나모 모스크바"], [])})
     sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert client._calls["paths"] == ["/player/100238380"]
+    assert client._calls["paths"] == ["/datacenter/PlayerAbility?spid=100238380"]
     sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert client._calls["paths"] == ["/player/100238380"]   # 재조회 없음
+    assert client._calls["paths"] == ["/datacenter/PlayerAbility?spid=100238380"]   # 재조회 없음
 
 
 def test_sync_detail_does_not_remember_failed_fetch():
@@ -603,7 +549,7 @@ def test_sync_detail_does_not_remember_failed_fetch():
         calls["n"] += 1
         return httpx.Response(500)
 
-    client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
+    client = httpx.Client(base_url=DATACENTER_BASE, transport=httpx.MockTransport(handler))
     r = sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
     assert r["failed"] == 1
     sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
@@ -611,13 +557,13 @@ def test_sync_detail_does_not_remember_failed_fetch():
 
 
 def test_fetch_log_expires_so_new_cards_get_a_retry():
-    # fc-info 는 신규 카드를 늦게 올린다. 영구 차단하면 그 카드는 영영 못 받는다.
+    # 공식 데이터센터 는 신규 카드를 늦게 올린다. 영구 차단하면 그 카드는 영영 못 받는다.
     con = connect_memory()
     _seed_gk(con, 100, "가")
     stale = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=FC_RECHECK_DAYS + 1)
-    con.execute("INSERT INTO fc_fetch_log (kind, spid, fetched_at) VALUES ('info', 100, ?)",
+    con.execute("INSERT INTO fc_fetch_log (kind, spid, fetched_at) VALUES ('fc-info-info', 100, ?)",
                 [stale])
-    client = _mock_by_name({"가": [{"id": 100, "salary": 5, "positions": [{"ovr": 90}]}]})
+    client = _mock_cards({"가": [{"id": 100, "salary": 5, "positions": [{"ovr": 90}]}]})
     r = sync_player_info(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
     assert client._calls["n"] == 1 and r["new"] == 1   # 기간이 지났으면 다시 물어본다
 
@@ -625,8 +571,8 @@ def test_fetch_log_expires_so_new_cards_get_a_retry():
 def test_retry_missing_ignores_recent_fetch_log_once():
     con = connect_memory()
     _seed_gk(con, 100, "가")
-    con.execute("INSERT INTO fc_fetch_log (kind, spid) VALUES ('info', 100)")
-    client = _mock_by_name({"가": [{"id": 100, "salary": 5, "positions": []}]})
+    con.execute("INSERT INTO fc_fetch_log (kind, spid) VALUES ('fc-info-info', 100)")
+    client = _mock_cards({"가": [{"id": 100, "salary": 5, "positions": []}]})
 
     r = sync_player_info(
         con, client=client, retry_missing=True, sleep=lambda _x: None, log=lambda _m: None,
@@ -635,19 +581,11 @@ def test_retry_missing_ignores_recent_fetch_log_once():
     assert client._calls["n"] == 1 and r["new"] == 1
 
 
-def test_sync_season_img_remembers_seasons_missing_from_catalog():
-    # 카탈로그에 없는 시즌이 하나라도 남으면 매 실행마다 목록을 최대 60페이지까지 훑는다.
-    # 훑어봤다는 사실을 기록해 다음 실행에서 건너뛴다.
+def test_sync_season_img_remembers_a_valid_card_without_season_image():
     con = connect_memory()
-    _seed_gk(con, 861048940, "가")          # 시즌 861 — 카탈로그에 없음
-    calls = {"n": 0}
-
-    def handler(_request):
-        calls["n"] += 1
-        return httpx.Response(200, json={"items": [], "nextCursor": None, "hasNext": False})
-
-    client = httpx.Client(base_url=FCINFO_BASE, transport=httpx.MockTransport(handler))
-    r = sync_season_img(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert calls["n"] == 1 and r["need"] == 1     # 못 찾음
-    sync_season_img(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
-    assert calls["n"] == 1                        # 두 번째엔 목록을 안 훑는다
+    _seed_gk(con, 861048940, '가')
+    client = _mock_cards({'가': [{'id': 861048940}]})
+    result = sync_season_img(con, client=client, sleep=lambda _: None, log=lambda _: None)
+    assert result['need'] == 1 and client._calls['n'] == 1
+    sync_season_img(con, client=client, sleep=lambda _: None, log=lambda _: None)
+    assert client._calls['n'] == 1

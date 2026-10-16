@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """트레잇 아이콘을 배경색으로 분류해 신규특성(금색) 코드 집합을 재생성한다.
 
-fc-info/넥슨 CDN 의 트레잇 아이콘(traits/trait_icon_{code}.png)은 신규특성이면 배경이
+넥슨 CDN 의 트레잇 아이콘(traits/trait_icon_{code}.png)은 신규특성이면 배경이
 금색, 일반특성이면 회색이다. HTML 마크업엔 구분 표식이 없어(클래스 동일) 아이콘 픽셀
 색으로만 판별한다. 이 스크립트가 뽑은 코드 집합을 config.NEW_TRAIT_CODES 에 반영한다.
 

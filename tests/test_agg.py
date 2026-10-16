@@ -69,7 +69,7 @@ def test_leaderboard_ranks_by_save_pct(con, sample_detail):
     lb = agg.card_leaderboard(con, gate=1)
     ids = [r["gk_sp_id"] for r in lb]
     assert ids == [280000002, 300000001]      # 0.75 > 0.667
-    assert lb[0]["rank"] == 1
+    assert all(r["rank"] is None and not r["rank_eligible"] for r in lb)
     assert lb[0]["save_pct"] == pytest.approx(0.75)
     assert lb[1]["save_pct"] == pytest.approx(2 / 3)
     assert lb[0]["matches"] == 1
@@ -140,7 +140,8 @@ def test_gsax_league_sum_is_zero(con):
     assert len(lb) == 2
     assert abs(sum(r["gsax"] for r in lb)) < 1e-6          # 리그 Σ GSAx = 0
     assert all(r["gsax_per_shot"] is not None for r in lb)
-    assert lb[0]["rank"] == 1 and lb[0]["gsax_per_shot"] >= lb[1]["gsax_per_shot"]
+    assert all(r["rank"] is None for r in lb)  # 한 유저 표본도 통계는 보존
+    assert lb[0]["gsax_per_shot"] >= lb[1]["gsax_per_shot"]
 
 
 def test_card_extras(con):
@@ -267,7 +268,8 @@ def test_until_excludes_upper_bound(con):
 def test_rank_timeseries_shape_and_window(con):
     from datetime import datetime
     for d in (10, 12, 14, 16, 18, 20):
-        _insert(con, _dated(f"t{d}", d, 500, 10, saves=3, goals=1))
+        for u in ("U", "V", "W"):
+            _insert(con, _dated(f"t{d}{u}", d, 500, 10, saves=3, goals=1, ouid=u))
     agg.rebuild(con)
     ts = agg.rank_timeseries(con, gate=1, window_days=4, step_days=2,
                              end=datetime(2026, 6, 20))
@@ -285,14 +287,14 @@ def test_rank_timeseries_shape_and_window(con):
 def test_rank_timeseries_marks_gate_misses_as_none(con):
     """게이트 미달 시점은 None 이어야 차트에서 선이 끊긴다."""
     from datetime import datetime
-    _insert(con, _dated("a", 10, 500, 10, saves=3, goals=1))
-    _insert(con, _dated("b", 19, 500, 10, saves=3, goals=1))
-    _insert(con, _dated("c", 20, 500, 10, saves=3, goals=1))
+    for mid, day in (("a", 10), ("b", 19), ("c", 20)):
+        for u in ("U", "V", "W"):
+            _insert(con, _dated(mid + u, day, 500, 10, saves=3, goals=1, ouid=u))
     agg.rebuild(con)
-    ts = agg.rank_timeseries(con, gate=2, window_days=4, step_days=2,
+    ts = agg.rank_timeseries(con, gate=4, window_days=4, step_days=2,
                              end=datetime(2026, 6, 21))
     slot = ts["cards"]["500_10"]
-    assert slot[-1] is not None and slot[-1][0] == 2   # [6/17, 6/21) 에 19·20일 2경기
+    assert slot[-1] is not None and slot[-1][0] == 6   # 19·20일 각 3유저
     assert any(v is None for v in slot)                # 게이트 못 채운 시점이 있다
 
 
@@ -300,3 +302,51 @@ def test_rank_timeseries_empty_when_no_data(con):
     from datetime import datetime
     ts = agg.rank_timeseries(con, gate=1, end=datetime(2026, 6, 20))
     assert ts["points"] == [] and ts["cards"] == {}
+
+
+@pytest.mark.parametrize("counts,eligible", [([34, 33, 33], True), ([35, 33, 32], False),
+                                             ([36, 32, 32], False)])
+def test_user_concentration_boundary_and_contiguous_ranks(con, counts, eligible):
+    for sp_id, distribution in ((500, counts), (700, [1, 1, 1])):
+        for user, n in enumerate(distribution):
+            for i in range(n):
+                result = 1 if sp_id == 500 else 3
+                _insert(con, _match_faced(f"{sp_id}-{user}-{i}", f"U{user}", sp_id, 10,
+                                          [(result, 1, 0.8, 0.5)]))
+    agg.rebuild(con)
+    for leaderboard in (agg.card_leaderboard, agg.grade_leaderboard, agg.gsax_leaderboard):
+        by = {r["gk_sp_id"]: r for r in leaderboard(con, gate=1)}
+        assert by[500]["rank_eligible"] is eligible
+        assert by[500]["rank"] == (1 if eligible else None)
+        assert by[500]["max_user_share"] == pytest.approx(counts[0] / 100)
+        assert by[500]["users"] == 3 and by[500]["saves"] == 100
+        assert by[700]["rank"] == (2 if eligible else 1)
+
+
+def test_concentration_uses_same_grade_and_date_window(con):
+    from datetime import datetime
+    for day, grade, users in ((10, 10, ["U"] * 9), (20, 10, ["U", "V", "W"]),
+                               (20, 11, ["U"] * 9)):
+        for i, user in enumerate(users):
+            _insert(con, _dated(f"{day}-{grade}-{i}", day, 500, grade, 1, 0, user))
+    agg.rebuild(con)
+    rows = agg.grade_leaderboard(con, gate=1, since=datetime(2026, 6, 20),
+                                 until=datetime(2026, 6, 21))
+    by = {r["grade"]: r for r in rows if r["gk_sp_id"] == 500}
+    assert by[10]["rank_eligible"] and by[10]["matches"] == 3
+    assert not by[11]["rank_eligible"]
+    old = agg.grade_leaderboard(con, gate=1, until=datetime(2026, 6, 20))
+    assert not next(r for r in old if r["gk_sp_id"] == 500)["rank_eligible"]
+    ts = agg.rank_timeseries(con, gate=1, window_days=4, step_days=6,
+                             end=datetime(2026, 6, 21))
+    assert ts["cards"]["500_10"] == [None, [3, 3, 0]]
+
+
+def test_concentration_preserves_distinct_match_counts_for_same_card_opponents(con):
+    for i, (a, b) in enumerate((("U", "V"), ("V", "W"), ("W", "U"))):
+        _insert(con, _match(str(i), a, 500, 10, 1, 0, b, 500, 10))
+    agg.rebuild(con)
+    r = agg.grade_leaderboard(con, gate=1)[0]
+    assert r["matches"] == 3 and r["users"] == 3
+    assert r["max_user_share"] == pytest.approx(2 / 3)
+    assert r["rank"] is None

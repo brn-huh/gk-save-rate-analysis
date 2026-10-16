@@ -1,13 +1,13 @@
 """신규 시즌·신규 카드의 부가정보 결손 점검.
 
-update.sh 는 build+export 만 한다 — meta/playerinfo/playerdetail 은 수동이라
-새 시즌이 나오면 급여·특성·엠블럼이 빈 채로 배포된다. 그걸 찾아내는 진단용.
+update.sh의 선수 정보 갱신 후에도 외부 서비스 실패 등으로 남은
+급여·특성·엠블럼 결손을 찾아내는 진단용.
 
     python scripts/check_card_gaps.py [--days 30]
 
 --days: 최근 N일 안에 gk_match 에 처음 등장한 카드를 '신규'로 본다(기본 30).
 
-'미조회'(아직 안 받음) 와 '없음 확정'(받아봤는데 fc-info 에 없거나 특성 0개) 을
+'미조회'(아직 안 받음) 와 '없음 확정'(받아봤는데 공식 데이터센터에 없거나 특성 0개) 을
 fc_fetch_log 로 구분한다. 미조회만 실제 할 일이다.
 읽기 전용 — 수집 중이면 DuckDB 락 때문에 실패한다(수집 끝나고 실행할 것).
 """
@@ -87,7 +87,7 @@ def main() -> int:
                count(*) FILTER (WHERE l.spid IS NOT NULL) AS confirmed_absent
         FROM card_first c
         LEFT JOIN player_info p ON p.spid = c.spid
-        LEFT JOIN fc_fetch_log l ON l.spid = c.spid AND l.kind = 'info'
+        LEFT JOIN fc_fetch_log l ON l.spid = c.spid AND l.kind = 'fc-info-info'
         WHERE p.spid IS NULL GROUP BY 1 HAVING not_tried > 0 ORDER BY not_tried DESC
         """
     )
@@ -95,13 +95,13 @@ def main() -> int:
         """
         SELECT count(*) FROM card_first c
         LEFT JOIN player_info p ON p.spid = c.spid
-        JOIN fc_fetch_log l ON l.spid = c.spid AND l.kind = 'info'
+        JOIN fc_fetch_log l ON l.spid = c.spid AND l.kind = 'fc-info-info'
         WHERE p.spid IS NULL
         """
     )[0]
     tot = sum(r[1] for r in rows)
     print(f"\n[3] player_info 미조회 카드: {tot}장  → `gksave playerinfo`")
-    print(f"    (별개로 fc-info '미등재 확정' {absent}장 — 받아봤지만 없는 카드, 할 일 아님)")
+    print(f"    (별개로 fc-info '미등재 확인' {absent}장 — 재확인은 `gksave playerinfo --retry-missing`)")
     for sid, nt, ca in rows[:15]:
         print(f"    시즌 {sid}  미조회 {nt}장")
 
@@ -113,7 +113,7 @@ def main() -> int:
                (l.spid IS NOT NULL) AS searched
         FROM card_first c
         LEFT JOIN season_img s ON s.season_id = c.season_id
-        LEFT JOIN fc_fetch_log l ON l.spid = c.season_id AND l.kind = 'season'
+        LEFT JOIN fc_fetch_log l ON l.spid = c.season_id AND l.kind = 'fc-info-season'
         WHERE s.season_id IS NULL ORDER BY 1 DESC
         """
     )
@@ -124,7 +124,7 @@ def main() -> int:
         print("    " + ", ".join(str(s) for s in todo))
     if done:
         print(f"    (별개로 '못 찾음 확정' {len(done)}개: {', '.join(str(s) for s in done)}"
-              " — fc-info 목록에 없는 옛 시즌)")
+              " — fc-info에서 엠블럼을 찾지 못한 시즌)")
 
     # 5) 특성 (gksave playerdetail 로 해결)
     rows = q(
@@ -134,7 +134,7 @@ def main() -> int:
                count(*) FILTER (WHERE l.spid IS NOT NULL) AS confirmed_none
         FROM card_first c
         LEFT JOIN (SELECT DISTINCT spid FROM player_trait) t ON t.spid = c.spid
-        LEFT JOIN fc_fetch_log l ON l.spid = c.spid AND l.kind = 'detail'
+        LEFT JOIN fc_fetch_log l ON l.spid = c.spid AND l.kind = 'nexon-detail'
         WHERE t.spid IS NULL GROUP BY 1 HAVING not_tried > 0 ORDER BY not_tried DESC
         """
     )
@@ -142,7 +142,7 @@ def main() -> int:
         """
         SELECT count(*) FROM card_first c
         LEFT JOIN (SELECT DISTINCT spid FROM player_trait) t ON t.spid = c.spid
-        JOIN fc_fetch_log l ON l.spid = c.spid AND l.kind = 'detail'
+        JOIN fc_fetch_log l ON l.spid = c.spid AND l.kind = 'nexon-detail'
         WHERE t.spid IS NULL
         """
     )[0]

@@ -11,7 +11,9 @@ raw_match 경계 덕에 지표를 추가할 때 원본을 다시 긁지 않는�
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import duckdb
 
@@ -42,7 +44,7 @@ CREATE TABLE IF NOT EXISTS meta_season (
     class_name VARCHAR
 );
 
--- 선수 부가정보 캐시 (fc-info GK 검색). 우리 gk_sp_id 만, 카드당 1회.
+-- 선수 부가정보 캐시 (fc-info). 우리 GK/CB 카드만, 카드당 1회.
 -- 급여·기본OVR 은 카드(spid)별, 키·몸무게·체형은 실선수 속성. 반복 수집 안 함.
 CREATE TABLE IF NOT EXISTS player_info (
     spid       BIGINT PRIMARY KEY,
@@ -55,14 +57,14 @@ CREATE TABLE IF NOT EXISTS player_info (
     fetched_at TIMESTAMP DEFAULT now()
 );
 
--- 시즌 엠블럼 이미지 (season_id → 넥슨 CDN URL). fc-info classImg 에서 얻어 매핑만 저장,
+-- 시즌 엠블럼 이미지 (season_id → 넥슨 CDN URL). 두 출처에서 얻어 매핑만 저장,
 -- 이미지 자체는 ssl.nexon.com 에서 직접 로드. 시즌은 ~149개뿐이라 가볍다.
 CREATE TABLE IF NOT EXISTS season_img (
     season_id INTEGER PRIMARY KEY,
     img       VARCHAR
 );
 
--- 선수 국적 (pid → 국가). fc-info 상세페이지에서 pid당 1회 수집. 국가는 시즌 무관 선수 속성이라
+-- 선수 국적 (pid → 국가). 공식 데이터센터에서 pid당 1회 수집. 국가는 시즌 무관 선수 속성이라
 -- spid(카드) 아닌 pid(실선수) 키. nation_code 로 넥슨 CDN 국기(countries/smallflags/{code}.png) 로드.
 CREATE TABLE IF NOT EXISTS player_bio (
     pid         BIGINT PRIMARY KEY,
@@ -91,7 +93,8 @@ CREATE TABLE IF NOT EXISTS player_trait (
     PRIMARY KEY (spid, ord)
 );
 
--- fc-info 조회 시도 기록(negative cache). kind: 'info'(검색) | 'detail'(상세페이지).
+-- 조회 시도 기록(negative cache). fc-info- / nexon- 접두사로 출처를 구분하고 과거 기록은 보존한다.
+-- 이전 kind: 'info'(검색) | 'detail'(상세페이지).
 -- 미등재 카드나 특성 0개 카드는 결과 테이블에 남는 행이 없어, 결과만 보면 매번 재조회하게 된다.
 -- "언제 받아봤는지"를 남겨 config.FC_RECHECK_DAYS 동안 건너뛴다. 성공한 조회만 기록한다
 -- (일시적 실패까지 기록하면 그 카드는 TTL 동안 못 받는다).
@@ -131,6 +134,24 @@ CREATE TABLE IF NOT EXISTS shot (
     hit_post     BOOLEAN,
     x            DOUBLE,
     y            DOUBLE
+);
+
+-- 경기 명단의 4백. CB는 순서 무관, 풀백은 후속 필터를 위해 좌우 구분해 보관한다.
+CREATE TABLE IF NOT EXISTS defense_match (
+    match_id VARCHAR,
+    match_date TIMESTAMP,
+    gk_ouid VARCHAR,
+    gk_sp_id BIGINT,
+    gk_sp_grade INTEGER,
+    cb1_sp_id BIGINT,
+    cb1_grade INTEGER,
+    cb2_sp_id BIGINT,
+    cb2_grade INTEGER,
+    lb_sp_id BIGINT,
+    lb_grade INTEGER,
+    rb_sp_id BIGINT,
+    rb_grade INTEGER,
+    PRIMARY KEY (match_id, gk_ouid)
 );
 
 -- ── 조회 편의 뷰 (이름·시즌·강화 조인) ──────────────────────────
@@ -186,6 +207,7 @@ _MIGRATIONS = (
     "ALTER TABLE gk_match  ADD COLUMN IF NOT EXISTS aerial_success INTEGER",
     # 증분 빌드: 파싱 완료된 매치 추적 (NULL = 미파싱)
     "ALTER TABLE raw_match ADD COLUMN IF NOT EXISTS parsed_at TIMESTAMP",
+    "ALTER TABLE raw_match ADD COLUMN IF NOT EXISTS defense_parsed_at TIMESTAMP",
 )
 
 
@@ -241,3 +263,23 @@ def have_match(con: duckdb.DuckDBPyConnection, match_id: str) -> bool:
 
 def raw_match_count(con: duckdb.DuckDBPyConnection) -> int:
     return con.execute("SELECT count(*) FROM raw_match").fetchone()[0]
+
+
+def raw_match_batches(
+    con: duckdb.DuckDBPyConnection, predicate: str = "TRUE", parameters: list | tuple = (),
+) -> Iterator[list[tuple[str, Any]]]:
+    """내부 SQL 조건으로 원본을 최대 1000행씩 조회한다. 값은 parameters로 바인딩한다."""
+    lower, upper = con.execute(
+        f"SELECT min(rowid), max(rowid) FROM raw_match WHERE {predicate}", parameters,
+    ).fetchone()
+    if lower is None:
+        return
+    # rowid 범위로 제한해 전체 BLOB 결과 버퍼와 처리한 행의 반복 탐색을 피한다.
+    for start in range(lower, upper + 1, 1000):
+        batch = con.execute(
+            f"SELECT match_id, payload FROM raw_match "
+            f"WHERE rowid >= ? AND rowid < ? AND ({predicate})",
+            [start, start + 1000, *parameters],
+        ).fetchall()
+        if batch:
+            yield batch

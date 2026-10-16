@@ -13,13 +13,16 @@ import csv
 import os
 import tempfile
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Callable
 
 import duckdb
 
+from . import defense
 from .codec import decode_payload
+from .db import raw_match_batches
 from .config import (
     DEFAULT,
+    MAX_USER_MATCH_PERCENT,
     MIN_MATCHES_GATE,
     PITCH_SCALE_M,
     SHOT_TYPE_HEADER,
@@ -52,36 +55,30 @@ def rebuild(con: duckdb.DuckDBPyConnection, *, full: bool = False) -> ParseStats
     full=False (기본, 증분): parsed_at IS NULL 인 미파싱 매치만 처리 → 수집한 만큼만.
     full=True             : 전체 재파싱. gk_match/shot 를 날리고 parsed_at 초기화 후 재생성.
 
-    스트리밍(fetchmany) + 임시 CSV + DuckDB COPY 벌크 적재로 속도를 유지.
+    쿼리부터 1000행씩 제한하고, 임시 CSV + DuckDB COPY로 원자적으로 적재한다.
     """
-    if full:
-        con.execute("DELETE FROM gk_match")
-        con.execute("DELETE FROM shot")
-        con.execute("UPDATE raw_match SET parsed_at = NULL")
-
+    predicate = "TRUE" if full else "parsed_at IS NULL"
     unparsed = con.execute(
-        "SELECT count(*) FROM raw_match WHERE parsed_at IS NULL"
+        f"SELECT count(*) FROM raw_match WHERE {predicate}"
     ).fetchone()[0]
-    if unparsed == 0:
+    if unparsed == 0 and not full:
         return ParseStats()
 
     stats = ParseStats()
     af, aw = _new_csv()
     sf, sw = _new_csv()
-    parsed_ids: list[str] = []
+    df, dw = _new_csv()
+    pf, pw = _new_csv()
     try:
         aw.writerow(_GK_MATCH_COLS)
         sw.writerow(_SHOT_COL_LIST)
-        cur = con.execute(
-            "SELECT match_id, payload FROM raw_match WHERE parsed_at IS NULL"
-        )
-        while True:
-            batch = cur.fetchmany(1000)
-            if not batch:
-                break
+        dw.writerow(defense.COLUMNS)
+        pw.writerow(["match_id"])
+        for batch in raw_match_batches(con, predicate):
             for mid, payload in batch:
                 detail = decode_payload(payload)
                 apps, shots = parse_match(detail, stats)
+                dw.writerows(defense.rows(apps))
                 for x in apps:
                     aw.writerow([x.match_id, x.match_date, x.gk_ouid, x.gk_sp_id, x.gk_sp_grade,
                                  x.sp_rating, x.pass_try, x.pass_success,
@@ -92,23 +89,35 @@ def rebuild(con: duckdb.DuckDBPyConnection, *, full: bool = False) -> ParseStats
                         x.shot_type, x.result, x.is_pk, x.in_penalty, x.assist, x.hit_post,
                         x.x, x.y,
                     ])
-                parsed_ids.append(mid)
+                pw.writerow([mid])
         af.close()
         sf.close()
-        con.execute(
-            f"COPY gk_match ({', '.join(_GK_MATCH_COLS)}) FROM '{af.name}' "
-            "(HEADER true, NULLSTR '')"
-        )
-        con.execute(f"COPY shot ({_SHOT_COLS}) FROM '{sf.name}' (HEADER true, NULLSTR '')")
-        # 파싱 완료 표시 — 다음 증분 빌드에서 스킵
-        if parsed_ids:
-            placeholders = ", ".join("?" * len(parsed_ids))
+        df.close()
+        pf.close()
+        con.execute("BEGIN TRANSACTION")
+        try:
+            if full:
+                con.execute("DELETE FROM gk_match")
+                con.execute("DELETE FROM shot")
+                con.execute("DELETE FROM defense_match")
+                con.execute("UPDATE raw_match SET parsed_at = NULL, defense_parsed_at = NULL")
+            con.execute(f"COPY gk_match ({', '.join(_GK_MATCH_COLS)}) FROM ? "
+                        "(HEADER true, NULLSTR '')", [af.name])
+            con.execute(f"COPY shot ({_SHOT_COLS}) FROM ? (HEADER true, NULLSTR '')", [sf.name])
+            con.execute(f"COPY defense_match ({', '.join(defense.COLUMNS)}) FROM ? "
+                        "(HEADER true, NULLSTR '')", [df.name])
+            # 처리한 ID도 CSV에 두어 전체 ID 목록과 거대한 바인드 인수를 메모리에 쌓지 않는다.
             con.execute(
-                f"UPDATE raw_match SET parsed_at = now() WHERE match_id IN ({placeholders})",
-                parsed_ids,
+                "UPDATE raw_match SET parsed_at = now(), defense_parsed_at = now() "
+                "WHERE match_id IN (SELECT match_id FROM read_csv(?, header=true, "
+                "columns={'match_id': 'VARCHAR'}))", [pf.name],
             )
+            con.execute("COMMIT")
+        except BaseException:
+            con.execute("ROLLBACK")
+            raise
     finally:
-        for f in (af, sf):
+        for f in (af, sf, df, pf):
             if not f.closed:
                 f.close()
             try:
@@ -145,6 +154,43 @@ def _save_pct(saves: int, goals: int) -> float | None:
     return saves / denom if denom > 0 else None
 
 
+def _match_counts_cte(
+    since: datetime | None, until: datetime | None = None, *, by_grade: bool = True,
+) -> tuple[str, list]:
+    keys = "gk_sp_id, gk_sp_grade" if by_grade else "gk_sp_id"
+    pred, params = _date_pred(since, until, first=True)
+    return f"""
+        user_matches AS (
+            SELECT {keys}, gk_ouid, count(DISTINCT match_id) AS n
+            FROM gk_match{pred} GROUP BY {keys}, gk_ouid
+        ),
+        m AS (
+            SELECT totals.*, users, max_user_matches
+            FROM (
+                SELECT {keys}, count(DISTINCT match_id) AS matches
+                FROM gk_match{pred} GROUP BY {keys}
+            ) totals JOIN (
+                SELECT {keys}, count(*) AS users, max(n) AS max_user_matches
+                FROM user_matches GROUP BY {keys}
+            ) concentration USING ({keys})
+        )
+    """, params + params
+
+
+def _rank_leaderboard(rows: list[dict[str, Any]], metric: str) -> list[dict[str, Any]]:
+    """편중된 표본도 통계는 보존하고 순위만 부여하지 않는다."""
+    rows.sort(key=lambda r: (r[metric] is not None, r[metric] or 0.0), reverse=True)
+    rank = 0
+    for r in rows:
+        top = r.pop("max_user_matches")
+        r["max_user_share"] = top / r["matches"]
+        r["rank_eligible"] = top * 100 < r["matches"] * MAX_USER_MATCH_PERCENT
+        if r["rank_eligible"]:
+            rank += 1
+        r["rank"] = rank if r["rank_eligible"] else None
+    return rows
+
+
 def card_leaderboard(
     con: duckdb.DuckDBPyConnection,
     *,
@@ -154,15 +200,13 @@ def card_leaderboard(
     """카드(sp_id) 단위 종합선방률 리더보드. gate 미만 표본은 제외.
 
     since 를 주면 match_date >= since 인 경기만 집계한다(최근 N일 등).
+    사용자 편중으로 제외된 카드도 통계는 반환하며 rank=None 이다.
     """
-    m_pred, m_params = _date_pred(since, first=True)
+    m_cte, m_params = _match_counts_cte(since, by_grade=False)
     s_pred, s_params = _date_pred(since, first=False)
     rows = con.execute(
         f"""
-        WITH m AS (
-            SELECT gk_sp_id, count(DISTINCT match_id) AS matches
-            FROM gk_match{m_pred} GROUP BY gk_sp_id
-        ),
+        WITH {m_cte},
         s AS (
             SELECT gk_sp_id,
                    sum(CASE WHEN result = 1 THEN 1 ELSE 0 END) AS saves,
@@ -170,7 +214,8 @@ def card_leaderboard(
             FROM shot WHERE NOT is_pk{s_pred} GROUP BY gk_sp_id
         )
         SELECT m.gk_sp_id, m.matches,
-               COALESCE(s.saves, 0) AS saves, COALESCE(s.goals, 0) AS goals
+               COALESCE(s.saves, 0) AS saves, COALESCE(s.goals, 0) AS goals,
+               m.users, m.max_user_matches
         FROM m LEFT JOIN s USING (gk_sp_id)
         WHERE m.matches >= ?
         """,
@@ -184,14 +229,12 @@ def card_leaderboard(
             "saves": r[2],
             "goals": r[3],
             "save_pct": _save_pct(r[2], r[3]),
+            "users": r[4],
+            "max_user_matches": r[5],
         }
         for r in rows
     ]
-    # 선방률 desc, None(유효슛 0)은 맨 뒤
-    out.sort(key=lambda d: (d["save_pct"] is not None, d["save_pct"] or 0.0), reverse=True)
-    for i, d in enumerate(out, 1):
-        d["rank"] = i
-    return out
+    return _rank_leaderboard(out, "save_pct")
 
 
 def grade_leaderboard(
@@ -205,15 +248,13 @@ def grade_leaderboard(
 
     각 (sp_id, spGrade) 조합이 한 행. gate 는 그 조합의 표본 경기수에 건다.
     until 을 주면 [since, until) 창만 집계한다(순위 추이의 과거 시점).
+    사용자 편중으로 제외된 조합도 통계는 반환하며 rank=None 이다.
     """
-    m_pred, m_params = _date_pred(since, until, first=True)
+    m_cte, m_params = _match_counts_cte(since, until)
     s_pred, s_params = _date_pred(since, until, first=False)
     rows = con.execute(
         f"""
-        WITH m AS (
-            SELECT gk_sp_id, gk_sp_grade, count(DISTINCT match_id) AS matches
-            FROM gk_match{m_pred} GROUP BY 1, 2
-        ),
+        WITH {m_cte},
         s AS (
             SELECT gk_sp_id, gk_sp_grade,
                    sum(CASE WHEN result = 1 THEN 1 ELSE 0 END) AS saves,
@@ -221,7 +262,7 @@ def grade_leaderboard(
             FROM shot WHERE NOT is_pk{s_pred} GROUP BY 1, 2
         )
         SELECT m.gk_sp_id, m.gk_sp_grade, m.matches,
-               COALESCE(s.saves, 0), COALESCE(s.goals, 0)
+               COALESCE(s.saves, 0), COALESCE(s.goals, 0), m.users, m.max_user_matches
         FROM m LEFT JOIN s USING (gk_sp_id, gk_sp_grade)
         WHERE m.matches >= ?
         """,
@@ -230,13 +271,11 @@ def grade_leaderboard(
 
     out = [
         {"gk_sp_id": r[0], "grade": r[1], "matches": r[2],
-         "saves": r[3], "goals": r[4], "save_pct": _save_pct(r[3], r[4])}
+         "saves": r[3], "goals": r[4], "save_pct": _save_pct(r[3], r[4]),
+         "users": r[5], "max_user_matches": r[6]}
         for r in rows
     ]
-    out.sort(key=lambda d: (d["save_pct"] is not None, d["save_pct"] or 0.0), reverse=True)
-    for i, d in enumerate(out, 1):
-        d["rank"] = i
-    return out
+    return _rank_leaderboard(out, "save_pct")
 
 
 def rank_timeseries(
@@ -247,6 +286,7 @@ def rank_timeseries(
     step_days: int = 3,
     end: datetime,
     start: datetime | None = None,
+    log: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """롤링 window_days 창을 step_days 간격으로 소급 샘플링한 카드별 원자료 시계열.
 
@@ -282,7 +322,11 @@ def rank_timeseries(
 
     cards: dict[str, list] = {}
     for i, t in enumerate(points):
+        if log is not None:
+            log(f"export: 순위 추이 {i+1}/{len(points)} · {t:%Y-%m-%d} 집계 중")
         for c in grade_leaderboard(con, gate=gate, since=t - span, until=t):
+            if not c["rank_eligible"]:
+                continue
             key = f"{c['gk_sp_id']}_{c['grade']}"
             slot = cards.get(key)
             if slot is None:
@@ -290,6 +334,33 @@ def rank_timeseries(
             slot[i] = [c["matches"], c["saves"], c["goals"]]
 
     return {**base, "points": [p.date().isoformat() for p in points], "cards": cards}
+
+
+def _expected_shots_cte(
+    since: datetime | None, *, dist_bins: int = 5, min_dist_m: float = 0.0,
+) -> tuple[str, list]:
+    """카드 순위와 수비 조합이 같은 전체 표본·난이도 모델을 사용한다."""
+    pred, params = _date_pred(since, first=False)
+    dist_filter = (
+        f" AND sqrt((1 - x) * (1 - x) + (0.5 - y) * (0.5 - y)) * {PITCH_SCALE_M} >= {min_dist_m}"
+        if min_dist_m > 0 else ""
+    )
+    return f"""
+        WITH s AS (
+            SELECT match_id, gk_ouid, gk_sp_id, gk_sp_grade, result, shot_type,
+                   sqrt((1 - x) * (1 - x) + (0.5 - y) * (0.5 - y)) AS dist
+            FROM shot
+            WHERE NOT is_pk AND x IS NOT NULL AND y IS NOT NULL{pred}{dist_filter}
+        ),
+        b AS (SELECT *, ntile({int(dist_bins)}) OVER (ORDER BY dist) AS dbin FROM s),
+        bin_rate AS (
+            SELECT shot_type, dbin, avg(CASE WHEN result = 1 THEN 1.0 ELSE 0 END) AS p_save
+            FROM b GROUP BY shot_type, dbin
+        ),
+        ps AS (
+            SELECT b.*, br.p_save FROM b JOIN bin_rate br USING (shot_type, dbin)
+        )
+    """, params
 
 
 def gsax_leaderboard(
@@ -312,40 +383,20 @@ def gsax_leaderboard(
     min_dist_m > 0 이면 그 거리(m) 미만 슛을 제외한다(예: 5 = 초근거리 제외).
     거의 못 막는 뽀록성 초근 슛의 노이즈를 빼 실력 신호를 안정화.
     """
-    s_pred, s_params = _date_pred(since, first=False)
-    m_pred, m_params = _date_pred(since, first=True)
-    dist_filter = (
-        f" AND sqrt((1 - x) * (1 - x) + (0.5 - y) * (0.5 - y)) * {PITCH_SCALE_M} >= {min_dist_m}"
-        if min_dist_m > 0 else ""
-    )
+    cte, s_params = _expected_shots_cte(since, dist_bins=dist_bins, min_dist_m=min_dist_m)
+    m_cte, m_params = _match_counts_cte(since)
     rows = con.execute(
         f"""
-        WITH s AS (
-            SELECT gk_sp_id, gk_sp_grade, result, shot_type,
-                   sqrt((1 - x) * (1 - x) + (0.5 - y) * (0.5 - y)) AS dist
-            FROM shot
-            WHERE NOT is_pk AND x IS NOT NULL AND y IS NOT NULL{s_pred}{dist_filter}
-        ),
-        b AS (SELECT *, ntile({int(dist_bins)}) OVER (ORDER BY dist) AS dbin FROM s),
-        bin_rate AS (
-            SELECT shot_type, dbin, avg(CASE WHEN result = 1 THEN 1.0 ELSE 0 END) AS p_save
-            FROM b GROUP BY shot_type, dbin
-        ),
-        ps AS (
-            SELECT b.gk_sp_id, b.gk_sp_grade, b.result, br.p_save
-            FROM b JOIN bin_rate br USING (shot_type, dbin)
-        ),
+        {cte},
         a AS (
             SELECT gk_sp_id, gk_sp_grade, count(*) AS shots,
                    sum(CASE WHEN result = 1 THEN 1 ELSE 0 END) AS saves,
                    sum(p_save) AS exp_saves
             FROM ps GROUP BY 1, 2
         ),
-        m AS (
-            SELECT gk_sp_id, gk_sp_grade, count(DISTINCT match_id) AS matches
-            FROM gk_match{m_pred} GROUP BY 1, 2
-        )
-        SELECT a.gk_sp_id, a.gk_sp_grade, m.matches, a.shots, a.saves, a.exp_saves
+        {m_cte}
+        SELECT a.gk_sp_id, a.gk_sp_grade, m.matches, a.shots, a.saves, a.exp_saves,
+               m.users, m.max_user_matches
         FROM a JOIN m USING (gk_sp_id, gk_sp_grade)
         WHERE m.matches >= ?
         """,
@@ -353,18 +404,71 @@ def gsax_leaderboard(
     ).fetchall()
 
     out = []
-    for sp_id, grade, matches, shots, saves, exp in rows:
+    for sp_id, grade, matches, shots, saves, exp, users, top in rows:
         gsax = saves - exp
         out.append({
             "gk_sp_id": sp_id, "grade": grade, "matches": matches, "shots": shots,
             "saves": saves, "exp_saves": round(exp, 2), "gsax": round(gsax, 2),
             "gsax_per_shot": gsax / shots if shots else None,
             "save_pct": saves / shots if shots else None,
+            "users": users, "max_user_matches": top,
         })
-    out.sort(key=lambda d: (d["gsax_per_shot"] is not None, d["gsax_per_shot"] or 0.0), reverse=True)
-    for i, d in enumerate(out, 1):
-        d["rank"] = i
-    return out
+    return _rank_leaderboard(out, "gsax_per_shot")
+
+
+def defense_combinations(
+    con: duckdb.DuckDBPyConnection, *, gate: int = MIN_MATCHES_GATE,
+    min_users: int = 5, since: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """같은 GK 카드×강화의 CB 쌍 비교. 사용자 식별자는 집계 결과에 내보내지 않는다."""
+    cte, s_params = _expected_shots_cte(since)
+    m_pred, m_params = _date_pred(since, first=True)
+    s_pred, raw_params = _date_pred(since, first=False)
+    keys = "gk_sp_id, gk_sp_grade, cb1_sp_id, cb1_grade, cb2_sp_id, cb2_grade"
+    rows = con.execute(
+        f"""
+        {cte},
+        d AS (SELECT * FROM defense_match{m_pred}),
+        m AS (
+            SELECT {keys}, count(*) AS matches, count(DISTINCT gk_ouid) AS users
+            FROM d GROUP BY {keys}
+            HAVING count(*) >= ? AND count(DISTINCT gk_ouid) >= ?
+        ),
+        raw_s AS (
+            SELECT match_id, gk_ouid, gk_sp_id, gk_sp_grade,
+                   count(*) AS shots,
+                   sum(CASE WHEN result = 1 THEN 1 ELSE 0 END) AS saves,
+                   sum(CASE WHEN result = 3 THEN 1 ELSE 0 END) AS goals
+            FROM shot WHERE NOT is_pk{s_pred} GROUP BY 1, 2, 3, 4
+        ),
+        expected AS (
+            SELECT match_id, gk_ouid, gk_sp_id, gk_sp_grade, count(*) AS gsax_shots,
+                   sum(CASE WHEN result = 1 THEN 1.0 ELSE 0.0 END - p_save) AS gsax
+            FROM ps GROUP BY 1, 2, 3, 4
+        ),
+        totals AS (
+            SELECT {', '.join('d.' + k.strip() for k in keys.split(','))},
+                   coalesce(sum(r.shots), 0) AS shots, coalesce(sum(r.saves), 0) AS saves,
+                   coalesce(sum(r.goals), 0) AS goals,
+                   coalesce(sum(e.gsax_shots), 0) AS gsax_shots, sum(e.gsax) AS gsax
+            FROM d
+            LEFT JOIN raw_s r USING (match_id, gk_ouid, gk_sp_id, gk_sp_grade)
+            LEFT JOIN expected e USING (match_id, gk_ouid, gk_sp_id, gk_sp_grade)
+            GROUP BY {', '.join('d.' + k.strip() for k in keys.split(','))}
+        )
+        SELECT m.*, t.shots, t.saves, t.goals, t.gsax_shots, t.gsax
+        FROM m JOIN totals t USING ({keys})
+        ORDER BY m.matches DESC, {', '.join('m.' + k.strip() for k in keys.split(','))}
+        """, s_params + m_params + [gate, min_users] + raw_params,
+    ).fetchall()
+    return [{
+        "gk_sp_id": r[0], "grade": r[1],
+        "cb1_sp_id": r[2], "cb1_grade": r[3], "cb2_sp_id": r[4], "cb2_grade": r[5],
+        "matches": r[6], "users": r[7], "shots": r[8], "saves": r[9], "goals": r[10],
+        "gsax_shots": r[11], "gsax_per_shot": r[12] / r[11] if r[11] else None,
+        "save_pct": _save_pct(r[9], r[10]),
+        "shots_per_match": r[8] / r[6], "goals_per_match": r[10] / r[6],
+    } for r in rows]
 
 
 def grade_breakdown(
