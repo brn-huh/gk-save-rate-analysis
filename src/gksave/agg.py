@@ -12,7 +12,9 @@ from __future__ import annotations
 import csv
 import os
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timedelta
+from time import monotonic
 from typing import Any, Callable
 
 import duckdb
@@ -32,6 +34,7 @@ from .config import (
     shot_type_name,
 )
 from .parse import ParseStats, parse_match
+from .progress import format_duration
 
 _GK_MATCH_COLS = ["match_id", "match_date", "gk_ouid", "gk_sp_id", "gk_sp_grade",
                   "sp_rating", "pass_try", "pass_success", "aerial_try", "aerial_success"]
@@ -352,7 +355,10 @@ def _expected_shots_cte(
             FROM shot
             WHERE NOT is_pk AND x IS NOT NULL AND y IS NOT NULL{pred}{dist_filter}
         ),
-        b AS (SELECT *, ntile({int(dist_bins)}) OVER (ORDER BY dist) AS dbin FROM s),
+        -- 동일 거리에서도 입력 순서·병렬 실행에 따라 구간이 바뀌지 않게 한다.
+        b AS (SELECT *, ntile({int(dist_bins)}) OVER (
+            ORDER BY dist, match_id, gk_ouid, gk_sp_id, gk_sp_grade, shot_type, result
+        ) AS dbin FROM s),
         bin_rate AS (
             SELECT shot_type, dbin, avg(CASE WHEN result = 1 THEN 1.0 ELSE 0 END) AS p_save
             FROM b GROUP BY shot_type, dbin
@@ -363,112 +369,202 @@ def _expected_shots_cte(
     """, params
 
 
-def gsax_leaderboard(
-    con: duckdb.DuckDBPyConnection,
-    *,
-    gate: int = MIN_MATCHES_GATE,
-    since: datetime | None = None,
-    dist_bins: int = 5,
-    min_dist_m: float = 0.0,
-) -> list[dict[str, Any]]:
-    """GSAx(난이도 보정) 리더보드.
+_MATCH_KEYS = "match_id, gk_ouid, gk_sp_id, gk_sp_grade"
+_DUO_KEYS = "gk_sp_id, gk_sp_grade, cb1_sp_id, cb1_grade, cb2_sp_id, cb2_grade"
+_DEFENSE_BATCH_SIZE = 32
 
-    각 슛을 (타입 × 정규화거리 구간)으로 묶어 리그 전체의 그 구간 선방률 =
-    기대선방확률로 본다. 카드별 기대선방 = 자기가 마주한 슛들의 기대확률 합,
-    GSAx = 실제선방 − 기대선방. 슛 난이도 교란(쉬운 슛 많이 마주한 이점)을 제거한다.
-    (유저 실력 교란은 within_ouid 가 담당 — 상호보완)
 
-    순위는 GSAx/슛(난이도보정 선방 레이트) 기준. 리그 전체 Σ GSAx = 0.
-
-    min_dist_m > 0 이면 그 거리(m) 미만 슛을 제외한다(예: 5 = 초근거리 제외).
-    거의 못 막는 뽀록성 초근 슛의 노이즈를 빼 실력 신호를 안정화.
-    """
-    cte, s_params = _expected_shots_cte(since, dist_bins=dist_bins, min_dist_m=min_dist_m)
-    m_cte, m_params = _match_counts_cte(since)
-    rows = con.execute(
-        f"""
-        {cte},
-        a AS (
-            SELECT gk_sp_id, gk_sp_grade, count(*) AS shots,
+@contextmanager
+def _match_shots(con, since, *, dist_bins=5, min_dist_m=0.0, eligible_keys=None,
+                 defense_gate=None, min_users=5, log=None):
+    """전체 슛 모델은 한 번 계산하고, 듀오에 필요한 경기만 개별 통계로 보존한다."""
+    log = log or (lambda _: None)
+    eligible_join = ""
+    try:
+        if eligible_keys is not None:
+            keys = sorted(eligible_keys)
+            con.execute("CREATE TEMP TABLE _gksave_eligible AS SELECT "
+                        "unnest(?::BIGINT[]) AS gk_sp_id, unnest(?::INTEGER[]) AS gk_sp_grade",
+                        [[k[0] for k in keys], [k[1] for k in keys]])
+            eligible_join = "JOIN _gksave_eligible USING (gk_sp_id, gk_sp_grade)"
+        match_columns = "NULL::VARCHAR AS match_id, NULL::VARCHAR AS gk_ouid"
+        match_join = ""
+        if defense_gate is not None:
+            log("export: 센터백 듀오 대상 선정 중 (경기수·사용자 수 조건 적용)")
+            pred, params = _date_pred(since, first=True)
+            con.execute(f"""
+                CREATE TEMP TABLE _gksave_duo_candidates AS
+                SELECT {_DUO_KEYS}, count(*) AS matches, count(DISTINCT gk_ouid) AS users
+                FROM defense_match {eligible_join}{pred} GROUP BY {_DUO_KEYS}
+                HAVING count(*) >= ? AND count(DISTINCT gk_ouid) >= ?
+            """, params + [defense_gate, min_users])
+            con.execute(f"""
+                CREATE TEMP TABLE _gksave_duo_matches AS
+                SELECT d.match_id, d.gk_ouid, {', '.join('d.' + k.strip() for k in _DUO_KEYS.split(','))}
+                FROM defense_match d JOIN _gksave_duo_candidates c USING ({_DUO_KEYS}){pred}
+            """, params)
+            counts = con.execute("SELECT count(DISTINCT (gk_sp_id,gk_sp_grade)), count(*), "
+                                 "coalesce(sum(matches),0) FROM _gksave_duo_candidates").fetchone()
+            log(f"export: 센터백 듀오 대상 GK 카드·강화 {counts[0]:,}개 · 조합 {counts[1]:,}개 · 출전 경기 {counts[2]:,}건")
+            match_columns = ("CASE WHEN d.match_id IS NOT NULL THEN e.match_id END AS match_id, "
+                             "CASE WHEN d.match_id IS NOT NULL THEN e.gk_ouid END AS gk_ouid")
+            match_join = f"LEFT JOIN _gksave_duo_matches d USING ({_MATCH_KEYS})"
+        model_started = monotonic()
+        log("export: 공통 GSAx 모델·경기별 슛 통계 준비 중 (전체 표본으로 1회 계산 · 남은 시간 미산정)")
+        cte, params = _expected_shots_cte(since, dist_bins=dist_bins, min_dist_m=min_dist_m)
+        pred, raw_params = _date_pred(since, first=False)
+        unmodelled = "x IS NULL OR y IS NULL OR shot_type IS NULL"
+        if min_dist_m > 0:
+            unmodelled += (f" OR NOT (sqrt((1-x)*(1-x)+(0.5-y)*(0.5-y)) * "
+                          f"{PITCH_SCALE_M} >= {min_dist_m})")
+        con.execute(f"""
+            CREATE TEMP TABLE _gksave_match_shots AS
+            {cte}, events AS (
+                SELECT {_MATCH_KEYS}, result, true AS modelled, p_save FROM ps
+                UNION ALL
+                SELECT {_MATCH_KEYS}, result, false AS modelled, NULL::DOUBLE AS p_save
+                FROM shot WHERE NOT is_pk AND ({unmodelled}){pred}
+            )
+            SELECT {match_columns}, e.gk_sp_id, e.gk_sp_grade, count(*) AS shots,
                    sum(CASE WHEN result = 1 THEN 1 ELSE 0 END) AS saves,
-                   sum(p_save) AS exp_saves
-            FROM ps GROUP BY 1, 2
-        ),
-        {m_cte}
+                   sum(CASE WHEN result = 3 THEN 1 ELSE 0 END) AS goals,
+                   sum(CASE WHEN modelled THEN 1 ELSE 0 END) AS gsax_shots,
+                   sum(CASE WHEN modelled AND result = 1 THEN 1 ELSE 0 END) AS gsax_saves,
+                   sum(CASE WHEN modelled THEN p_save ELSE 0 END) AS exp_saves
+            FROM events e {eligible_join} {match_join} GROUP BY 1, 2, 3, 4
+        """, params + raw_params)
+        log(f"export: 공통 GSAx 모델·경기별 슛 통계 준비 완료 · 경과 {format_duration(monotonic() - model_started)}")
+        yield
+    finally:
+        con.execute("DROP TABLE IF EXISTS temp.main._gksave_match_shots")
+        con.execute("DROP TABLE IF EXISTS temp.main._gksave_duo_matches")
+        con.execute("DROP TABLE IF EXISTS temp.main._gksave_duo_candidates")
+        con.execute("DROP TABLE IF EXISTS temp.main._gksave_eligible")
+
+
+def _gsax_from_match_shots(con, *, gate, since):
+    m_cte, params = _match_counts_cte(since)
+    rows = con.execute(f"""
+        WITH {m_cte}, a AS (
+            SELECT gk_sp_id, gk_sp_grade, sum(gsax_shots) AS shots,
+                   sum(gsax_saves) AS saves, sum(exp_saves) AS exp_saves
+            FROM _gksave_match_shots GROUP BY 1, 2 HAVING sum(gsax_shots) > 0
+        )
         SELECT a.gk_sp_id, a.gk_sp_grade, m.matches, a.shots, a.saves, a.exp_saves,
                m.users, m.max_user_matches
-        FROM a JOIN m USING (gk_sp_id, gk_sp_grade)
-        WHERE m.matches >= ?
-        """,
-        s_params + m_params + [gate],
-    ).fetchall()
-
+        FROM a JOIN m USING (gk_sp_id, gk_sp_grade) WHERE m.matches >= ?
+    """, params + [gate]).fetchall()
     out = []
     for sp_id, grade, matches, shots, saves, exp, users, top in rows:
         gsax = saves - exp
         out.append({
             "gk_sp_id": sp_id, "grade": grade, "matches": matches, "shots": shots,
             "saves": saves, "exp_saves": round(exp, 2), "gsax": round(gsax, 2),
-            "gsax_per_shot": gsax / shots if shots else None,
-            "save_pct": saves / shots if shots else None,
+            "gsax_per_shot": gsax / shots, "save_pct": saves / shots,
             "users": users, "max_user_matches": top,
         })
     return _rank_leaderboard(out, "gsax_per_shot")
+
+
+def gsax_leaderboard(
+    con: duckdb.DuckDBPyConnection, *, gate: int = MIN_MATCHES_GATE,
+    since: datetime | None = None, dist_bins: int = 5, min_dist_m: float = 0.0,
+) -> list[dict[str, Any]]:
+    """전체 표본의 타입×거리 모델에 따른 GSAx/슛 순위. 편중 카드는 rank=None.
+
+    min_dist_m보다 가까운 슛은 모델과 GSAx에서 제외한다. PK·좌표 누락 슛도 제외한다.
+    """
+    with _match_shots(con, since, dist_bins=dist_bins, min_dist_m=min_dist_m):
+        return _gsax_from_match_shots(con, gate=gate, since=since)
+
+
+def _defense_from_match_shots(con, *, log=None):
+    log = log or (lambda _: None)
+    started = monotonic()
+    rows = []
+    try:
+        cards = con.execute("SELECT gk_sp_id, gk_sp_grade, sum(matches) FROM _gksave_duo_candidates "
+                            "GROUP BY 1, 2 ORDER BY 1, 2").fetchall()
+        if not cards:
+            log("export: 센터백 듀오 집계 완료 · 조건을 통과한 대상 없음")
+            return []
+        total_matches = sum(c[2] for c in cards)
+        log(f"export: 센터백 듀오 입력 준비 중 · GK 카드·강화 {len(cards):,}개 · 출전 경기 {total_matches:,}건")
+        # GK 순으로 저장해 묶음마다 전체 원본을 다시 읽지 않고 구간만 조회한다.
+        con.execute(f"""
+            CREATE TEMP TABLE _gksave_duo_input AS
+            SELECT {', '.join('d.' + k.strip() for k in _DUO_KEYS.split(','))},
+                   coalesce(s.shots, 0) AS shots, coalesce(s.saves, 0) AS saves,
+                   coalesce(s.goals, 0) AS goals, coalesce(s.gsax_shots, 0) AS gsax_shots,
+                   coalesce(s.gsax_saves - s.exp_saves, 0) AS gsax
+            FROM _gksave_duo_matches d
+            LEFT JOIN _gksave_match_shots s USING ({_MATCH_KEYS})
+            ORDER BY d.gk_sp_id, d.gk_sp_grade
+        """)
+        completed_matches = 0
+        batch_started = monotonic()
+        log(f"export: 센터백 듀오 GK 카드·강화 0/{len(cards):,}개 완료 (0.0%) · 예상 남은 시간 계산 중")
+        for offset in range(0, len(cards), _DEFENSE_BATCH_SIZE):
+            batch = cards[offset:offset + _DEFENSE_BATCH_SIZE]
+            rows.extend(con.execute(f"""
+                WITH totals AS (
+                    SELECT {_DUO_KEYS}, sum(shots) AS shots, sum(saves) AS saves,
+                           sum(goals) AS goals, sum(gsax_shots) AS gsax_shots, sum(gsax) AS gsax
+                    FROM _gksave_duo_input
+                    JOIN (SELECT unnest(?::BIGINT[]) AS gk_sp_id,
+                                 unnest(?::INTEGER[]) AS gk_sp_grade) batch
+                    USING (gk_sp_id, gk_sp_grade)
+                    WHERE gk_sp_id BETWEEN ? AND ? GROUP BY {_DUO_KEYS}
+                )
+                SELECT c.*, t.shots, t.saves, t.goals, t.gsax_shots, t.gsax
+                FROM _gksave_duo_candidates c JOIN totals t USING ({_DUO_KEYS})
+            """, [[c[0] for c in batch], [c[1] for c in batch], batch[0][0], batch[-1][0]]).fetchall())
+            completed_matches += sum(c[2] for c in batch)
+            done = offset + len(batch)
+            remaining = (monotonic() - batch_started) * (total_matches - completed_matches) / completed_matches
+            log(f"export: 센터백 듀오 GK 카드·강화 {done:,}/{len(cards):,}개 완료 ({done / len(cards) * 100:.1f}%) · "
+                f"출전 경기 {completed_matches:,}/{total_matches:,}건 · 듀오 {len(rows):,}개 · "
+                f"단계 경과 {format_duration(monotonic() - started)} · "
+                f"예상 남은 시간 약 {format_duration(remaining)}")
+    finally:
+        con.execute("DROP TABLE IF EXISTS temp.main._gksave_duo_input")
+    rows.sort(key=lambda r: (-r[6], *r[:6]))
+    return [{
+        "gk_sp_id": r[0], "grade": r[1],
+        "cb1_sp_id": r[2], "cb1_grade": r[3], "cb2_sp_id": r[4], "cb2_grade": r[5],
+        "matches": r[6], "users": r[7], "shots": r[8], "saves": r[9], "goals": r[10],
+        "gsax_shots": r[11], "gsax_per_shot": r[12] / r[11] if r[11] else None,
+        "save_pct": _save_pct(r[9], r[10]), "shots_per_match": r[8] / r[6],
+        "goals_per_match": r[10] / r[6],
+    } for r in rows]
 
 
 def defense_combinations(
     con: duckdb.DuckDBPyConnection, *, gate: int = MIN_MATCHES_GATE,
     min_users: int = 5, since: datetime | None = None,
 ) -> list[dict[str, Any]]:
-    """같은 GK 카드×강화의 CB 쌍 비교. 사용자 식별자는 집계 결과에 내보내지 않는다."""
-    cte, s_params = _expected_shots_cte(since)
-    m_pred, m_params = _date_pred(since, first=True)
-    s_pred, raw_params = _date_pred(since, first=False)
-    keys = "gk_sp_id, gk_sp_grade, cb1_sp_id, cb1_grade, cb2_sp_id, cb2_grade"
-    rows = con.execute(
-        f"""
-        {cte},
-        d AS (SELECT * FROM defense_match{m_pred}),
-        m AS (
-            SELECT {keys}, count(*) AS matches, count(DISTINCT gk_ouid) AS users
-            FROM d GROUP BY {keys}
-            HAVING count(*) >= ? AND count(DISTINCT gk_ouid) >= ?
-        ),
-        raw_s AS (
-            SELECT match_id, gk_ouid, gk_sp_id, gk_sp_grade,
-                   count(*) AS shots,
-                   sum(CASE WHEN result = 1 THEN 1 ELSE 0 END) AS saves,
-                   sum(CASE WHEN result = 3 THEN 1 ELSE 0 END) AS goals
-            FROM shot WHERE NOT is_pk{s_pred} GROUP BY 1, 2, 3, 4
-        ),
-        expected AS (
-            SELECT match_id, gk_ouid, gk_sp_id, gk_sp_grade, count(*) AS gsax_shots,
-                   sum(CASE WHEN result = 1 THEN 1.0 ELSE 0.0 END - p_save) AS gsax
-            FROM ps GROUP BY 1, 2, 3, 4
-        ),
-        totals AS (
-            SELECT {', '.join('d.' + k.strip() for k in keys.split(','))},
-                   coalesce(sum(r.shots), 0) AS shots, coalesce(sum(r.saves), 0) AS saves,
-                   coalesce(sum(r.goals), 0) AS goals,
-                   coalesce(sum(e.gsax_shots), 0) AS gsax_shots, sum(e.gsax) AS gsax
-            FROM d
-            LEFT JOIN raw_s r USING (match_id, gk_ouid, gk_sp_id, gk_sp_grade)
-            LEFT JOIN expected e USING (match_id, gk_ouid, gk_sp_id, gk_sp_grade)
-            GROUP BY {', '.join('d.' + k.strip() for k in keys.split(','))}
-        )
-        SELECT m.*, t.shots, t.saves, t.goals, t.gsax_shots, t.gsax
-        FROM m JOIN totals t USING ({keys})
-        ORDER BY m.matches DESC, {', '.join('m.' + k.strip() for k in keys.split(','))}
-        """, s_params + m_params + [gate, min_users] + raw_params,
-    ).fetchall()
-    return [{
-        "gk_sp_id": r[0], "grade": r[1],
-        "cb1_sp_id": r[2], "cb1_grade": r[3], "cb2_sp_id": r[4], "cb2_grade": r[5],
-        "matches": r[6], "users": r[7], "shots": r[8], "saves": r[9], "goals": r[10],
-        "gsax_shots": r[11], "gsax_per_shot": r[12] / r[11] if r[11] else None,
-        "save_pct": _save_pct(r[9], r[10]),
-        "shots_per_match": r[8] / r[6], "goals_per_match": r[10] / r[6],
-    } for r in rows]
+    """전체 표본 모델을 사용하는 센터백 듀오 통계. 사용자 식별자는 반환하지 않는다."""
+    with _match_shots(con, since, defense_gate=gate, min_users=min_users):
+        return _defense_from_match_shots(con)
+
+
+def export_rankings(
+    con: duckdb.DuckDBPyConnection, *, eligible_keys: set[tuple[int, int]],
+    gate: int = MIN_MATCHES_GATE, since: datetime | None = None,
+    log: Callable[[str], None] | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """공통 모델을 한 연결에서 한 번 준비하고 GSAx와 듀오 통계를 함께 반환한다."""
+    log = log or (lambda _: None)
+    if not eligible_keys:
+        log("export: 순위 대상 없음 — 공통 모델·센터백 듀오 계산 생략")
+        return [], []
+    with _match_shots(con, since, eligible_keys=eligible_keys, defense_gate=gate, log=log):
+        log("export: GSAx 카드 순위 집계 중 (공통 모델 재사용)")
+        started = monotonic()
+        gsax = _gsax_from_match_shots(con, gate=gate, since=since)
+        log(f"export: GSAx 카드 순위 집계 완료 · 경과 {format_duration(monotonic() - started)}")
+        combos = _defense_from_match_shots(con, log=log)
+        return gsax, combos
 
 
 def grade_breakdown(

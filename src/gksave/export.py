@@ -125,19 +125,16 @@ def build_payload(
             k: v for k, v in payload["trend"]["cards"].items()
             if k in eligible_trend_keys
         }
-    # GSAx(난이도 보정)
-    log("export: GSAx 슛 난이도 보정 집계 중")
-    gsax = [c for c in agg.gsax_leaderboard(con, gate=gate, since=since)
-            if (c["gk_sp_id"], c["grade"]) in eligible_keys]
+    gsax, combinations = agg.export_rankings(
+        con, eligible_keys=eligible_keys, gate=gate, since=since, log=log,
+    )
     payload["gsax"] = gsax
-    log("export: 센터백 듀오 집계 중")
     payload["defense"] = {
         "generated_at": payload["generated_at"],
         "date_range": date_range,
         "gate_min_matches": gate,
         "min_users": 5,
-        "combinations": [r for r in agg.defense_combinations(con, gate=gate, since=since)
-                         if (r["gk_sp_id"], r["grade"]) in eligible_keys],
+        "combinations": combinations,
     }
 
     # 리더보드 카드에 GSAx 붙이기 (같은 (sp_id, 강화) 키로) → 동일선수·페이지에서도 반영

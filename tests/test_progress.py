@@ -22,6 +22,7 @@ def test_heartbeat_reports_current_stage_and_stops_after_completion(monkeypatch)
         assert received.wait(2)
     assert messages[0] == "통계 export: 시작"
     assert messages[-1].startswith("통계 export: 완료 · 경과 ")
+    assert any("현재 작업 경과" in m and "전체 경과" in m for m in messages)
     count = len(messages)
     Event().wait(0.01)
     assert len(messages) == count

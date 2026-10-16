@@ -144,6 +144,23 @@ def test_gsax_league_sum_is_zero(con):
     assert lb[0]["gsax_per_shot"] >= lb[1]["gsax_per_shot"]
 
 
+def test_gsax_distance_ties_do_not_depend_on_insertion_order(con):
+    rows = [(f"synthetic-{sp}-{i}", f"synthetic-user-{sp}", sp, 10, result)
+            for sp, result in ((500, 1), (700, 3)) for i in range(3)]
+    con.executemany("INSERT INTO gk_match (match_id,gk_ouid,gk_sp_id,gk_sp_grade) VALUES (?,?,?,?)",
+                    [row[:4] for row in rows])
+
+    def scores(order):
+        con.execute("DELETE FROM shot")
+        con.executemany("INSERT INTO shot (match_id,gk_ouid,gk_sp_id,gk_sp_grade,result,"
+                        "shot_type,is_pk,x,y) VALUES (?,?,?,?,?,1,false,0.8,0.5)", order)
+        return {r["gk_sp_id"]: r["gsax"] for r in agg.gsax_leaderboard(con, gate=1, dist_bins=2)}
+
+    grouped = scores(rows)
+    interleaved = scores([rows[i] for i in (0, 3, 1, 4, 2, 5)])
+    assert grouped == interleaved
+
+
 def test_card_extras(con):
     # GK 본인 스탯 + 상황별(박스 안/밖·1대1·연계) 검증
     gk_status = {"spRating": 7.5, "passTry": 20, "passSuccess": 18,

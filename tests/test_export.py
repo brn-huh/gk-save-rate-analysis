@@ -5,11 +5,19 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 
-from gksave import export
+from gksave import agg, export
 from gksave.db import connect_memory
 
 
-def test_export_omits_concentrated_cards_from_all_outputs(tmp_path):
+def test_export_omits_concentrated_cards_from_all_outputs(tmp_path, monkeypatch):
+    model_calls = []
+    original = agg._expected_shots_cte
+
+    def counted(*args, **kwargs):
+        model_calls.append(1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(agg, "_expected_shots_cte", counted)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     since = now - timedelta(days=10)
     cases = [
@@ -41,6 +49,7 @@ def test_export_omits_concentrated_cards_from_all_outputs(tmp_path):
         con.execute("INSERT INTO meta_season VALUES (300,'TEST A'), (400,'TEST B'), (500,'TEST C')")
         logs = []
         export.export(con, tmp_path, gate=1, since=since, log=logs.append)
+        assert len(model_calls) == 1
         assert con.execute("SELECT count(*) FROM gk_match").fetchone()[0] == 81
 
     def keys(rows):
@@ -64,7 +73,8 @@ def test_export_omits_concentrated_cards_from_all_outputs(tmp_path):
     embedded = json.loads(re.search(r'id="gk-data"[^>]*>(.*?)</script>', html, re.S)[1])
     assert keys(embedded["leaderboard"]) == expected
     assert "합성 GK B" not in html
-    phases = ["사용자 비중", "강화효과", "순위 추이", "GSAx", "센터백 듀오",
+    phases = ["사용자 비중", "강화효과", "순위 추이", "센터백 듀오 대상 선정", "공통 GSAx 모델",
+              "GSAx 카드 순위", "센터백 듀오 입력 준비",
               "거리 구간별", "슛 타입별", "추가 통계", "선수·시즌", "JSON·CSV", "HTML", "저장 완료"]
     positions = [next(i for i, line in enumerate(logs) if phase in line) for phase in phases]
     assert positions == sorted(positions)

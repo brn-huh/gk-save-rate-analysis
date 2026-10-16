@@ -69,21 +69,21 @@ def test_date_range_respects_since():
     assert windowed["date_range"]["max"] == "2026-06-20"
 
 
-def test_export_computes_gsax_once(monkeypatch):
+def test_export_skips_shot_model_when_no_cards_qualify(monkeypatch):
     from gksave import export
 
     con = connect_memory()
     calls = 0
-    original = agg.gsax_leaderboard
+    original = agg._expected_shots_cte
 
     def counted(*args, **kwargs):
         nonlocal calls
         calls += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(agg, "gsax_leaderboard", counted)
+    monkeypatch.setattr(agg, "_expected_shots_cte", counted)
     export.build_payload(con, gate=1)
-    assert calls == 1
+    assert calls == 0
     con.close()
 
 

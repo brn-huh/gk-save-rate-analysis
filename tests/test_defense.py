@@ -121,6 +121,75 @@ def test_gsax_uses_league_baseline_and_only_coordinate_shots(con):
     assert row["save_pct"] == pytest.approx(10 / 11)
 
 
+def test_combined_rankings_reuse_model_and_report_real_batches(con, monkeypatch):
+    keys = {(300000001, 10), (300000001, 11), (400000003, 10)}
+    for sp_id, grade in sorted(keys | {(500000004, 10)}):
+        for i in range(5):
+            user = "synthetic-biased" if sp_id == 500000004 else f"synthetic-user-{i}"
+            d = _match(f"synthetic-{sp_id}-{grade}-{i}", user, gk_grade=grade,
+                       saves=i, goals=4-i)
+            d["matchInfo"][0]["player"][0]["spId"] = sp_id
+            _insert(con, d)
+    agg.rebuild(con)
+    expected_g = [r for r in agg.gsax_leaderboard(con, gate=1)
+                  if (r["gk_sp_id"], r["grade"]) in keys]
+    expected_d = [r for r in agg.defense_combinations(con, gate=1)
+                  if (r["gk_sp_id"], r["grade"]) in keys]
+    monkeypatch.setattr(agg, "_DEFENSE_BATCH_SIZE", 1)
+    logs = []
+    gsax, duos = agg.export_rankings(con, eligible_keys=keys, gate=1, log=logs.append)
+    assert gsax == expected_g
+    assert duos == expected_d
+    completed = [line for line in logs if "개 완료 (" in line and "경기 " in line]
+    assert len(completed) == 3
+    assert "1/3개 완료 (33.3%)" in completed[0]
+    assert "3/3개 완료 (100.0%)" in completed[-1]
+    assert "경기 15/15건" in completed[-1] and "듀오 3개" in completed[-1]
+    assert "예상 남은 시간 약 0분 00초" in completed[-1]
+    assert all("synthetic-user" not in line and "gk_ouid" not in line for line in logs)
+
+    for stop_at in ("슛 통계 준비 완료", "1/3개 완료"):
+        def interrupted(message):
+            if stop_at in message:
+                raise KeyboardInterrupt("synthetic interruption")
+
+        with pytest.raises(KeyboardInterrupt):
+            agg.export_rankings(con, eligible_keys=keys, gate=1, log=interrupted)
+        assert agg.export_rankings(con, eligible_keys=keys, gate=1) == (gsax, duos)
+
+
+def test_combined_rankings_work_on_read_only_connection(tmp_path):
+    from gksave.config import Settings
+
+    settings = Settings(data_dir=tmp_path)
+    with db.connect(settings) as con:
+        for i in range(5):
+            _insert(con, _match(f"synthetic-readonly-{i}", f"synthetic-user-{i}"))
+        agg.rebuild(con)
+    with db.connect(settings, read_only=True) as con:
+        gsax, duos = agg.export_rankings(con, eligible_keys={(300000001, 10)}, gate=1)
+        assert len(gsax) == len(duos) == 1
+        assert duos[0]["matches"] == 5 and duos[0]["saves"] == 10
+        assert con.execute("SELECT count(*) FROM raw_match").fetchone()[0] == 5
+        assert con.execute("SELECT table_name FROM duckdb_tables() WHERE temporary "
+                           "AND table_name LIKE '_gksave_%'").fetchall() == []
+
+
+def test_unmodelled_shots_remain_in_raw_duo_totals(con):
+    d = _match("synthetic-unmodelled", saves=1, goals=0)
+    d["matchInfo"][1]["shootDetail"] += [
+        {"result": 3, "type": None, "x": 0.9, "y": 0.5},
+        {"result": 1, "type": 1, "x": None, "y": 0.5},
+        {"result": 3, "type": 1, "x": 0.9, "y": None},
+        {"result": 3, "type": 9, "x": 0.9, "y": 0.5},
+    ]
+    _insert(con, d)
+    agg.rebuild(con)
+    row = agg.defense_combinations(con, gate=1, min_users=1)[0]
+    assert (row["shots"], row["saves"], row["goals"], row["gsax_shots"]) == (4, 2, 2, 1)
+    assert row["save_pct"] == 0.5 and row["gsax_per_shot"] == 0
+
+
 def test_backfill_is_incremental_windowed_and_preserves_existing_stats(con):
     _insert(con, _match("old"))
     recent = _match("recent")
