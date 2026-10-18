@@ -372,10 +372,12 @@ async def snowball_async(
             pending = [
                 row[0]
                 for row in con.execute(
-                    "SELECT ouid FROM frontier WHERE state = 'pending' ORDER BY added_at"
+                    "SELECT ouid FROM frontier WHERE state = 'pending' "
+                    "AND ouid NOT IN (SELECT unnest(?::VARCHAR[])) "
+                    "ORDER BY added_at LIMIT ?",
+                    [list(deferred), user_workers],
                 ).fetchall()
-                if row[0] not in deferred
-            ][:user_workers]
+            ]
             if not pending:
                 _log_progress(con, stored=stored, max_new_matches=max_new_matches, log=log)
                 log(f"{datetime.now():%Y-%m-%d %H:%M:%S} | 유저 큐 소진")
@@ -387,6 +389,7 @@ async def snowball_async(
             )
             users = {ouid: _UserRun(ouid) for ouid in pending}
             works: dict[str, _MatchWork] = {}
+            stored_in_batch: set[str] = set()
             match_queue: asyncio.Queue[_MatchWork] = asyncio.Queue(match_queue_size)
             result_queue: asyncio.Queue[tuple[_MatchWork, dict[str, Any] | None]] = (
                 asyncio.Queue(max(detail_workers * 2, 1))
@@ -395,7 +398,11 @@ async def snowball_async(
             fatal: list[BaseException] = []
 
             async def register(ouid: str, mid: str) -> None:
-                if stop.is_set() or have_match(con, mid):
+                # 큐 대기 중 저장된 경기도 목록 조회 시점의 결과와 함께 확인한다.
+                if mid in stored_in_batch:
+                    return
+                if stop.is_set():
+                    users[ouid].failed = True
                     return
                 work = works.get(mid)
                 if work is not None:
@@ -418,13 +425,26 @@ async def snowball_async(
                         ids = await _a_user_matches(client, user.ouid, page * limit, limit)
                         if not ids:
                             break
+                        candidates = []
                         for mid in ids:
                             if since is not None:
                                 match_time = match_id_time(mid)
                                 if match_time is not None and match_time < since:
                                     reached_old = True
                                     break
-                            await register(user.ouid, mid)
+                            candidates.append(mid)
+                        existing = set()
+                        if candidates:
+                            existing = {
+                                row[0] for row in con.execute(
+                                    "SELECT match_id FROM raw_match "
+                                    "WHERE match_id IN (SELECT unnest(?))",
+                                    [candidates],
+                                ).fetchall()
+                            }
+                        for mid in candidates:
+                            if mid not in existing:
+                                await register(user.ouid, mid)
                         if reached_old:
                             break
                     user.scan_complete = True
@@ -461,6 +481,7 @@ async def snowball_async(
                             try:
                                 if _store_detail(con, work.match_id, detail):
                                     stored += 1
+                                stored_in_batch.add(work.match_id)
                             except BaseException as exc:
                                 fatal.append(exc)
                                 stop.set()
