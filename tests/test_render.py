@@ -66,6 +66,107 @@ def test_defense_filters_exact_gk_and_grade_and_sorts_missing_last():
 
 
 @requires_node
+def test_defense_team_color_search_requires_shared_gk_and_defender_metadata():
+    rows = [{"gk_sp_id": 1, "grade": 10, "cb1_sp_id": 10, "cb2_sp_id": second,
+             "matches": 100, "save_pct": 0.7} for second in (20, 30, 40)]
+    defenders = {
+        "10": {"bio": {"nation_name": "프랑스", "clubs": ["테스트", "테스트 FC"]}, "season_name": "ICON"},
+        "20": {"bio": {"nation_name": "프랑스", "clubs": ["테스트"]}, "season_name": "ICON"},
+        "30": {"bio": {"nation_name": "독일", "clubs": ["테스트 FC"]}},
+    }
+    gk = {"bio": {"nation_name": "프랑스", "clubs": ["테스트", "테스트 FC"]}, "season_name": "ICON"}
+    source = render.FILTER_JS + render.DEFENSE_JS + "\nconst rows=" + json.dumps(rows) + ";const defenders=" + json.dumps(defenders) + ";const gk=" + json.dumps(gk) + ";"
+    for color, expected in [("프랑스", "20"), ("프랑", "20"), ("테스트", "20,30"), ("테스트 FC", "30"),
+                            ("  iCoN  ", "20"), ("없는 팀", ""), ("", "20,30,40"), ("   ", "20,30,40")]:
+        expr = f"filterDefenseRows(rows,'1_10',100,'save_pct',{json.dumps(color)},defenders,gk).map(r=>r.cb2_sp_id).join(',')"
+        assert _eval_js(expr, source) == expected
+    assert _eval_js("filterDefenseRows(rows,'1_10',100,'save_pct','프랑',defenders,{bio:{nation_name:'독일'}}).length", source) == "0"
+    assert _eval_js("filterDefenseRows(rows,'1_10',100,'save_pct','테스트',defenders,{bio:{clubs:['테스트 United']}}).length", source) == "0"
+    assert _eval_js("filterDefenseRows(rows,'1_10',100,'save_pct','ICON',defenders,{}).length", source) == "0"
+
+
+@requires_node
+def test_defense_top_ten_filters_before_limiting_and_resets_on_changes():
+    html = render.build_html(_PAYLOAD)
+    source = "function filterDefenseRows(" + html.split("function filterDefenseRows(", 1)[1].split("defenseRetry.onclick=loadDefense;", 1)[0]
+    script = """
+const fields={};
+const document={getElementById:id=>fields[id]||(fields[id]={value:'',min:50,options:[],
+  appendChild(option){this.options.push(option);}}),createElement:()=>({})};
+const location={reload(){}};
+const esc=String,pct=String,gps=String,ciText=()=>'',heroImg=()=>'',gradeBadge=()=>'',seasonIcon=()=>'';
+const D={leaderboard:[{gk_sp_id:1,grade:10,bio:{nation_name:'프랑스'}}]};
+""" + render.FILTER_JS + source + """
+defenseData={min_users:5,defenders:{99:{bio:{nation_name:'프랑스'}}},combinations:[]};
+for(let i=0;i<25;i++){
+  defenseData.defenders[i+100]={bio:{nation_name:i<11?'독일':'프랑스'}};
+  defenseData.combinations.push({gk_sp_id:1,grade:10,cb1_sp_id:i+100,cb2_sp_id:99,
+    matches:100,users:5,save_pct:1-i/100,gsax_shots:100,shots:100,
+    shots_per_match:1,goals_per_match:i/100});
+}
+defenseGk.value='1_10'; defenseGate.value=100; defenseSort.value='save_pct';
+const states=[];
+function record(){states.push({count:(fields.defenseResults.innerHTML.match(/<article/g)||[]).length,
+  status:defenseStatus.textContent,more:!defenseMore.hidden,html:fields.defenseResults.innerHTML,
+  selected:defenseGk.value,query:defenseTeamColor.value});}
+renderDefense(); record();
+defenseMore.onclick(); record();
+defenseTeamColor.value='프랑'; defenseTeamColor.oninput(); record();
+defenseMore.onclick(); record();
+defenseSort.value='goals_per_match'; defenseSort.onchange(); record();
+defenseGate.value=101; defenseGate.onchange(); record();
+defenseGate.value=100; defenseGate.onchange();
+defenseTeamColor.value='없는 팀'; defenseTeamColor.oninput(); record();
+defenseTeamColor.value=''; defenseTeamColor.oninput(); record();
+defenseGk.value=''; defenseGk.onchange();
+process.stdout.write(JSON.stringify({states,colorDisabled:defenseTeamColor.disabled,color:defenseTeamColor.value}));
+"""
+    result = subprocess.run([_NODE, "-e", script], capture_output=True, text=True, check=True)
+    result = json.loads(result.stdout)
+    states = result["states"]
+    assert [s["count"] for s in states] == [10, 20, 10, 14, 10, 0, 0, 10]
+    assert [s["more"] for s in states] == [True, True, True, False, True, False, False, True]
+    assert "25개 중 상위 10개" in states[0]["status"]
+    assert "프랑 · 듀오 14개 중 상위 10개" in states[2]["status"]
+    assert "선수 111" in states[2]["html"] and "선수 100" not in states[2]["html"]
+    assert '공통 팀컬러:</strong> 프랑스' in states[2]["html"]
+    assert "팀컬러나 골키퍼" in states[5]["html"]
+    assert states[6]["query"] == "없는 팀"
+    assert "전체 팀컬러" in states[7]["status"]
+    assert all(s["selected"] == "1_10" for s in states)
+    assert result["colorDisabled"] and result["color"] == ""
+
+
+def test_defense_has_team_color_search_field():
+    html = render.build_html(_PAYLOAD)
+    assert 'id="defenseTeamColor" type="search"' in html
+    assert 'for="defenseTeamColor">3. 공통 팀컬러 검색' in html
+
+
+@requires_node
+def test_defense_team_color_info_prioritizes_club_and_nation_shared_by_all_three():
+    html = render.build_html(_PAYLOAD)
+    helper = 'function defenseTeamColorInfo(' + html.split('function defenseTeamColorInfo(', 1)[1].split('async function loadDefense', 1)[0]
+    source = "const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\n" + render.DEFENSE_JS + helper
+    gk = {"bio": {"nation_name": "프랑스", "clubs": ["레알 마드리드", "파리 생제르맹"]}, "season_name": "ICON"}
+    first = {"bio": {"nation_name": "프랑스", "clubs": ["레알 마드리드", "레알 마드리드", "유벤투스"]}, "season_name": "ICON"}
+    second = {"bio": {"nation_name": "프랑스", "clubs": ["레알 마드리드", "첼시"]}, "season_name": "ICON"}
+    shared = _eval_js(f"defenseTeamColorInfo({json.dumps(gk)},{json.dumps(first)},{json.dumps(second)})", source)
+    assert '공통 팀컬러:</strong> 레알 마드리드 · 프랑스 · ICON</p>' in shared
+    assert shared.count('레알 마드리드') == 1
+    assert '유벤투스' not in shared and '첼시' not in shared and '미확인' not in shared
+    unrelated = {"bio": {"nation_name": "독일", "clubs": ["테스트 클럽"]}, "season_name": "TEST"}
+    assert '공통 팀컬러:</strong> 없음' in _eval_js(f"defenseTeamColorInfo({json.dumps(unrelated)},{json.dumps(first)},{json.dumps(second)})", source)
+    missing = _eval_js("defenseTeamColorInfo({season_name:'ICON'},{season_name:'ICON'},{season_name:'ICON'})", source)
+    assert '공통 팀컬러:</strong> ICON ' in missing and '국가·클럽 정보 미확인' in missing
+    assert '확인 가능한 정보 없음' in _eval_js("defenseTeamColorInfo()", source)
+    malicious = {"bio": {"nation_name": "<script>", "clubs": ["<img src=x>"]}, "season_name": "<svg>"}
+    escaped = _eval_js(f"defenseTeamColorInfo({json.dumps(malicious)},{json.dumps(malicious)},{json.dumps(malicious)})", source)
+    assert '<script>' not in escaped and '<img' not in escaped and '<svg>' not in escaped
+    assert '&lt;script&gt;' in escaped and '&lt;img src=x&gt;' in escaped and '&lt;svg&gt;' in escaped
+
+
+@requires_node
 @pytest.mark.parametrize("version", ["2026-07-04T00:00:00Z", "new-version", None])
 def test_defense_version_mismatch_blocks_results_and_offers_reload(version):
     html = render.build_html(_PAYLOAD)

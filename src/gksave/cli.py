@@ -107,7 +107,8 @@ def _cmd_playerdetail(args) -> None:
     con = connect(DEFAULT)
     try:
         with progress("공식 데이터센터 선수 상세 갱신") as log:
-            playerinfo.sync_player_detail(con, delay=args.delay, limit=args.limit, log=log)
+            playerinfo.sync_player_detail(con, delay=args.delay, limit=args.limit,
+                                          include_defenders=args.defenders, log=log)
     finally:
         con.close()
 
@@ -256,6 +257,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pd.add_argument("--delay", type=float, default=2.0, help="상세요청 사이 지연(초, 기본 2초, 최소 1초)")
     pd.add_argument("--limit", type=int, help="이번에 받을 카드 수 상한(소량 시험용)")
+    pd.add_argument("--defenders", action="store_true", help="수비 조합의 센터백 특성·국가·클럽도 수집")
     pd.set_defaults(func=_cmd_playerdetail)
 
     rb = sub.add_parser(

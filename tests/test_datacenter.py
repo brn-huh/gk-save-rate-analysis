@@ -47,6 +47,8 @@ def test_collection_command_delays():
     from gksave.cli import build_parser
     for command, delay in [('playerinfo',3.0),('playerdetail',2.0),('resyncbio',2.0)]:
         assert build_parser().parse_args([command]).delay==delay
+    assert not build_parser().parse_args(['playerdetail']).defenders
+    assert build_parser().parse_args(['playerdetail','--defenders']).defenders
 
 
 def test_fcinfo_collection_searches_each_name_and_waits_between_requests():

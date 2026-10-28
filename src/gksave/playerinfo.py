@@ -420,10 +420,14 @@ def _store_bio(con: duckdb.DuckDBPyConnection, pid: int, html: str) -> None:
     code, name, clubs = parse_bio(html)
     con.execute(
         "INSERT INTO player_bio (pid, nation_code, nation_name) VALUES (?, ?, ?) "
-        "ON CONFLICT DO NOTHING",
+        "ON CONFLICT (pid) DO UPDATE SET "
+        "nation_code = coalesce(player_bio.nation_code, excluded.nation_code), "
+        "nation_name = coalesce(nullif(trim(player_bio.nation_name), ''), excluded.nation_name), "
+        "fetched_at = now()",
         [pid, code, name],
     )
-    con.execute("DELETE FROM player_club WHERE pid = ?", [pid])   # 재수집 시 갱신
+    if clubs:
+        con.execute("DELETE FROM player_club WHERE pid = ?", [pid])
     for ord_, club in enumerate(clubs):
         con.execute("INSERT INTO player_club (pid, ord, club_name) VALUES (?, ?, ?)",
                     [pid, ord_, club])
@@ -446,10 +450,11 @@ def sync_player_detail(
     client: httpx.Client | None = None,
     delay: float = 2.0,
     limit: int | None = None,
+    include_defenders: bool = False,
     sleep: Callable[[float], None] = time.sleep,
     log: Callable[[str], None] = _log,
 ) -> dict[str, int]:
-    """우리 GK 카드(spid)의 상세를 공식 데이터센터에서 능력치와 상세페이지를 받아 특성 + 국가·클럽을 채운다.
+    """GK와 선택 시 센터백 카드의 공식 데이터센터 상세로 특성 + 국가·클럽을 채운다.
 
     특성은 시즌(카드)별이라 spid 당 1회 받는다. 국가·클럽은 선수(pid) 불변이라 그 상세페이지에서
     부수적으로 뽑아 pid 가 아직 없을 때만 저장한다 — 두 종류를 한 패스(per-spid)로 수집.
@@ -457,24 +462,25 @@ def sync_player_detail(
     limit 지정 시 그만큼만(소량 시험용). 반환: {'spids','already','need','new','failed','bio_new'}.
     """
     log("player_detail: 조회할 카드·캐시 확인 중")
-    ours = [r[0] for r in con.execute("SELECT DISTINCT gk_sp_id FROM gk_match").fetchall()]
+    ours = sorted(_our_cards(con, include_defenders))
     have = {r[0] for r in con.execute("SELECT DISTINCT spid FROM player_trait").fetchall()}
-    have_bio = {r[0] for r in con.execute("SELECT pid FROM player_bio").fetchall()}
+    have_bio = {r[0] for r in con.execute(
+        "SELECT b.pid FROM player_bio b WHERE nullif(trim(b.nation_name), '') IS NOT NULL "
+        "AND EXISTS (SELECT 1 FROM player_club c WHERE c.pid = b.pid "
+        "AND nullif(trim(c.club_name), '') IS NOT NULL)"
+    ).fetchall()}
     # 특성이 0개인 카드는 받아도 player_trait 에 행이 안 남는다 → 조회 기록으로도 걸러야
     # 매 실행마다 같은 상세페이지를 다시 받지 않는다.
     seen = _fetched_recently(con, "detail")
     need = [spid for spid in ours if spid not in have and spid not in seen]
-    # 특성은 있어(need 에서 빠진) 페이지를 안 받는 pid 중, 국가·클럽이 아직 없는 pid 는
-    # 대표 spid 하나를 받아 bio 만 채운다(클럽 파싱 개선 후 재수집에도 이 경로가 쓰인다).
-    need_set = set(need)
-    seen_pid: set[int] = set()
+    # 국가·클럽 누락은 과거 조회 성공 여부와 별개로 대표 카드 하나를 다시 확인한다.
+    needed_pids = {_pid_of(spid) for spid in need}
     for spid in ours:
         pid = _pid_of(spid)
-        if spid in seen:            # 최근에 이 페이지를 봤으면 bio 때문에 다시 받지 않는다
-            continue
-        if pid not in have_bio and spid not in need_set and pid not in seen_pid:
-            seen_pid.add(pid)
+        if pid not in have_bio and pid not in needed_pids:
+            needed_pids.add(pid)
             need.append(spid)
+    need.sort(key=lambda spid: _pid_of(spid) in have_bio)
     if limit is not None:
         need = need[:limit]
     if not need:

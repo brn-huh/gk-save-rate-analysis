@@ -342,6 +342,8 @@ def test_public_export_has_names_but_no_identifiers_and_is_loaded_separately(con
     con.execute("INSERT INTO meta_season VALUES (300, '테스트 시즌')")
     con.execute("INSERT INTO season_img VALUES (300,'https://example.test/season.png')")
     con.execute("INSERT INTO player_info (spid,salary,ovr,height) VALUES (300000010,25,110,190)")
+    con.execute("INSERT INTO player_bio (pid,nation_name) VALUES (10,'프랑스')")
+    con.execute("INSERT INTO player_club VALUES (10,0,'테스트 클럽')")
     export.export(con, tmp_path, gate=1)
     public = (tmp_path / "defense.json").read_text()
     data = json.loads(public)
@@ -349,7 +351,10 @@ def test_public_export_has_names_but_no_identifiers_and_is_loaded_separately(con
     assert data["defenders"]["300000010"]["player_name"] == "센터백 A"
     assert data["defenders"]["300000010"]["season_img"] == "https://example.test/season.png"
     assert data["defenders"]["300000010"]["info"]["salary"] == 25
+    assert data["defenders"]["300000010"]["bio"]["nation_name"] == "프랑스"
+    assert data["defenders"]["300000010"]["bio"]["clubs"] == ["테스트 클럽"]
     assert data["defenders"]["300000020"]["info"]["salary"] is None
+    assert data["defenders"]["300000020"]["bio"] is None
     main = json.loads((tmp_path / "leaderboard.json").read_text())
     assert data["generated_at"] == main["generated_at"]
     assert data["date_range"] == main["date_range"]

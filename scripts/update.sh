@@ -20,12 +20,9 @@ echo "=== 카드정보 갱신 ==="
 echo "=== 선수명·시즌 메타 갱신 ==="
 gksave meta          || echo "! meta 실패 — 이번 회차는 건너뜀" >&2
 echo "=== fc-info 카드정보·시즌 이미지 갱신 ==="
-if gksave playerinfo --defenders; then
-  echo "=== 공식 데이터센터 선수 상세 갱신 (최대 120장) ==="
-  gksave playerdetail --limit 120 || echo "! playerdetail 실패 — 이번 회차는 건너뜀" >&2
-else
-  echo "! playerinfo 실패 — 추가 부가정보 요청을 멈추고 기존 캐시로 export합니다" >&2
-fi
+gksave playerinfo --defenders || echo "! playerinfo 실패 — 공식 데이터센터 정보 수집은 계속합니다" >&2
+echo "=== 공식 데이터센터 선수 상세 갱신 (최대 120장 · 국가·클럽 누락 우선) ==="
+gksave playerdetail --defenders --limit 120 || echo "! playerdetail 실패 — 이번 회차는 건너뜀" >&2
 
 # 사용자 편중 제외는 export 공통 로직에 적용되어 collect.sh 경유 실행에도 동일하다.
 echo "=== export (롤링 60일 · 한 유저 비중 35% 이상 제외) ===" && gksave export --gate 200 --days 60 --out out || exit 1

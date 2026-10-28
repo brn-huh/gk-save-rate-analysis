@@ -182,8 +182,9 @@ def build_payload(
     meta.enrich(con, defenders)
     playerinfo.attach_info(con, defenders)
     playerinfo.attach_season_img(con, defenders)
+    playerinfo.attach_bio(con, defenders)
     payload["defense"]["defenders"] = {
-        str(c["gk_sp_id"]): {k: c[k] for k in ("player_name", "season_id", "season_name", "season_img", "info")}
+        str(c["gk_sp_id"]): {k: c[k] for k in ("player_name", "season_id", "season_name", "season_img", "info", "bio")}
         for c in defenders
     }
     return payload

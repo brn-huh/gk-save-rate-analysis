@@ -372,6 +372,27 @@ def test_sync_detail_stores_traits_and_bio_in_one_pass():
     assert clubs == [(1179, "유벤투스"), (238380, "디나모 모스크바")]
 
 
+def test_sync_detail_optionally_collects_defender_bio_and_keeps_incremental_cache():
+    con = connect_memory()
+    con.execute("INSERT INTO defense_match (match_id,gk_ouid,cb1_sp_id,cb2_sp_id) "
+                "VALUES ('synthetic-defense','synthetic-user',300000010,300000020)")
+    client = _mock_full({
+        300000010: (21, "독일", ["테스트 클럽"], [(15, "긴 패스 선호")]),
+        300000020: (21, "독일", ["테스트 클럽"], [(15, "긴 패스 선호")]),
+    })
+    options = dict(client=client, sleep=lambda _x: None, log=lambda _m: None)
+    assert sync_player_detail(con, **options)["spids"] == 0
+    assert not client._calls["paths"]
+    first = sync_player_detail(con, include_defenders=True, limit=1, **options)
+    assert first["spids"] == 2 and first["bio_new"] == 1
+    second = sync_player_detail(con, include_defenders=True, **options)
+    assert second["bio_new"] == 1
+    assert con.execute("SELECT pid,nation_name FROM player_bio ORDER BY pid").fetchall() == [(10, "독일"), (20, "독일")]
+    assert con.execute("SELECT club_name FROM player_club ORDER BY pid").fetchall() == [("테스트 클럽",), ("테스트 클럽",)]
+    assert sync_player_detail(con, include_defenders=True, **options)["need"] == 0
+    assert len(client._calls["paths"]) == 2
+
+
 def test_sync_detail_traits_per_spid_bio_per_pid():
     # 같은 선수(pid 167495) 두 시즌: 특성은 카드별 저장, 국가·클럽은 pid당 1회.
     con = connect_memory()
@@ -394,6 +415,7 @@ def test_sync_detail_incremental_skips_trait_cached_spid():
     con.execute("INSERT INTO player_trait (spid, ord, trait_code, trait_name, is_new) "
                 "VALUES (100238380, 0, 60, 'X', TRUE)")
     con.execute("INSERT INTO player_bio (pid, nation_code, nation_name) VALUES (238380, 40, '러시아')")
+    con.execute("INSERT INTO player_club VALUES (238380,0,'디나모 모스크바')")
     client = _mock_full({100238380: (99, "바뀜", ["X"], [(99, "바뀜")])})
     r = sync_player_detail(con, client=client, sleep=lambda _x: None, log=lambda _m: None)
     assert client._calls["paths"] == [] and r["new"] == 0
@@ -417,6 +439,60 @@ def test_sync_detail_revisits_for_missing_bio_only():
     assert [r[0] for r in con.execute(
         "SELECT club_name FROM player_club WHERE pid=238380 ORDER BY ord").fetchall()] \
         == ["디나모 모스크바", "스파르타크"]
+
+
+@pytest.mark.parametrize('nation,clubs', [(None, []), ('', []), ('  ', []), ('러시아', []), (None, ['디나모 모스크바'])])
+def test_sync_detail_repairs_incomplete_bio_even_after_recent_success(nation, clubs):
+    con = connect_memory()
+    _seed_gk(con, 100238380, '야신')
+    con.execute("INSERT INTO player_bio (pid,nation_name) VALUES (238380,?)", [nation])
+    for i, club in enumerate(clubs):
+        con.execute("INSERT INTO player_club VALUES (238380,?,?)", [i, club])
+    con.execute("INSERT INTO player_trait VALUES (100238380,0,60,'기존 특성',true)")
+    con.execute("INSERT INTO fc_fetch_log (kind,spid) VALUES ('nexon-detail',100238380)")
+    client = _mock_full({100238380: (40, '러시아', ['디나모 모스크바'], [(99, '무시')])})
+    options = dict(client=client, sleep=lambda _: None, log=lambda _: None)
+    result = sync_player_detail(con, **options)
+    assert result['bio_new'] == 1
+    assert con.execute("SELECT nation_name FROM player_bio WHERE pid=238380").fetchone() == ('러시아',)
+    assert con.execute("SELECT club_name FROM player_club WHERE pid=238380").fetchall() == [('디나모 모스크바',)]
+    assert con.execute("SELECT trait_code FROM player_trait").fetchall() == [(60,)]
+    assert sync_player_detail(con, **options)['need'] == 0
+
+
+def test_sync_detail_prioritizes_missing_bio_before_trait_refresh_with_limit():
+    con = connect_memory()
+    _seed_gk(con, 100001179, '골키퍼')
+    con.execute("INSERT INTO player_bio (pid,nation_name) VALUES (1179,'이탈리아')")
+    con.execute("INSERT INTO player_club VALUES (1179,0,'유벤투스')")
+    con.execute("INSERT INTO defense_match (match_id,gk_ouid,cb1_sp_id,cb2_sp_id) "
+                "VALUES ('synthetic-defense','synthetic-user',300000010,300000010)")
+    client = _mock_full({300000010: (21, '독일', ['테스트 클럽'], [])})
+    result = sync_player_detail(con, client=client, include_defenders=True, limit=1,
+                                sleep=lambda _: None, log=lambda _: None)
+    assert result['bio_new'] == 1
+    assert client._calls['paths'] == ['/datacenter/PlayerAbility?spid=300000010']
+
+
+def test_sync_detail_keeps_known_nation_when_backfilling_missing_clubs():
+    con = connect_memory()
+    _seed_gk(con, 100238380, '야신')
+    con.execute("INSERT INTO player_bio (pid,nation_code,nation_name) VALUES (238380,40,'러시아')")
+    client = _mock_full({100238380: (99, '다른 시즌의 국적', ['디나모 모스크바'], [])})
+    sync_player_detail(con, client=client, sleep=lambda _: None, log=lambda _: None)
+    assert con.execute("SELECT nation_code,nation_name FROM player_bio").fetchone() == (40, '러시아')
+    assert con.execute("SELECT club_name FROM player_club").fetchall() == [('디나모 모스크바',)]
+
+
+def test_sync_detail_keeps_known_clubs_when_response_only_repairs_nation():
+    con = connect_memory()
+    _seed_gk(con, 100238380, '야신')
+    con.execute("INSERT INTO player_bio (pid) VALUES (238380)")
+    con.execute("INSERT INTO player_club VALUES (238380,0,'디나모 모스크바')")
+    client = _mock_full({100238380: (40, '러시아', [], [])})
+    sync_player_detail(con, client=client, sleep=lambda _: None, log=lambda _: None)
+    assert con.execute("SELECT nation_name FROM player_bio").fetchone() == ('러시아',)
+    assert con.execute("SELECT club_name FROM player_club").fetchall() == [('디나모 모스크바',)]
 
 
 def test_resync_bio_uses_majority_nation():

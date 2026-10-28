@@ -68,7 +68,7 @@ const matchNames=(name,q)=>{
   const terms=q.split(',').map(s=>s.trim()).filter(Boolean);
   return !terms.length || terms.some(t=>matchName(name,t));
 };
-// 리더보드 전용: '팀컬러' 검색 — 국가·클럽·시즌(카드) 어디든 부분일치하면 통과(OR).
+// 리더보드 전용: '팀컬러' 검색 — 국가·클럽·시즌 어디든 부분일치하면 통과(OR).
 // FC온라인에선 국가/클럽/시즌을 통틀어 팀컬러라 부른다. 이름 검색과는 별개 입력.
 const matchTeamColor=(c,q)=>{
   if(!q) return true;
@@ -129,9 +129,12 @@ function ciText(s,g){
 """
 
 DEFENSE_JS = r"""
-function filterDefenseRows(rows, gkKey, gate, metric){
+function filterDefenseRows(rows, gkKey, gate, metric, teamColor='', defenders={}, gk={}){
   const ascending=metric==='shots_per_match'||metric==='goals_per_match';
-  return rows.filter(r=>`${r.gk_sp_id}_${r.grade}`===gkKey&&r.matches>=gate).sort((a,b)=>{
+  const query=teamColor.trim().toLowerCase();
+  return rows.filter(r=>`${r.gk_sp_id}_${r.grade}`===gkKey&&r.matches>=gate&&
+    (!query||commonDefenseTeamColors(gk,defenders[r.cb1_sp_id],defenders[r.cb2_sp_id])
+      .some(color=>matchName(color.name,query)))).sort((a,b)=>{
     const av=a[metric], bv=b[metric];
     if(av==null&&bv!=null) return 1;
     if(bv==null&&av!=null) return -1;
@@ -139,6 +142,16 @@ function filterDefenseRows(rows, gkKey, gate, metric){
       a.cb1_sp_id-b.cb1_sp_id || a.cb1_grade-b.cb1_grade ||
       a.cb2_sp_id-b.cb2_sp_id || a.cb2_grade-b.cb2_grade;
   });
+}
+function commonDefenseTeamColors(gk={},first={},second={}){
+  const clubs=[...new Set(gk.bio?.clubs||[])].filter(club=>
+    (first.bio?.clubs||[]).includes(club)&&(second.bio?.clubs||[]).includes(club));
+  const nation=gk.bio?.nation_name;
+  const season=gk.season_name;
+  return [...clubs.map(name=>({type:'클럽',name})),
+    {type:'국가',name:nation&&nation===first.bio?.nation_name&&nation===second.bio?.nation_name?nation:null},
+    {type:'시즌',name:season&&season===first.season_name&&season===second.season_name?season:null}
+  ].filter(color=>color.name);
 }
 """
 
@@ -447,6 +460,7 @@ _TEMPLATE = r"""<!doctype html>
   .defense-results{display:grid;gap:12px;margin-top:16px}
   .defense-result{padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
   .defense-result h3{margin:0 0 12px;font-size:1rem;line-height:1.6;overflow-wrap:anywhere}
+  .defense-team-colors{margin:0 0 12px;font-size:.85rem;line-height:1.6;overflow-wrap:anywhere}
   .defense-pair{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;align-items:center;margin-bottom:16px;padding:12px;background:var(--panel2);border-radius:12px}
   .defense-pair-plus{color:var(--mut);font-size:1.25rem}
   .defense-player{display:flex;align-items:center;gap:12px;min-width:0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
@@ -471,6 +485,7 @@ _TEMPLATE = r"""<!doctype html>
   #panel-defense .controls label{display:flex;flex-direction:column;gap:6px;color:var(--mut);font-size:.85rem}
   #panel-defense .controls select,#panel-defense .controls input{min-height:44px;max-width:100%;min-width:0}
   #panel-defense .defense-gk{flex:1;min-width:200px}
+  #panel-defense .defense-team-color{min-width:0;max-width:100%}
   #panel-defense .defense-search{flex-basis:100%}
   #defenseGate{width:100px}
   /* 더보기 */
@@ -680,7 +695,7 @@ _TEMPLATE = r"""<!doctype html>
 <!-- 탭 3: 센터백 듀오 -->
 <div class="panel" id="panel-defense">
   <h2>골키퍼 × 센터백 듀오</h2>
-  <p class="muted">골키퍼를 검색하고 시즌·강화를 선택해, 센터백 듀오의 선방률·실점을 비교해 보세요.</p>
+  <p class="muted">골키퍼의 시즌·강화를 선택한 뒤 팀컬러를 검색해 듀오를 찾아보세요. 선택한 정렬 기준 상위 10개부터 표시합니다.</p>
   <p class="muted">유저·전술 등의 영향이 남는 관찰 통계로, 듀오의 성능 향상을 입증하지 않습니다.</p>
   <div class="controls">
     <label class="defense-search" for="defenseSearch">1. 골키퍼 찾기
@@ -688,6 +703,9 @@ _TEMPLATE = r"""<!doctype html>
     </label>
     <label class="defense-gk" for="defenseGk">2. 시즌·강화 선택
       <select id="defenseGk" disabled><option value="">데이터를 불러오면 선택할 수 있습니다</option></select>
+    </label>
+    <label class="defense-team-color" for="defenseTeamColor">3. 공통 팀컬러 검색
+      <input id="defenseTeamColor" type="search" placeholder="클럽·국가·시즌 검색 (예: 레알, 프랑스)" aria-describedby="defenseTeamColorHint" disabled>
     </label>
     <label for="defenseGate">최소 경기수
       <input id="defenseGate" type="number" inputmode="numeric" min="50" max="50000" step="1" value="100" disabled>
@@ -702,11 +720,13 @@ _TEMPLATE = r"""<!doctype html>
       </select>
     </label>
   </div>
+  <p class="muted" id="defenseTeamColorHint">선택한 골키퍼와 두 센터백, 세 명 모두가 공유하는 팀컬러를 검색합니다. 클럽·국가를 먼저 표시하며, 검색어를 지우면 전체 듀오를 봅니다. 국가·클럽 정보가 없는 선수는 해당 검색에서 제외됩니다.</p>
   <p class="muted" id="defenseStatus" role="status" aria-live="polite" aria-atomic="true">센터백 듀오 탭을 열면 데이터를 불러옵니다.</p>
   <div id="defenseSelected"></div>
   <div class="defense-results" id="defenseResults"></div>
-  <div class="more"><button id="defenseMore" type="button" hidden>더 보기</button><button id="defenseRetry" type="button" hidden>다시 불러오기</button><button id="defenseReload" type="button" hidden>새로고침</button></div>
+  <div class="more"><button id="defenseMore" type="button" hidden>10개 더 보기</button><button id="defenseRetry" type="button" hidden>다시 불러오기</button><button id="defenseReload" type="button" hidden>새로고침</button></div>
   <details class="help"><summary>듀오 통계의 집계 기준 · 읽는 법</summary>
+    <p>공통 팀컬러는 선택한 골키퍼와 두 센터백, 세 명의 클럽·국가·시즌에서 겹치는 항목입니다. 클럽, 국가, 시즌 순서로 표시합니다. 실제 경기에서 팀컬러가 적용되었음을 뜻하지 않습니다.</p>
     <p>같은 골키퍼의 시즌·강화를 고정하고, 경기 명단에 센터백 2명과 좌우 풀백이 기록된 경기를 비교합니다. 센터백의 시즌·강화도 구분하며, 좌우 배치가 바뀐 같은 두 카드는 하나의 듀오로 묶습니다. 풀백이 다른 경기도 센터백 쌍이 같으면 함께 집계합니다.</p>
     <p>선방률은 PK·자책골을 제외한 선방 ÷ (선방 + 실점)입니다. 경기당 유효슛과 실점도 같은 제외 기준을 씁니다. 유효슛이 없던 경기도 경기수에 포함합니다.</p>
     <p>GSAx는 전체 집계 기간의 슛 타입 × 거리 구간 평균으로 기대선방을 계산합니다. 좌표가 있는 유효슛만 계산하며, 좌표 표본 비율을 각 조합에 표시합니다. 유저 실력·전술·풀백·상대 수준의 차이는 보정하지 않습니다.</p>
@@ -1316,9 +1336,11 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 });
 
 __DEFENSE_JS__
-let defenseData=null, defenseLoading=false, defenseLimit=50, defenseCards=[];
+const DEFENSE_PAGE=10;
+let defenseData=null, defenseLoading=false, defenseLimit=DEFENSE_PAGE, defenseCards=[];
 const defenseSearch=document.getElementById('defenseSearch');
 const defenseGk=document.getElementById('defenseGk');
+const defenseTeamColor=document.getElementById('defenseTeamColor');
 const defenseGate=document.getElementById('defenseGate');
 const defenseSort=document.getElementById('defenseSort');
 const defenseStatus=document.getElementById('defenseStatus');
@@ -1338,6 +1360,13 @@ function defensePlayer(c,id,grade,role){
     (brief.length?`<p class="defense-player-info">${brief.map(esc).join(' · ')}</p>`:'')+
     (details.length?`<p class="defense-player-info defense-player-info-extra">${details.map(esc).join(' · ')}</p>`:'')+'</div></div>';
 }
+function defenseTeamColorInfo(gk={},first={},second={}){
+  const colors=commonDefenseTeamColors(gk,first,second);
+  const missingBio=[gk,first,second].some(card=>!card.bio);
+  const summary=colors.length?colors.map(color=>esc(color.name)).join(' · '):missingBio?'확인 가능한 정보 없음':'없음';
+  return '<p class="defense-team-colors"><strong>공통 팀컬러:</strong> '+summary+
+    (missingBio?' <span class="muted">(국가·클럽 정보 미확인)</span>':'')+'</p>';
+}
 async function loadDefense(){
   if(defenseData||defenseLoading) return;
   defenseLoading=true; defenseRetry.hidden=true; defenseReload.hidden=true;
@@ -1350,6 +1379,7 @@ async function loadDefense(){
     if(data.generated_at!==D.generated_at){
       defenseSearch.disabled=true;
       defenseGk.disabled=true;
+      defenseTeamColor.disabled=true;
       defenseGate.disabled=true; defenseSort.disabled=true;
       document.getElementById('defenseResults').innerHTML='';
       document.getElementById('defenseSelected').innerHTML='';
@@ -1387,7 +1417,7 @@ function renderDefenseGkOptions(){
   });
   defenseGk.disabled=!cards.length;
   defenseGk.value=cards.some(c=>`${c.gk_sp_id}_${c.grade}`===previous)?previous:'';
-  defenseLimit=50;
+  defenseLimit=DEFENSE_PAGE;
   renderDefense();
 }
 function renderDefense(){
@@ -1396,6 +1426,8 @@ function renderDefense(){
   const gate=Math.min(50000,Math.max(floor,Math.trunc(Number(defenseGate.value))||floor));
   defenseGate.value=gate;
   const gk=D.leaderboard.find(c=>`${c.gk_sp_id}_${c.grade}`===defenseGk.value);
+  const gkRows=defenseData.combinations.filter(r=>`${r.gk_sp_id}_${r.grade}`===defenseGk.value);
+  defenseTeamColor.disabled=!gk;
   defenseGate.disabled=!gk; defenseSort.disabled=!gk;
   document.getElementById('defenseSelected').innerHTML=gk?defensePlayer(gk,gk.gk_sp_id,gk.grade,'선택한 골키퍼'):'';
   if(!gk){
@@ -1407,11 +1439,13 @@ function renderDefense(){
     document.getElementById('defenseResults').innerHTML='';
     return;
   }
-  const rows=filterDefenseRows(defenseData.combinations,defenseGk.value,gate,defenseSort.value);
-  defenseStatus.textContent=`선택한 골키퍼 기준 · 듀오 ${rows.length.toLocaleString('ko-KR')}개 · ${gate.toLocaleString('ko-KR')}경기 이상 · 사용자 ${defenseData.min_users}명 이상 · ${defenseSort.options[defenseSort.selectedIndex]?.textContent||'선방률 높은 순'}`;
+  const rows=filterDefenseRows(gkRows,defenseGk.value,gate,defenseSort.value,defenseTeamColor.value,defenseData.defenders,gk);
+  defenseStatus.textContent=`선택한 골키퍼 기준 · ${defenseTeamColor.value.trim()||'전체 팀컬러'} · 듀오 ${rows.length.toLocaleString('ko-KR')}개 중 상위 ${Math.min(rows.length,defenseLimit)}개 표시 · ${gate.toLocaleString('ko-KR')}경기 이상 · 사용자 ${defenseData.min_users}명 이상 · ${defenseSort.options[defenseSort.selectedIndex]?.textContent||'선방률 높은 순'}`;
   const stat=(key,label,value)=>`<div${key===defenseSort.value?' class="defense-stat-current"':''}><dt>${label}</dt><dd>${value}</dd></div>`;
   document.getElementById('defenseResults').innerHTML=rows.slice(0,defenseLimit).map((r,i)=>
-    `<article class="defense-result"><h3>이 골키퍼의 듀오 ${i+1}위</h3><div class="defense-pair">`+
+    `<article class="defense-result"><h3>이 골키퍼의 듀오 ${i+1}위</h3>`+
+    defenseTeamColorInfo(gk,defenseData.defenders[String(r.cb1_sp_id)],defenseData.defenders[String(r.cb2_sp_id)])+
+    '<div class="defense-pair">'+
     defensePlayer(defenseData.defenders[String(r.cb1_sp_id)]||{},r.cb1_sp_id,r.cb1_grade,'')+
     '<span class="defense-pair-plus" aria-hidden="true">+</span>'+
     defensePlayer(defenseData.defenders[String(r.cb2_sp_id)]||{},r.cb2_sp_id,r.cb2_grade,'')+'</div><dl class="defense-stats">'+
@@ -1421,13 +1455,14 @@ function renderDefense(){
     stat('goals_per_match','경기당 실점',r.goals_per_match.toFixed(2))+
     stat('matches','경기수',r.matches.toLocaleString('ko-KR'))+
     stat('users','사용자 수',r.users.toLocaleString('ko-KR')+'명')+'</dl></article>'
-  ).join('') || '<p class="empty">표본 기준을 충족하는 듀오가 없습니다. 골키퍼를 바꾸거나 최소 경기수를 낮춰 보세요.</p>';
+  ).join('') || '<p class="empty">선택한 팀컬러·표본 기준을 충족하는 듀오가 없습니다. 팀컬러나 골키퍼를 바꾸거나 최소 경기수를 낮춰 보세요.</p>';
   defenseMore.hidden=rows.length<=defenseLimit;
 }
-[defenseGk,defenseSort].forEach(el=>el.onchange=()=>{defenseLimit=50;renderDefense();});
+[defenseGk,defenseSort].forEach(el=>el.onchange=()=>{defenseLimit=DEFENSE_PAGE;renderDefense();});
+defenseTeamColor.oninput=()=>{defenseLimit=DEFENSE_PAGE;renderDefense();};
 defenseSearch.oninput=renderDefenseGkOptions;
-defenseGate.onchange=()=>{defenseLimit=50;renderDefense();};
-defenseMore.onclick=()=>{defenseLimit+=50;renderDefense();};
+defenseGate.onchange=()=>{defenseLimit=DEFENSE_PAGE;renderDefense();};
+defenseMore.onclick=()=>{defenseLimit+=DEFENSE_PAGE;renderDefense();};
 defenseRetry.onclick=loadDefense;
 
 // 강화 효과는 귀무 결과다(신뢰구간이 0 포함). 상단 배너에 상시 고정하면 '카드 추천 아님'
