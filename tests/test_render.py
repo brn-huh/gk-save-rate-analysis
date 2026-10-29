@@ -521,8 +521,8 @@ def test_nexon_analytics_script_is_present_and_async():
     assert "async" in m.group(0)
 
 
-def test_analytics_is_the_only_external_dependency():
-    """자기완결형 HTML 기조: 애널리틱스 말고 외부에서 끌어오는 리소스가 늘면 안 된다.
+def test_external_scripts_are_limited_to_adsense_and_analytics():
+    """자기완결형 HTML 기조: 광고·애널리틱스 외에 외부 리소스를 추가하지 않는다.
 
     선수 이미지는 <img src> 라 여기 걸리지 않는다(렌더 차단 아님, 폴백 있음).
     파비콘은 data URI 라 https 리소스가 아니므로 여기 걸리지 않는다.
@@ -531,7 +531,14 @@ def test_analytics_is_the_only_external_dependency():
     html = render.build_html(_PAYLOAD)
     html = re.sub(r'<link rel="canonical"[^>]*>', "", html)
     srcs = re.findall(r'<(?:script|link)[^>]*(?:src|href)="(https?://[^"]+)"', html)
-    assert srcs == ["https://openapi.nexon.com/js/analytics.js?app_id=307467"]
+    assert srcs == [
+        "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1645070512024900",
+        "https://openapi.nexon.com/js/analytics.js?app_id=307467",
+    ]
+    head = html.split('</head>', 1)[0]
+    assert head.count('adsbygoogle.js') == 1
+    assert '<script async src="' + srcs[0] + '" crossorigin="anonymous"></script>' in head
+    assert '현재 광고는 게재하지 않으며' not in html
 
 
 def test_seo_meta_points_at_the_deployed_url():

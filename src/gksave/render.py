@@ -1,7 +1,7 @@
 """정적 HTML 표출 (인터랙티브).
 
 export 페이로드를 자기완결형 HTML 한 장으로 렌더. CSS/JS 는 전부 inline.
-외부 의존은 둘뿐이다 — 넥슨 애널리틱스 스크립트(약관), 선수 이미지 CDN(폴백 있음).
+외부 리소스는 넥슨 애널리틱스, Google AdSense, 선수 이미지 CDN(폴백 있음)이다.
 데이터를 JSON 으로 embed 하고 vanilla JS 로 렌더 → 검색·정렬·행 클릭 시 거리존별·
 타입별 드릴다운. 그대로 열거나 GitHub Pages 등에 올려도 된다.
 
@@ -228,6 +228,7 @@ _TEMPLATE = r"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="google-adsense-account" content="ca-pub-1645070512024900">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1645070512024900" crossorigin="anonymous"></script>
 <title>FC온라인 GK 선방률 순위</title>
 <meta name="description" content="FC온라인 공식경기 실데이터로 뽑은 골키퍼 선방률·GSAx 리더보드. 선수·시즌·강화단계별 선방률, 거리 구간별·슛 타입별 상세, 급여 대비 가성비까지 비교합니다.">
 <link rel="canonical" href="__SITE_URL__">
@@ -809,7 +810,7 @@ _TEMPLATE = r"""<!doctype html>
   <p><strong>Cloudflare:</strong> 사이트 제공과 보안을 위해 IP 주소 및 요청·접속 정보가 처리될 수 있습니다. <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare 개인정보처리방침</a></p>
 
   <h3>3. Google AdSense 광고와 쿠키</h3>
-  <p>현재 광고는 게재하지 않으며, 다음 내용은 Google AdSense 광고 게재 시 적용됩니다.</p>
+  <p>이 사이트는 Google AdSense를 통해 광고를 게재할 수 있습니다.</p>
   <p>Google 및 제3자 광고 공급업체는 쿠키를 사용하여 이 사이트와 다른 웹사이트의 이전 방문 기록에 따라 광고를 제공할 수 있습니다. 광고 제공과 효과 측정을 위해 IP 주소, 방문 페이지 주소 등이 Google에 전달될 수 있습니다.</p>
   <p><a href="https://myadcenter.google.com/">Google 내 광고 센터</a>에서 맞춤 광고를 거부할 수 있으며, <a href="https://www.aboutads.info/choices/">제3자 맞춤 광고 거부 안내</a>에서 참여 업체의 광고 쿠키 거부 방법을 확인할 수 있습니다. 브라우저 설정에서도 쿠키를 차단하거나 삭제할 수 있습니다. 자세한 정보 처리 내용은 <a href="https://policies.google.com/privacy?hl=ko">Google 개인정보처리방침</a>과 <a href="https://policies.google.com/technologies/partner-sites?hl=ko">파트너 사이트 정보 이용 안내</a>를 참고하세요.</p>
 
