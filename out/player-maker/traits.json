@@ -1,0 +1,399 @@
+{
+  "collected_at": "2026-11-04T11:11:57.216050+00:00",
+  "source": "https://fconline.nexon.com/datacenter",
+  "checked_codes": [
+    0,
+    199
+  ],
+  "traits": [
+    {
+      "code": 0,
+      "name": "선호 포지션 고집",
+      "file": "assets/trait-0.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_00.png",
+      "sha256": "6712b88c9833d71f03e74bec1e6eba72fc76baf528b2d2a2eb1aa8bf3e3c7f74",
+      "is_new": false
+    },
+    {
+      "code": 1,
+      "name": "장거리 스로인",
+      "file": "assets/trait-1.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_01.png",
+      "sha256": "2e72e7948b6dface634e929c99d023033dae2762d0e66e77f90d8e86e8756f64",
+      "is_new": false
+    },
+    {
+      "code": 3,
+      "name": "파울 유도 선호",
+      "file": "assets/trait-3.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_03.png",
+      "sha256": "c1c0c0469e9b6036b8f5bb32b2f3bfb6d79d8eab02701f6169c3e0f5e9c92c54",
+      "is_new": false
+    },
+    {
+      "code": 4,
+      "name": "유리몸",
+      "file": "assets/trait-4.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_04.png",
+      "sha256": "a542ea1aa06800dcb1cf12144f5855e471e80a754d8c4a7a4af8fd5b24f60b62",
+      "is_new": false
+    },
+    {
+      "code": 5,
+      "name": "강철몸",
+      "file": "assets/trait-5.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_05.png",
+      "sha256": "51cb49bdd1291b619eb7cbe9888c261d5e7f891f917b8d012f5d166719d70c2b",
+      "is_new": false
+    },
+    {
+      "code": 6,
+      "name": "주발 선호",
+      "file": "assets/trait-6.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_06.png",
+      "sha256": "b94e591b313d05cbcf95df0abcb88a705c92042b8e1f96af79660ddb9e804639",
+      "is_new": false
+    },
+    {
+      "code": 7,
+      "name": "슬라이딩 태클 선호",
+      "file": "assets/trait-7.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_07.png",
+      "sha256": "70cf329263be1bf3e39be035216c4a2c9073d0a8e7702e4d0535ee8e1e34fe5e",
+      "is_new": false
+    },
+    {
+      "code": 9,
+      "name": "개인 플레이 선호",
+      "file": "assets/trait-9.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_09.png",
+      "sha256": "cc083411207f7e13a8b1ecb945cedd85073196cfa4f41158fe38df7bf9a5a6c8",
+      "is_new": false
+    },
+    {
+      "code": 11,
+      "name": "트러블 메이커",
+      "file": "assets/trait-11.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_11.png",
+      "sha256": "a9fe9a822012df5a3f11857b7191445bed6ceb4125643d629bd930318b99d869",
+      "is_new": false
+    },
+    {
+      "code": 12,
+      "name": "얼리 크로스 선호",
+      "file": "assets/trait-12.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_12.png",
+      "sha256": "7886e010c99c3d3f5a5a9cab6e2a718de658bcb99b76205a5c16cc776fcc96de",
+      "is_new": false
+    },
+    {
+      "code": 13,
+      "name": "예리한 감아차기",
+      "file": "assets/trait-13.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_13.png",
+      "sha256": "0004873d2dbd954f7a6207339842b2283255ef3d0918198a6a00669ca4084f2f",
+      "is_new": false
+    },
+    {
+      "code": 14,
+      "name": "화려한 개인기",
+      "file": "assets/trait-14.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_14.png",
+      "sha256": "984bcfa1946800fe51a99378ac1db614f047d9ae9ee1aba3e7552a0824b08fa5",
+      "is_new": false
+    },
+    {
+      "code": 15,
+      "name": "긴 패스 선호",
+      "file": "assets/trait-15.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_15.png",
+      "sha256": "76696a3c05e08b5d0e682dd8856a4ee4240a62d55ab02edc3682dce9253b6141",
+      "is_new": false
+    },
+    {
+      "code": 16,
+      "name": "중거리 슛 선호",
+      "file": "assets/trait-16.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_16.png",
+      "sha256": "08068ba519edfe4d22ef294a2f03e8e8f1b69a17388ff0ab7a6dbdc95fec21b1",
+      "is_new": false
+    },
+    {
+      "code": 17,
+      "name": "스피드 드리블러",
+      "file": "assets/trait-17.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_17.png",
+      "sha256": "d8750af663dca8fbfc28b6bfcca9fa4e6b1d7a320fbdc29947b0dc42238cc33c",
+      "is_new": false
+    },
+    {
+      "code": 18,
+      "name": "플레이 메이커",
+      "file": "assets/trait-18.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_18.png",
+      "sha256": "11e9e25c86e9d245eeba765e04fa9d58a6ff6fece059c4848a859ffc8f587ab5",
+      "is_new": false
+    },
+    {
+      "code": 19,
+      "name": "GK 공격 가담",
+      "file": "assets/trait-19.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_19.png",
+      "sha256": "f3897e9f5e4d511cf40605c5cfbd35dfee6eb19fd12885fb5c0c6e45737bfa85",
+      "is_new": false
+    },
+    {
+      "code": 20,
+      "name": "GK 능숙한 펀칭",
+      "file": "assets/trait-20.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_20.png",
+      "sha256": "7e5f7f525577f8feb252177da8594b541b190f6cffa98c1e35cfb3df53f358ff",
+      "is_new": false
+    },
+    {
+      "code": 21,
+      "name": "GK 멀리 던지기",
+      "file": "assets/trait-21.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_21.png",
+      "sha256": "38968090cf5232d96c799c03eb6bfc49e0a371584f4209db31c21b52b7b2ef87",
+      "is_new": false
+    },
+    {
+      "code": 22,
+      "name": "파워 헤더",
+      "file": "assets/trait-22.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_22.png",
+      "sha256": "29c1ad6a2100fc0c8f679e6b61d28d4c96a174e3b2d49458400492e7d4211967",
+      "is_new": false
+    },
+    {
+      "code": 23,
+      "name": "GK 침착한 1:1 수비",
+      "file": "assets/trait-23.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_23.png",
+      "sha256": "8d79850a78630282b79ac7840c9323cba1aeb0d8d44099d623e58516d318438d",
+      "is_new": false
+    },
+    {
+      "code": 24,
+      "name": "초 장거리 스로인",
+      "file": "assets/trait-24.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_24.png",
+      "sha256": "39fbae829124900f43e06b42402102b757220ea1e6ff71f528dae6b706a8fbe6",
+      "is_new": false
+    },
+    {
+      "code": 25,
+      "name": "아웃사이드 슈팅/크로스",
+      "file": "assets/trait-25.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_25.png",
+      "sha256": "885823a7c644a8a4b97eaa570279fc713ca293a9ef9750356ab68f78d0c21999",
+      "is_new": false
+    },
+    {
+      "code": 27,
+      "name": "패스 마스터",
+      "file": "assets/trait-27.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_27.png",
+      "sha256": "13080a7ceab9bcfac73922b527b8f817ae64eb65fadd7b820b2cfd038e3eccec",
+      "is_new": false
+    },
+    {
+      "code": 28,
+      "name": "승부욕",
+      "file": "assets/trait-28.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_28.png",
+      "sha256": "8d6d50468a8406573ee560af2e489837514484c90a0826547bda7570832bf0e2",
+      "is_new": false
+    },
+    {
+      "code": 29,
+      "name": "화려한 걷어내기",
+      "file": "assets/trait-29.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_29.png",
+      "sha256": "31b69311b4398fdbd68f8cf8d88e8faa351a87d8f9aebabef63fff9d2bc2ce3f",
+      "is_new": false
+    },
+    {
+      "code": 41,
+      "name": "칩슛 선호",
+      "file": "assets/trait-41.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_41.png",
+      "sha256": "013efc4af2557773e446279e36f1075af2c19c451350ca14a283eb05f443a8b9",
+      "is_new": false
+    },
+    {
+      "code": 42,
+      "name": "테크니컬 드리블러",
+      "file": "assets/trait-42.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_42.png",
+      "sha256": "a1198c268cf4396ff1909cfa3d311af1b8f2268f7c583a39cf1f3954c7ebbe2c",
+      "is_new": false
+    },
+    {
+      "code": 43,
+      "name": "GK 스위퍼 키퍼",
+      "file": "assets/trait-43.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_43.png",
+      "sha256": "ff448fe5eaba39e0daca2c6738d0ba54c68df321cc6ebe2fdd3073f1da2ab756",
+      "is_new": false
+    },
+    {
+      "code": 48,
+      "name": "GK 소극적 크로스 수비",
+      "file": "assets/trait-48.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_48.png",
+      "sha256": "5444929654c240e69657353cc9033155b523e291eea91dada685ae01168305e1",
+      "is_new": false
+    },
+    {
+      "code": 49,
+      "name": "GK 적극적 크로스 수비",
+      "file": "assets/trait-49.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_49.png",
+      "sha256": "4408be04b01380d89f66684a8c7aae72c2312776897bba617062974ded639e13",
+      "is_new": false
+    },
+    {
+      "code": 50,
+      "name": "아크로바틱 피니셔",
+      "file": "assets/trait-50.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_50.png",
+      "sha256": "b7203c9f9b21e7ac427dabbeeb33a10061524efeea480548d9b58bb72c8d7d91",
+      "is_new": true
+    },
+    {
+      "code": 51,
+      "name": "크로스 포쳐",
+      "file": "assets/trait-51.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_51.png",
+      "sha256": "6adc057fdf8c5e635d0943020d882697092d4093674a94377bf88b9c734d868b",
+      "is_new": true
+    },
+    {
+      "code": 52,
+      "name": "라인 브레이커",
+      "file": "assets/trait-52.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_52.png",
+      "sha256": "534971452279e98b83fa40ed6e3e93b0b59bb125f22b661d48bd3b41f26ff51a",
+      "is_new": true
+    },
+    {
+      "code": 53,
+      "name": "와일드 태클러",
+      "file": "assets/trait-53.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_53.png",
+      "sha256": "8a8ab5bdb95f6919a548b49f1f956da1271eb9471ff079e6f874524696da380f",
+      "is_new": true
+    },
+    {
+      "code": 54,
+      "name": "체이서",
+      "file": "assets/trait-54.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_54.png",
+      "sha256": "4e01fdf41808e2e9f4489a737f423633f68c21e8678b644e8b10ea1a7b807703",
+      "is_new": true
+    },
+    {
+      "code": 55,
+      "name": "2개의 심장",
+      "file": "assets/trait-55.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_55.png",
+      "sha256": "363fee31e5aeaef1f6b1a0bc337c455019490c1ea9b8b6cbaaec642fe8e37b95",
+      "is_new": true
+    },
+    {
+      "code": 56,
+      "name": "파이터",
+      "file": "assets/trait-56.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_56.png",
+      "sha256": "00c3812e9b2532f06377fc7a194f1778d3956d83ccdb9faf2fa85933854c038d",
+      "is_new": true
+    },
+    {
+      "code": 57,
+      "name": "GK 빠른 반응",
+      "file": "assets/trait-57.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_57.png",
+      "sha256": "815b45aef3fb06086a7501ce73410140c6fcbb551ccf7fcf8dc52ca3c0a40e1e",
+      "is_new": true
+    },
+    {
+      "code": 59,
+      "name": "커맨더",
+      "file": "assets/trait-59.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_59.png",
+      "sha256": "a5db52e94f9d5f498fb8b0ca3c22ce016f29afe1012e9cd789d8f2307fedde07",
+      "is_new": true
+    },
+    {
+      "code": 60,
+      "name": "GK 공중볼 장악",
+      "file": "assets/trait-60.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_60.png",
+      "sha256": "3adfd00e7dedf12319d06f1bda7054a8b94f8321b13fef2524b71feb6505bde7",
+      "is_new": true
+    },
+    {
+      "code": 62,
+      "name": "블로커",
+      "file": "assets/trait-62.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_62.png",
+      "sha256": "fcb9d9b1991a2a45f0d8e1ed162ab867ecfaff4565f3e63cef3f89b3013d65c3",
+      "is_new": true
+    },
+    {
+      "code": 63,
+      "name": "스피드스터",
+      "file": "assets/trait-63.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_63.png",
+      "sha256": "2f9065bd44c7aed7b210f534c70887e80c006f8da2ccf2df8100f80b5db27d6a",
+      "is_new": true
+    },
+    {
+      "code": 64,
+      "name": "타이탄",
+      "file": "assets/trait-64.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_64.png",
+      "sha256": "77304f61ddbeae1ef887922cbcb3d34c74e1b52e008c3116c150ccf84cbeceae",
+      "is_new": true
+    },
+    {
+      "code": 65,
+      "name": "트릭스터",
+      "file": "assets/trait-65.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_65.png",
+      "sha256": "d598b913d981cc57026238732b2c4b91484f468acdab06dac1205ccd2e46066e",
+      "is_new": true
+    },
+    {
+      "code": 66,
+      "name": "레이저 슈터",
+      "file": "assets/trait-66.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_66.png",
+      "sha256": "a12e4fd215058824c0a241b19546b2e4cd04a412f94900b0c2369a51ef2903dd",
+      "is_new": true
+    },
+    {
+      "code": 67,
+      "name": "프레데터",
+      "file": "assets/trait-67.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_67.png",
+      "sha256": "225d0f0e9762f6db18bece360fc6063821015e549b9c2fdf970466bea93a4e1a",
+      "is_new": true
+    },
+    {
+      "code": 68,
+      "name": "GK 데드아이",
+      "file": "assets/trait-68.png",
+      "source": "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/traits/trait_icon_68.png",
+      "sha256": "b149a1b085bb63f86541df08f8f8ec9a961e74a911ff646f19649f891b00b4c3",
+      "is_new": true
+    }
+  ],
+  "classification": "Hexagon background color; same six-point rule as scripts/classify_new_traits.py",
+  "names_source": "https://ssl.nexon.com/s1/fc/online/obt/coachHelper/app.ybFnFD3C.js",
+  "names_page": "https://fconline.nexon.com/datacenter/coachhelper",
+  "names_source_sha256": "1f1d58c58d4c63c9ffd7f06e20f733cf96526070a5415a990e51960c7c8cbf0b",
+  "names_collected_at": "2026-11-05T11:08:37.162719+00:00"
+}

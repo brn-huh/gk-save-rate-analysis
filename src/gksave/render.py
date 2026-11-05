@@ -1,7 +1,8 @@
 """정적 HTML 표출 (인터랙티브).
 
-export 페이로드를 자기완결형 HTML 한 장으로 렌더. CSS/JS 는 전부 inline.
+export 페이로드를 HTML 한 장으로 렌더. 분석 화면의 CSS/JS 는 inline.
 외부 리소스는 넥슨 애널리틱스, Google AdSense, 선수 이미지 CDN(폴백 있음)이다.
+선수 편집기는 player_maker/의 로컬 정적 자산을 탭 진입 시 불러온다.
 데이터를 JSON 으로 embed 하고 vanilla JS 로 렌더 → 검색·정렬·행 클릭 시 거리존별·
 타입별 드릴다운. 그대로 열거나 GitHub Pages 등에 올려도 된다.
 
@@ -19,6 +20,7 @@ from typing import Any
 from .config import MAX_USER_MATCH_PERCENT, SITE_URL
 
 IMAGE_CDN = "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common"
+MAKER_DIR = Path(__file__).parent / "player_maker"
 
 # 브라우저 탭 아이콘(파비콘). 자기완결형 유지를 위해 64px PNG 를 data URI 로 임베드한다.
 # 원본은 assets/gk-icon.png. 흰 캔버스는 네 모서리 flood-fill 로 투명화(공·장갑 흰색은 검은
@@ -216,6 +218,7 @@ def build_html(payload: dict[str, Any]) -> str:
         "__FILTER_JS__": FILTER_JS,
         "__STATS_JS__": STATS_JS,
         "__DEFENSE_JS__": DEFENSE_JS,
+        "__MAKER_HTML__": (MAKER_DIR / "editor.html").read_text(encoding="utf-8"),
         "__INITIAL_META__": meta,
         "__INITIAL_ROWS__": _initial_rows(page["leaderboard"]),
         "__DATA__": data_json,
@@ -241,6 +244,7 @@ _TEMPLATE = r"""<!doctype html>
 <meta name="twitter:card" content="summary">
 <link rel="icon" type="image/png" href="__FAVICON__">
 <link rel="apple-touch-icon" href="__FAVICON__">
+<link rel="stylesheet" href="player-maker/editor.css">
 <!-- 넥슨 Open API 애널리틱스(페이지뷰 집계). app_id 는 스크립트가 자기 src 에서 읽으므로
      공개가 정상 설계다. async 없으면 외부 요청이 첫 렌더를 막는다. -->
 <script type="text/javascript" src="https://openapi.nexon.com/js/analytics.js?app_id=307467" async></script>
@@ -437,7 +441,7 @@ _TEMPLATE = r"""<!doctype html>
   .reading-note b{color:var(--gold)}
   /* 탭 */
   .tabs{display:flex;gap:6px;margin:16px 0 4px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .tab{padding:9px 15px;border:1px solid transparent;border-bottom:none;border-radius:9px 9px 0 0;
+  .tab{padding:9px 15px;border:1px solid rgba(240,209,122,.4);border-bottom:none;border-radius:9px 9px 0 0;
         background:transparent;color:var(--mut);cursor:pointer;font-size:.9rem;font-family:inherit;
         font-weight:700;transition:.15s;margin-bottom:-1px}
   .tab:hover{color:var(--text)}
@@ -622,6 +626,7 @@ _TEMPLATE = r"""<!doctype html>
 <div class="tabs">
   <button class="tab active" data-tab="lb" aria-pressed="true">리더보드</button>
   <button class="tab tab-new" data-tab="defense" aria-pressed="false" aria-label="센터백 듀오, 베타"><span>센터백 듀오</span><span class="tab-new-badge" aria-hidden="true">Beta</span></button>
+  <button class="tab tab-new" data-tab="maker" aria-pressed="false" aria-label="내 선수 만들기, 신규"><span>내 선수 만들기</span><span class="tab-new-badge" aria-hidden="true">New</span></button>
   <button class="tab" data-tab="sp" aria-pressed="false">동일 선수 비교</button>
   <button class="tab" data-tab="help" aria-pressed="false">지표 설명 · 사용법</button>
 </div>
@@ -785,6 +790,8 @@ _TEMPLATE = r"""<!doctype html>
   <div class="warn" id="warnFull"></div>
 </div>
 
+__MAKER_HTML__
+
 <div class="reading-note" id="warn"></div>
 
 <footer>
@@ -804,6 +811,7 @@ _TEMPLATE = r"""<!doctype html>
 
   <h3>1. 검색과 브라우저 저장</h3>
   <p>최근 검색 기능을 위해 팀컬러 검색어를 이용자의 브라우저에 최대 3개 저장하며, 서버로 전송하지 않습니다. 검색어는 삭제하거나 새 검색어로 대체될 때까지 보관됩니다. 최근 검색의 삭제 기능 또는 브라우저의 사이트 데이터 삭제 기능으로 지울 수 있습니다.</p>
+  <p>내 선수 만들기에 입력한 정보와 사진은 브라우저 메모리에서만 처리하며 서버로 전송하거나 저장하지 않습니다. 사진 배경 제거도 브라우저 안에서 실행됩니다. 페이지를 닫거나 새로고침하면 편집 내용이 사라지며, PNG 저장 시 결과 이미지만 이용자의 기기에 저장됩니다.</p>
 
   <h3>2. 방문 통계와 외부 서비스</h3>
   <p><strong>넥슨:</strong> 방문 통계 수집을 위해 방문·유입 페이지 주소, 사이트 도메인, 화면 크기를 전송합니다. 통계 수집 및 이미지 제공 과정에서 IP 주소 등 접속 정보가 전달될 수 있습니다. <a href="https://member.nexon.com/policy/privacy.aspx">넥슨 개인정보처리방침</a></p>
@@ -1334,6 +1342,11 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   t.setAttribute('aria-pressed','true');
   document.getElementById('panel-'+t.dataset.tab).classList.add('active');
   if(t.dataset.tab==='defense') loadDefense();
+  if(t.dataset.tab==='maker') import('./player-maker/editor.js').then(m=>m.init()).catch(()=>{
+    const status=document.getElementById('makerStatus');
+    status.textContent='편집기를 불러오지 못했습니다. 다른 탭으로 이동한 뒤 다시 열어주세요.';
+    status.dataset.error='true';
+  });
 });
 
 __DEFENSE_JS__

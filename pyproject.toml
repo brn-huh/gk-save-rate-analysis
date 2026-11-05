@@ -28,5 +28,10 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+gksave = ["*.txt", "player_maker/*.html", "player_maker/*.css", "player_maker/*.js",
+          "player_maker/*.json", "player_maker/*.md", "player_maker/assets/*",
+          "player_maker/vendor/*", "player_maker/vendor/wasm/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -244,6 +245,7 @@ def export(
     # 공개용 정적 HTML — slim(상세 제외) 임베드. 드릴다운 상세는 details.json 을 클릭 시 fetch.
     # (file:// 직접 열기는 fetch 차단 → 로컬 확인은 `python3 -m http.server` 로.)
     log("export: HTML 생성·저장 중")
+    shutil.copytree(render.MAKER_DIR, out_dir / "player-maker", dirs_exist_ok=True)
     (out_dir / "index.html").write_text(render.build_html(slim), encoding="utf-8")
 
     # sitemap — 페이지가 한 장뿐이라 URL 도 하나다. lastmod 를 export 시각으로 갱신해

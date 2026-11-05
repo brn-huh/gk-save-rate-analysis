@@ -1,0 +1,66 @@
+<section class="panel" id="panel-maker" aria-labelledby="makerTitle">
+  <div class="maker-heading"><div><p class="maker-eyebrow">PLAYER STUDIO</p><h2 id="makerTitle">내 선수 만들기</h2><p class="maker-note">사진 한 장으로 만드는 나만의 FC 카드. 이름부터 능력치까지 자유롭게 바꿔보세요.</p></div><span class="maker-badge">CUSTOM PLAYER</span></div>
+  <p id="makerStatus" class="maker-status" role="status" aria-live="polite" aria-atomic="true">편집기를 준비하고 있습니다.</p>
+  <div class="maker-layout">
+    <div class="maker-preview">
+      <div class="maker-card-stage"><canvas id="makerCard" width="680" height="800" role="img" aria-label="직접 만드는 선수 카드 미리보기"></canvas></div>
+      <p class="maker-note maker-center" id="makerCaption">시즌을 선택하고 내 사진을 넣어보세요.</p>
+      <div class="maker-downloads"><button type="button" id="makerSaveCard" disabled>카드 PNG 저장</button><button type="button" id="makerSaveAll" class="maker-secondary" disabled>전체 PNG 저장</button></div>
+      <p class="maker-note maker-center">전체 저장에는 기본 정보·능력치 그래프·나만의 특성이 함께 담깁니다.</p>
+      <div class="maker-summary" id="makerSummary"></div>
+      <section id="makerTraitsSection" aria-labelledby="makerTraitsTitle" hidden><h4 id="makerTraitsTitle">나만의 특성</h4><div id="makerTraitsPreview" class="traits"></div></section>
+      <canvas id="makerRadar" width="640" height="560" role="img" aria-label="직접 입력한 능력치의 6각형 그래프"></canvas>
+      <p class="maker-note maker-center">각 항목에 입력한 수치가 그래프에 그대로 반영됩니다. OVR은 직접 입력한 값입니다.</p>
+    </div>
+    <form id="makerForm" class="maker-editor" onsubmit="return false">
+      <fieldset><legend><span>01</span> 카드 디자인</legend>
+        <label class="maker-field" for="makerSeasonSearch">시즌 선택<input id="makerSeasonSearch" type="search" placeholder="전체 목록 보기 / 검색" autocomplete="off" maxlength="80" aria-controls="makerSeasonChoices" aria-describedby="makerSeasonCurrent makerSeasonResults" disabled></label>
+        <select id="makerSeason" name="season" aria-label="선택한 시즌" hidden disabled><option>시즌을 불러오고 있습니다.</option></select>
+        <div class="maker-choice-list" id="makerSeasonChoices" role="group" aria-label="시즌 검색 결과" hidden></div>
+        <p class="maker-choice-results" id="makerSeasonResults" role="status" aria-live="polite"></p>
+        <p class="maker-choice-current" id="makerSeasonCurrent"></p>
+        <div class="maker-fields">
+          <label class="maker-field" for="makerName">이름<input id="makerName" name="playerName" maxlength="24" value="나만의 선수" autocomplete="off"></label>
+          <label class="maker-field" for="makerPosition">포지션<select id="makerPosition" name="position"><option>ST</option><option>CF</option><option>LW</option><option>RW</option><option>CAM</option><option>CM</option><option>LM</option><option>RM</option><option>CDM</option><option>LB</option><option>RB</option><option>LWB</option><option>RWB</option><option>CB</option><option>SW</option><option>GK</option></select></label>
+          <label class="maker-field" for="makerOvr">OVR<input id="makerOvr" name="ovr" type="number" min="1" max="200" value="120" inputmode="numeric"></label>
+          <label class="maker-field" for="makerSalary">급여<input id="makerSalary" name="salary" type="number" min="1" max="99" value="30" inputmode="numeric"></label>
+          <label class="maker-field" for="makerGrade">강화<select id="makerGrade" name="grade"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option></select></label>
+        </div>
+      </fieldset>
+      <fieldset><legend><span>02</span> 내 사진</legend>
+        <label class="maker-upload" for="makerPhoto"><strong>사진 선택하기</strong><span>JPG · PNG · WebP / 최대 15 MB</span><input id="makerPhoto" type="file" accept="image/jpeg,image/png,image/webp"></label>
+        <p class="maker-note">사진의 배경을 자동으로 제거합니다. 사진은 서버에 전송되지 않으며, 탭을 닫으면 사라집니다.</p>
+        <div class="maker-photo-controls" id="makerPhotoControls" hidden>
+          <label class="maker-field" for="makerZoom">사진 크기<input id="makerZoom" name="zoom" type="range" min="50" max="220" value="100"></label>
+          <label class="maker-field" for="makerX">좌우 위치<input id="makerX" name="photoX" type="range" min="-120" max="120" value="0"></label>
+          <label class="maker-field" for="makerY">상하 위치<input id="makerY" name="photoY" type="range" min="-120" max="120" value="0"></label>
+          <button type="button" id="makerRemovePhoto" class="maker-secondary">사진 지우기</button>
+        </div>
+      </fieldset>
+      <fieldset><legend><span>03</span> 선수 정보</legend>
+        <div class="maker-fields">
+          <div class="maker-choice"><label class="maker-field" for="makerNationSearch">국가 선택<input id="makerNationSearch" type="search" placeholder="전체 목록 보기 / 검색" autocomplete="off" maxlength="80" aria-controls="makerNationChoices" aria-describedby="makerNationCurrent makerNationResults" disabled></label><select id="makerNation" name="nation" aria-label="선택한 국가" hidden disabled><option>국가를 불러오고 있습니다.</option></select><div class="maker-choice-list" id="makerNationChoices" role="group" aria-label="국가 검색 결과" hidden></div><p class="maker-choice-results" id="makerNationResults" role="status" aria-live="polite"></p><p class="maker-choice-current" id="makerNationCurrent"></p></div>
+          <div class="maker-choice"><label class="maker-field" for="makerClubSearch">클럽 선택<input id="makerClubSearch" type="search" placeholder="전체 목록 보기 / 검색" autocomplete="off" maxlength="80" aria-controls="makerClubChoices" aria-describedby="makerClubCurrent makerClubResults" disabled></label><select id="makerClub" name="club" aria-label="선택한 클럽" hidden disabled><option>클럽을 불러오고 있습니다.</option></select><div class="maker-choice-list" id="makerClubChoices" role="group" aria-label="클럽 검색 결과" hidden></div><p class="maker-choice-results" id="makerClubResults" role="status" aria-live="polite"></p><p class="maker-choice-current" id="makerClubCurrent"></p></div>
+          <label class="maker-field" for="makerHeight">키 (cm)<input id="makerHeight" name="height" type="number" min="100" max="250" value="180" inputmode="numeric"></label>
+          <label class="maker-field" for="makerWeight">몸무게 (kg)<input id="makerWeight" name="weight" type="number" min="30" max="200" value="75" inputmode="numeric"></label>
+          <label class="maker-field" for="makerBody">체형<select id="makerBody" name="body"><option>보통</option><option>마름</option><option>건장</option><option>고유</option><option>마름(고유)</option><option>보통(고유)</option><option>건장(고유)</option><option>비만</option><option>비만(고유)</option></select></label>
+          <label class="maker-field" for="makerLeft">왼발 능력<select id="makerLeft" name="leftFoot"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select></label>
+          <label class="maker-field" for="makerRight">오른발 능력<select id="makerRight" name="rightFoot"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select></label>
+        </div>
+        <p class="maker-note">카드 하단: 국가 · FC 아이콘 리그 · 클럽</p>
+        <div class="maker-price-toggle"><label for="makerShowPrice"><input id="makerShowPrice" name="showPrice" type="checkbox" checked> 가격 표시</label></div>
+        <label class="maker-field" for="makerPrice">원하는 가격<input id="makerPrice" name="price" maxlength="32" placeholder="예: 1조 5,000억 BP" autocomplete="off"></label>
+      </fieldset>
+      <fieldset><legend><span>04</span> 상세 능력치</legend><p class="maker-note">그래프의 6개 항목마다 이름과 수치 하나를 입력하세요. 이름은 애교·건강처럼 바꿀 수 있고, 수치는 0~200 사이로 입력하면 됩니다.</p><div id="makerAbilities"></div></fieldset>
+      <fieldset><legend><span>05</span> 나만의 특성</legend>
+        <p class="maker-note">일반·신규 특성 아이콘을 고르고 이름을 자유롭게 지어보세요. 추가한 특성은 전체 PNG에도 함께 저장됩니다.</p>
+        <label class="maker-field" for="makerTraitFilter">아이콘 종류<select id="makerTraitFilter"><option value="all">전체 특성</option><option value="normal">일반 특성</option><option value="new">신규 특성</option></select></label>
+        <div id="makerTraitPicker" class="maker-trait-picker" role="group" aria-label="특성 아이콘 선택"></div>
+        <p class="maker-note" id="makerTraitChoice"></p>
+        <label class="maker-field" for="makerTraitName">내 특성 이름<input id="makerTraitName" maxlength="24" placeholder="예: 폭풍 애교, 간식 탐지기" autocomplete="off"></label>
+        <button type="button" id="makerAddTrait" disabled>특성 추가</button>
+        <div id="makerTraitEditor" class="maker-trait-editor" aria-label="추가한 특성"></div>
+      </fieldset>
+    </form>
+  </div>
+</section>

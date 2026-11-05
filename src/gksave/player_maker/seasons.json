@@ -1,0 +1,2914 @@
+{
+  "collected_at": "2026-11-04T06:07:43.332098+00:00",
+  "source": "https://open.api.nexon.com/static/fconline/meta/seasonid.json",
+  "style_source": "https://js.nexon.com/s3/fc/online/obt/seasons_ssl.css",
+  "seasons": [
+    {
+      "id": 100,
+      "code": "ICONTM",
+      "name": "ICON TM (ICON The Moment)",
+      "emblem": {
+        "file": "assets/100-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/icontm.png",
+        "sha256": "2896213266287feb438a31ca2267a6cf7769955ee3341f6e1bf711bf7f95cb3f"
+      },
+      "frame": {
+        "file": "assets/100-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/ICONTM.png",
+        "sha256": "cd2fe4401b2e17c5b527736ebc77cdeec6964cb8ef6c5dd336e7d12152a748d7"
+      },
+      "color": "#5d573d",
+      "nameColor": "#141432",
+      "salaryBorder": "#5d573d",
+      "salaryFill": "hsla(0,0%,100%,.5)"
+    },
+    {
+      "id": 110,
+      "code": "ICONTM_B",
+      "name": "ICON TM(제한) (ICON The Moment Bound)",
+      "emblem": {
+        "file": "assets/110-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/icontm_b.png",
+        "sha256": "2804f4e1b72d11755149e6d25336a9f04a6c002923d77e4eff5d00516364f5dd"
+      },
+      "frame": {
+        "file": "assets/110-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/ICONTM_B.png",
+        "sha256": "cd2fe4401b2e17c5b527736ebc77cdeec6964cb8ef6c5dd336e7d12152a748d7"
+      },
+      "color": "#5d573d",
+      "nameColor": "#141432",
+      "salaryBorder": "#5d573d",
+      "salaryFill": "hsla(0,0%,100%,.5)"
+    },
+    {
+      "id": 101,
+      "code": "ICON",
+      "name": "ICON (ICON)",
+      "emblem": {
+        "file": "assets/101-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/icon.png",
+        "sha256": "3da77a573e71ab674ca8ea25d665cf958a35935eb1a4426901a5cf4cdb2aa91b"
+      },
+      "frame": {
+        "file": "assets/101-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/ICON.png",
+        "sha256": "7fe5006bfc6ac37560a3b7aceedd0445928a3d6c17726b0f928a68d08a15a328"
+      },
+      "color": "#5d573d",
+      "nameColor": "#141432",
+      "salaryBorder": "#5d573d",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 113,
+      "code": "25IM_SP",
+      "name": "25IM - S&P (25 ICONS MATCH - Show & Prove)",
+      "emblem": {
+        "file": "assets/113-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25im_sp.png",
+        "sha256": "1c8a4c3b2ebaee1a929f422646844bef6dbb3892f7fcba1dde0c7ae014c62b84"
+      },
+      "frame": {
+        "file": "assets/113-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25IM_SP.png",
+        "sha256": "ad5a06fc6a4f8be3610bc48a60f6c4555b480efc28ca89af0152d4d32d93f58d"
+      },
+      "color": "#f8e19b",
+      "nameColor": "#f8e19b",
+      "salaryBorder": "#f8e19b",
+      "salaryFill": "rgba(16,8,5,.8)"
+    },
+    {
+      "id": 114,
+      "code": "25IM_FB",
+      "name": "25IM - FB (25 ICONS MATCH - Fan Boost)",
+      "emblem": {
+        "file": "assets/114-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25im_fb.png",
+        "sha256": "ad2831af9f1cc20d038fda50113b39aa05efe5c779232ff4fd2b92abd858c18b"
+      },
+      "frame": {
+        "file": "assets/114-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25IM_FB.png",
+        "sha256": "329375285e343879469bab2677e14b4a8fd397a412852358a7bd5962c2d1c7db"
+      },
+      "color": "#241f0c",
+      "nameColor": "#241f0c",
+      "salaryBorder": "#ede5b4",
+      "salaryFill": "rgba(18,15,8,.8)"
+    },
+    {
+      "id": 111,
+      "code": "ICON_M",
+      "name": "ICONS MATCH (ICONS MATCH)",
+      "emblem": {
+        "file": "assets/111-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/filter/icon_m.png",
+        "sha256": "94466ceafbaf42ef0f1be19af380b30904a22d65833c326b0edbc686a6b299d1"
+      },
+      "frame": {
+        "file": "assets/111-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/ICON_M.png",
+        "sha256": "7fe5006bfc6ac37560a3b7aceedd0445928a3d6c17726b0f928a68d08a15a328"
+      },
+      "color": "#5d573d",
+      "nameColor": "#141432",
+      "salaryBorder": "#5d573d",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 877,
+      "code": "UC",
+      "name": "UC (Untouchable Champions)",
+      "emblem": {
+        "file": "assets/877-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/uc.png",
+        "sha256": "e8cb7c041745a1063dea1b37d8ece75cac9a087a22ac9216b94129743cde62f7"
+      },
+      "frame": {
+        "file": "assets/877-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/UC.png",
+        "sha256": "2a1d7cd06f893373fd98746b27eb4d96f52e2721564f384fb79679e2ed21700c"
+      },
+      "color": "#fff",
+      "nameColor": "#fff",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 867,
+      "code": "SPT",
+      "name": "SPT (Spartan)",
+      "emblem": {
+        "file": "assets/867-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/spt.png",
+        "sha256": "e648c947bfe556dcca690287558e103e876e3e477f1c5b4e15154236b6400b79"
+      },
+      "frame": {
+        "file": "assets/867-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/SPT.png",
+        "sha256": "a0ac0509f348bfc13993b65eeff1a417be26ac2a4cd3520f0651ce62a704babf"
+      },
+      "color": "#ffc",
+      "nameColor": "#fff",
+      "salaryBorder": "#c5bebd",
+      "salaryFill": "rgba(0,0,0,.3)"
+    },
+    {
+      "id": 596,
+      "code": "SH",
+      "name": "SH (Step Higher)",
+      "emblem": {
+        "file": "assets/596-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/sh.png",
+        "sha256": "f22e889731b73fb5a0d1e7ec306ddf9289317cd5d8c0cfc069f4db5b3a0817b4"
+      },
+      "frame": {
+        "file": "assets/596-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/SH.png",
+        "sha256": "7d9c81444fa2d4213be3430360e4a4b25d659ac002c2a98cfd532ff51eda2d97"
+      },
+      "color": "#f0f2fa",
+      "nameColor": "#f0f2fa",
+      "salaryBorder": "#f0f2fa",
+      "salaryFill": "#121eaf"
+    },
+    {
+      "id": 864,
+      "code": "TK",
+      "name": "TK (Team Korea)",
+      "emblem": {
+        "file": "assets/864-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/tk.png",
+        "sha256": "7eed54c362d6e8caaf83a369b1e70ceabf639824114487832822af0de9f3d5b8"
+      },
+      "frame": {
+        "file": "assets/864-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/TK.png",
+        "sha256": "3590061b9d3b70e7da2ecf705cf12b8b98bd2a4e9a12d7a078d27bca266cfc23"
+      },
+      "color": "#584838",
+      "nameColor": "#584838",
+      "salaryBorder": "#584838",
+      "salaryFill": "#f6f5f2"
+    },
+    {
+      "id": 863,
+      "code": "PTG",
+      "name": "PTG (Path to Glory)",
+      "emblem": {
+        "file": "assets/863-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/ptg.png",
+        "sha256": "866b13ef200bb493fcd985f60505559c2ce6c3561f75b248b8a395b76d83e16b"
+      },
+      "frame": {
+        "file": "assets/863-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/PTG.png",
+        "sha256": "c9dd75519bbff09db68c236164373dea74829cc692c3d60393723a6553be9a3f"
+      },
+      "color": "#fcfcf7",
+      "nameColor": "#fcfcf7",
+      "salaryBorder": "#e7d5f9",
+      "salaryFill": "#b57aff"
+    },
+    {
+      "id": 862,
+      "code": "KHD",
+      "name": "KHD (Korea Heroes Debut)",
+      "emblem": {
+        "file": "assets/862-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/khd.png",
+        "sha256": "7a0f208885bbf662394c7b2557984397399ebe51a0e85397b86774fdccf8dd44"
+      },
+      "frame": {
+        "file": "assets/862-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/KHD.png",
+        "sha256": "b58a8ee6dcbb94105ff3efc1932e230922cab0c35918c055f109fac65d9c8c8f"
+      },
+      "color": "#ffd",
+      "nameColor": "#fff",
+      "salaryBorder": "#ffd",
+      "salaryFill": "#a01029"
+    },
+    {
+      "id": 861,
+      "code": "WG",
+      "name": "WG (Warriors of Glory)",
+      "emblem": {
+        "file": "assets/861-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/wg.png",
+        "sha256": "36dc6c0331fd0e9a9c308855be6cbeaf6749a29137ee18d68952ac2b147626ad"
+      },
+      "frame": {
+        "file": "assets/861-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/WG.png",
+        "sha256": "82b400e4a4ac62682270207367c8eebf3acc1d961c0fc03049562176ac7ef43c"
+      },
+      "color": "#ffefb1",
+      "nameColor": "#332113",
+      "salaryBorder": "#ffefb1",
+      "salaryFill": "#5f3215"
+    },
+    {
+      "id": 852,
+      "code": "FAC",
+      "name": "FAC (Football Association Champions)",
+      "emblem": {
+        "file": "assets/852-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/fac.png",
+        "sha256": "56c54cd22569764c551bedb099ef1c5e2db15eca3aa48cc0f9f4d2f9b8b90ab9"
+      },
+      "frame": {
+        "file": "assets/852-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/FAC.png",
+        "sha256": "e6f28f2b43f728bd6d0308485238df1155e2bdeff687f7bcb7fb5ce9d1e29f08"
+      },
+      "color": "#c1ffff",
+      "nameColor": "#fff",
+      "salaryBorder": "#c1ffff",
+      "salaryFill": "rgba(21,46,55,.8)"
+    },
+    {
+      "id": 851,
+      "code": "25DP",
+      "name": "25DP (25 Devoted Player)",
+      "emblem": {
+        "file": "assets/851-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25dp.png",
+        "sha256": "845056e57a3d01dc05ce567477873e71675dd4cb4362cae7ee85a76356615d4e"
+      },
+      "frame": {
+        "file": "assets/851-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25DP.png",
+        "sha256": "48a250d15bc5cb4b01f5770d5e1fd3ae0535873f48a852710b64291708c4e9c2"
+      },
+      "color": "#fffcde",
+      "nameColor": "#fff",
+      "salaryBorder": "#fffcde",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 848,
+      "code": "WS",
+      "name": "WS (Winning Streak)",
+      "emblem": {
+        "file": "assets/848-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/ws.png",
+        "sha256": "1fca709a8ccf7e0d2ceee624cc14580e73930fcf8f9c65b9b0bf78a768697c94"
+      },
+      "frame": {
+        "file": "assets/848-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/WS.png",
+        "sha256": "536319bcbfdaa55282da3a6b759eb126dd8ed00f53a8254e7f330a6bd10eaaeb"
+      },
+      "color": "#fffade",
+      "nameColor": "#fff",
+      "salaryBorder": "#fffade",
+      "salaryFill": "rgba(1,30,85,.8)"
+    },
+    {
+      "id": 868,
+      "code": "26FSL",
+      "name": "26FSL (26 FCO Superchampions League)",
+      "emblem": {
+        "file": "assets/868-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/26fsl.png",
+        "sha256": "b719cba7b1e936777af93665f1a4d4a054691a68ab4a28124e7d8322fa9b99c8"
+      },
+      "frame": {
+        "file": "assets/868-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/26FSL.png",
+        "sha256": "8725cbfa04e0acc914504088e697184f158695d675e1e6f348fddff4a8ff3784"
+      },
+      "color": "#1d252d",
+      "nameColor": "#c80506",
+      "salaryBorder": "#1d252d",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 850,
+      "code": "25FSL",
+      "name": "25FSL (25 FCO Superchampions League)",
+      "emblem": {
+        "file": "assets/850-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25fsl.png",
+        "sha256": "1f20d5aaa4ed3f6f20610e9219d329e09c1f0f457e0004f806a4b736ecf37057"
+      },
+      "frame": {
+        "file": "assets/850-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25FSL.png",
+        "sha256": "4e63c1d34a993e328f94f9f6ceb5d358926d2a22ba6982153b3e7eb5e9d666e4"
+      },
+      "color": "#fff",
+      "nameColor": "#fff",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(172,29,34,.8)"
+    },
+    {
+      "id": 846,
+      "code": "DCB",
+      "name": "DCB (Dramatic Comebacks)",
+      "emblem": {
+        "file": "assets/846-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/dcb.png",
+        "sha256": "6fe3a355239093629e99d531485eadbe4c1a46b091ccd405dbce243e87c3b823"
+      },
+      "frame": {
+        "file": "assets/846-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/DCB.png",
+        "sha256": "ed05238ba7f052286b2c0f3d81b0c79b569d5cb83f25b1d88b5e3b9470db8e63"
+      },
+      "color": "#ffe7b6",
+      "nameColor": "#f5e9cf",
+      "salaryBorder": "#ffe7b6",
+      "salaryFill": "rgba(21,19,22,.8)"
+    },
+    {
+      "id": 845,
+      "code": "CH",
+      "name": "CH (Continental Heroes)",
+      "emblem": {
+        "file": "assets/845-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/ch.png",
+        "sha256": "15ced7bcf9e5647f64eb8cb56dd6ea42e72cf4f54bbe889beecae984c1d5eb20"
+      },
+      "frame": {
+        "file": "assets/845-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/CH.png",
+        "sha256": "ce7b8c5e3ba24993926db4087cfa916f6b0088e11cb9e7efff5756e688d4b9a0"
+      },
+      "color": "#fff",
+      "nameColor": "#fff",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(55,50,80,.8)"
+    },
+    {
+      "id": 849,
+      "code": "HRT",
+      "name": "HRT (Heroes Cartoon)",
+      "emblem": {
+        "file": "assets/849-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/hrt.png",
+        "sha256": "f19bd653355209e239cb042bcd3155785a572a6aba78a88cadfa72bb3f8d1cd9"
+      },
+      "frame": {
+        "file": "assets/849-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/HRT.png",
+        "sha256": "8ac8036b3b654fcd5046d3b3dde596a5d8acd37de8b37fbcd3d489f025a9e0d9"
+      },
+      "color": "#fff",
+      "nameColor": "#fff",
+      "salaryBorder": "#fff",
+      "salaryFill": "#760c57"
+    },
+    {
+      "id": 840,
+      "code": "LE",
+      "name": "LE (Legend of Europa)",
+      "emblem": {
+        "file": "assets/840-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/le.png",
+        "sha256": "04f735e81c0825f4032b9ba7f288c3581c59d190d86a2fbf0eb6610e04c73861"
+      },
+      "frame": {
+        "file": "assets/840-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/LE.png",
+        "sha256": "89165b523e3134820f760a099dbf2e3d7a71a2669c1e8409b5e3b0928369d450"
+      },
+      "color": "#fbdb8f",
+      "nameColor": "#fbdb8f",
+      "salaryBorder": "#fbdb8f",
+      "salaryFill": "#210607"
+    },
+    {
+      "id": 839,
+      "code": "NO7",
+      "name": "NO7 (NUMBER 7)",
+      "emblem": {
+        "file": "assets/839-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/no7.png",
+        "sha256": "d5ea5af900961ac7b9f4058e6ab43c9800035b1150d4158e2912842f7e9d4250"
+      },
+      "frame": {
+        "file": "assets/839-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/NO7.png",
+        "sha256": "a4f1ca7b918455953814b233fdc92bc0fa6e394833366a13999b3124f8cffc0b"
+      },
+      "color": "#1a2a45",
+      "nameColor": "#fff",
+      "salaryBorder": "#1a2a45",
+      "salaryFill": "hsla(0,0%,100%,.8)"
+    },
+    {
+      "id": 836,
+      "code": "WB",
+      "name": "WB (Wonderboys)",
+      "emblem": {
+        "file": "assets/836-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/wb.png",
+        "sha256": "277fab68820555f290af4b8c4928f69c8dec165478574933675c66df5b32127d"
+      },
+      "frame": {
+        "file": "assets/836-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/WB.png",
+        "sha256": "dd5f24578f107e54674a2cae3729acac3d639859c7c5a5282b8d5e70c638c7ed"
+      },
+      "color": "#fff7be",
+      "nameColor": "#fff",
+      "salaryBorder": "#fff7be",
+      "salaryFill": "#3d00a3"
+    },
+    {
+      "id": 829,
+      "code": "GRU",
+      "name": "GRU (Greatest Runner-Ups)",
+      "emblem": {
+        "file": "assets/829-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/gru.png",
+        "sha256": "8778e53146cb25c50173d392710a52be36ca0685da35a01cf38e127f839abb08"
+      },
+      "frame": {
+        "file": "assets/829-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/GRU.png",
+        "sha256": "e20c6e41ee37f6d6ed2982e43506dd404c8f97c31e02d16cd9e9d6ef15f19ae9"
+      },
+      "color": "#fffcde",
+      "nameColor": "#fff",
+      "salaryBorder": "#fffcde",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 828,
+      "code": "BLD",
+      "name": "BLD (Best Legends)",
+      "emblem": {
+        "file": "assets/828-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/bld.png",
+        "sha256": "5fce8d680515acc66d86c360089806ab4e5d83c34a6cf86e6031f0b67ddb5c85"
+      },
+      "frame": {
+        "file": "assets/828-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/BLD.png",
+        "sha256": "b25191d9f075113a7f24e6184e424ef51565e5a9cc9574189e0a0eb3c6649fdb"
+      },
+      "color": "#f1d698",
+      "nameColor": "#fff",
+      "salaryBorder": "#f1d698",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 827,
+      "code": "BDO",
+      "name": "BDO (Ballon d'Or)",
+      "emblem": {
+        "file": "assets/827-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/bdo.png",
+        "sha256": "f5843236b042d4969d9ed7f508b667fd3bf3b58c230c68b13384d48dd984c080"
+      },
+      "frame": {
+        "file": "assets/827-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/BDO.png",
+        "sha256": "59b7fee9833c37dacd2162a0948c05b83be13effa9d450435d6e5568e1d574eb"
+      },
+      "color": "#ffefc3",
+      "nameColor": "#fff",
+      "salaryBorder": "#ffefc3",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 826,
+      "code": "24EP",
+      "name": "24EP (2024 Energetic Player)",
+      "emblem": {
+        "file": "assets/826-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/24ep.png",
+        "sha256": "6ddc9d40a65fe86b7125406f3f915e9d56b49ab2c8515aad27692499bd5f2c9f"
+      },
+      "frame": {
+        "file": "assets/826-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/24EP.png",
+        "sha256": "b53add993c81a3352db2f4f9f1f229f5e36bcee698d0053ee30800624cf879da"
+      },
+      "color": "#ffff63",
+      "nameColor": "#fff",
+      "salaryBorder": "#ffff63",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 825,
+      "code": "CU",
+      "name": "CU (Champions of Europe)",
+      "emblem": {
+        "file": "assets/825-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/cu.png",
+        "sha256": "48ebcd44789cb8a51bc13542a48d693d8111c282efa9ee24485e40a315d9bf38"
+      },
+      "frame": {
+        "file": "assets/825-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/CU.png",
+        "sha256": "74eb6f8ef27c37a01c1a4f412a4a9ae5a818902701bbe4415b9ad4f7cd6524db"
+      },
+      "color": "#fce38b",
+      "nameColor": "#fff",
+      "salaryBorder": "#fce38b",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 821,
+      "code": "MDL",
+      "name": "MDL (Medalist)",
+      "emblem": {
+        "file": "assets/821-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/mdl.png",
+        "sha256": "1b4c41a72deb1346ba883c23bcaf32bf2063d93692c29738ccfbec4558567c92"
+      },
+      "frame": {
+        "file": "assets/821-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/MDL.png",
+        "sha256": "f52c9c6b2750e84f72b57908b35deb2c9e77ab1041f15d2a9a1e8772d0a4e16f"
+      },
+      "color": "#23306e",
+      "nameColor": "#141432",
+      "salaryBorder": "#23306e",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 815,
+      "code": "EU24",
+      "name": "EU24 (UEFA EURO 2024)",
+      "emblem": {
+        "file": "assets/815-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/eu24.png",
+        "sha256": "31d3ce53ac3fcb28c68bf5944c4145b1def34da17d0875623435e7422af1f44f"
+      },
+      "frame": {
+        "file": "assets/815-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/EU24.png",
+        "sha256": "51f40ae277ffba347556d896f9514133d5e4f12a2b68b5dcaac2726edea0fc9f"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 818,
+      "code": "LD",
+      "name": "LD (Last Dance)",
+      "emblem": {
+        "file": "assets/818-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/ld.png",
+        "sha256": "cf191900c2c67be2d7a2c96708b116596e3025a186c2894dcec83fd390da77ae"
+      },
+      "frame": {
+        "file": "assets/818-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/LD.png",
+        "sha256": "fc7c2217c0b8e5f1020e76b8259410158fef5c5f83ec76521f26097f2e05e7f9"
+      },
+      "color": "#594a3e",
+      "nameColor": "#141432",
+      "salaryBorder": "#594a3e",
+      "salaryFill": "hsla(0,0%,100%,.5)"
+    },
+    {
+      "id": 814,
+      "code": "UT",
+      "name": "UT (Unexpected Transfer)",
+      "emblem": {
+        "file": "assets/814-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/ut.png",
+        "sha256": "80cf8b1654919b45b228f2a80506c2796f7bc4bf50ec3ed6a38092aaacdedcaf"
+      },
+      "frame": {
+        "file": "assets/814-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/UT.png",
+        "sha256": "69643245afcb03ae7e61c01fc0fa8f4ec89fc39a88fd9392ee476703734b5e2a"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 813,
+      "code": "JNM",
+      "name": "JNM (Journeyman)",
+      "emblem": {
+        "file": "assets/813-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/jnm.png",
+        "sha256": "7643affe8e4250cc09f5e40c822e1ea6e6264ead1ebd33c29823ac4e9eb02465"
+      },
+      "frame": {
+        "file": "assets/813-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/JNM.png",
+        "sha256": "b7e355c587233827b4989ef96a2d0fc55cdeb33f42f962df3db772fabfd9971b"
+      },
+      "color": "#ffffdb",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffffdb",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 802,
+      "code": "DC",
+      "name": "DC (Decade)",
+      "emblem": {
+        "file": "assets/802-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/dc.png",
+        "sha256": "8265b8b8d91e1b6511a0ce8ca94f4ed84080e09012db6ddac8bc03da1515ba0c"
+      },
+      "frame": {
+        "file": "assets/802-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/DC.png",
+        "sha256": "f17ef0858d360957cfb1c1822e6a92c6600bb72e3c975d57ca7bdf283bbf8034"
+      },
+      "color": "#ffdc96",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffdc96",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 801,
+      "code": "JVA",
+      "name": "JVA (Juventus Ambassador)",
+      "emblem": {
+        "file": "assets/801-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/jva.png",
+        "sha256": "2a36e7c0a00c2397d6259ed34b30e6f7f01042eead0080362b3134efbe4e3667"
+      },
+      "frame": {
+        "file": "assets/801-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/JVA.png",
+        "sha256": "d3853d3c0a316f23c45e30bfcc8fbdbfb6bcb4e088a6dedfb60b0b2f78591f58"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 290,
+      "code": "FCA",
+      "name": "FCA (FCAmbassador)",
+      "emblem": {
+        "file": "assets/290-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/fca.png",
+        "sha256": "be7adf5de336c20ad889fd5229ff4ce01fbc99f64d0f0affea7a57527e14e5cc"
+      },
+      "frame": {
+        "file": "assets/290-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/FCA.png",
+        "sha256": "7c787e1e38d3752a60e81a8e9d3b99c52ba4deb3d89e7bb058b7a209f4d78961"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 291,
+      "code": "23HW",
+      "name": "23HW (23 Hard Worker)",
+      "emblem": {
+        "file": "assets/291-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23hw.png",
+        "sha256": "26ba585fd6ea22c7c6f87fcdfba5bfc5ce06d21be473f7923536df3c92db9fee"
+      },
+      "frame": {
+        "file": "assets/291-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23HW.png",
+        "sha256": "d219498b445d109044580e711686b6788050b36fcbcd58ff51594892110a6a6e"
+      },
+      "color": "#e4ff66",
+      "nameColor": "#141432",
+      "salaryBorder": "#e4ff66",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 289,
+      "code": "CC",
+      "name": "CC (CenturyClub)",
+      "emblem": {
+        "file": "assets/289-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/cc.png",
+        "sha256": "18dbeb0836c942d8479c920c1688f84a6f57a22552015f5624ec9d0c3c811865"
+      },
+      "frame": {
+        "file": "assets/289-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/CC.png",
+        "sha256": "2b6cd88b73fec275f524b4cdd2a9f3676ac475498daffa21fea7d7f93dca40df"
+      },
+      "color": "#fee596",
+      "nameColor": "#141432",
+      "salaryBorder": "#fee596",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 283,
+      "code": "HG",
+      "name": "HG (Home Grown)",
+      "emblem": {
+        "file": "assets/283-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/hg.png",
+        "sha256": "5bb7c57a9f33f88e5ccf66f731bef05653c1d4ec50688d5f5a0aa9e96f9e7566"
+      },
+      "frame": {
+        "file": "assets/283-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/HG.png",
+        "sha256": "a62d4a4fabf095cbe4ff8a795c8d3757f9c5ecee446de2c11eb855493a408be3"
+      },
+      "color": "#f5ff51",
+      "nameColor": "#141432",
+      "salaryBorder": "#f5ff51",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 284,
+      "code": "RTN",
+      "name": "RTN (Returnees)",
+      "emblem": {
+        "file": "assets/284-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/rtn.png",
+        "sha256": "ee5449d3638d3a8a8483d64a3b8a658db8b3672aa0ab75ee9aef3251ac89b965"
+      },
+      "frame": {
+        "file": "assets/284-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/RTN.png",
+        "sha256": "3a15dc5744cb1f753a4b1c95ab9210504378fbe78c08f629315c0be15cc675c2"
+      },
+      "color": "#ffe9b5",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffe9b5",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 272,
+      "code": "BWC",
+      "name": "BWC (Best of World Cup)",
+      "emblem": {
+        "file": "assets/272-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/bwc.png",
+        "sha256": "7753dc25b7c916729152fce53de97d55542175efc09c9dce67a15be3027de229"
+      },
+      "frame": {
+        "file": "assets/272-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/BWC.png",
+        "sha256": "6df0a7580fccc1b769b29f44ff93c0b372d7c0825dca7a4f8e5a8033a788e4eb"
+      },
+      "color": "#ffebb4",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffebb4",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 273,
+      "code": "WC22",
+      "name": "WC22 (World Cup 2022)",
+      "emblem": {
+        "file": "assets/273-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/wc22.png",
+        "sha256": "6cf27cac1cefb60acfe82903e1d3cd0878d902c27282afcae439c8ef6242b1b2"
+      },
+      "frame": {
+        "file": "assets/273-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/WC22.png",
+        "sha256": "389794494a3b9e81d4249cc95d2cd6d3c3920113c7154310690ccc6c9f2dbfe3"
+      },
+      "color": "#ee4",
+      "nameColor": "#141432",
+      "salaryBorder": "#ee4",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 274,
+      "code": "RMCF",
+      "name": "RMCF (Real Madrid Ambassador)",
+      "emblem": {
+        "file": "assets/274-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/rmcf.png",
+        "sha256": "099a8d646f76799bb60a50e369d20e26b2857b6e8bfc6678b4668cfde51dbf3c"
+      },
+      "frame": {
+        "file": "assets/274-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/RMCF.png",
+        "sha256": "7f707172c132c8e0af455631351e33814f53065c6d42ed66cbaa58996b247f76"
+      },
+      "color": "#031352",
+      "nameColor": "#141432",
+      "salaryBorder": "#031352",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 270,
+      "code": "SPL",
+      "name": "SPL (Spotlight)",
+      "emblem": {
+        "file": "assets/270-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/spl.png",
+        "sha256": "65c8ffe5409a3bcccaa8b525889684b72751967ef9566fe6ac9368ff751914c4"
+      },
+      "frame": {
+        "file": "assets/270-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/SPL.png",
+        "sha256": "199f8a48c25c921cae7a67d267ef5ade1e3ff50a6324d78f299b1bfb34894655"
+      },
+      "color": "#80ffd6",
+      "nameColor": "#141432",
+      "salaryBorder": "#80ffd6",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 268,
+      "code": "LN",
+      "name": "LN (LEGENDARY NUMBERS)",
+      "emblem": {
+        "file": "assets/268-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/ln.png",
+        "sha256": "446613d5da80d08ccf43b15cb2829c5e85927e3ee54825cc471d0413b95e9b4b"
+      },
+      "frame": {
+        "file": "assets/268-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/LN.png",
+        "sha256": "f0a87b2bc212b089f7d8643474a42ea387185ffcf27d54855c46c0f67233c1a7"
+      },
+      "color": "#dafd65",
+      "nameColor": "#141432",
+      "salaryBorder": "#dafd65",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 265,
+      "code": "LOL",
+      "name": "LOL (LEGEND OF THE LOAN)",
+      "emblem": {
+        "file": "assets/265-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/lol.png",
+        "sha256": "1dac011929582a7ef74f91217929886462b1a72561e570978a1ff7e7ed01c547"
+      },
+      "frame": {
+        "file": "assets/265-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/LOL.png",
+        "sha256": "1bf632960725f69f2a559236bedc5aedaaa2bac34e418ae7422c1466ab8b7473"
+      },
+      "color": "#fdaaea",
+      "nameColor": "#141432",
+      "salaryBorder": "#fdaaea",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 264,
+      "code": "FA",
+      "name": "FA (FREE AGENT)",
+      "emblem": {
+        "file": "assets/264-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/fa.png",
+        "sha256": "77a69eabed446d51e216561aa0374607f4a1c7b0045aa26ff4fa2105b7a2cafd"
+      },
+      "frame": {
+        "file": "assets/264-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/FA.png",
+        "sha256": "889dff994c8004133cb897aa51a4f1874517d3bb47d81989311f71f808a9deb3"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 858,
+      "code": "26HR",
+      "name": "26HR (26 Heroes)",
+      "emblem": {
+        "file": "assets/858-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/26hr.png",
+        "sha256": "50f23cd42ef61628c2050cbc7f6f6dbbb867bd59e7f50c779241ddf478dffb77"
+      },
+      "frame": {
+        "file": "assets/858-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/26HR.png",
+        "sha256": "501f7072bac556e4511774b1ce5f67298baa6aabcde84c8d80a6e108c965693f"
+      },
+      "color": "#ffe8a8",
+      "nameColor": "#ffe8a8",
+      "salaryBorder": "#ffe8a8",
+      "salaryFill": "#2b2260"
+    },
+    {
+      "id": 835,
+      "code": "25HR",
+      "name": "25HR (25 Heroes)",
+      "emblem": {
+        "file": "assets/835-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25hr.png",
+        "sha256": "8a6b5c512db9ba33b8b3a997235b8dbc279148188e8cb10dbc35c2fbc3547597"
+      },
+      "frame": {
+        "file": "assets/835-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25HR.png",
+        "sha256": "3940818131b073ef1d8ef9530a019b95d4fa28dd91efb5f09eca86ca191edd0c"
+      },
+      "color": "#fff",
+      "nameColor": "#fff",
+      "salaryBorder": "#fff",
+      "salaryFill": "#760c57"
+    },
+    {
+      "id": 811,
+      "code": "24HR",
+      "name": "24HR (24 Heroes)",
+      "emblem": {
+        "file": "assets/811-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/24hr.png",
+        "sha256": "4c9f4b6abbecfb0d6a3bd000c261cd5e4c3c10b894b472f285453fdd61796cb1"
+      },
+      "frame": {
+        "file": "assets/811-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/24HR.png",
+        "sha256": "2ce33b177023bb935b581dec659163d0796e3e10aca36298ed5a33c065770bca"
+      },
+      "color": "#fdfad5",
+      "nameColor": "#141432",
+      "salaryBorder": "#fdfad5",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 281,
+      "code": "23HR",
+      "name": "23HR (23 Heroes)",
+      "emblem": {
+        "file": "assets/281-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23hr.png",
+        "sha256": "811c6b615e2b3023b9a64a478135b9979dccfbe6d14936c739a80b21f99e63db"
+      },
+      "frame": {
+        "file": "assets/281-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23HR.png",
+        "sha256": "ee72514cda3bdcb43bc587985ac7cc4e92ea9b8f215e447c2f6d66ba443af466"
+      },
+      "color": "#fef6c4",
+      "nameColor": "#141432",
+      "salaryBorder": "#fef6c4",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 261,
+      "code": "22HR",
+      "name": "22HR (22 Heroes)",
+      "emblem": {
+        "file": "assets/261-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/22hr.png",
+        "sha256": "9b081d9e4a86968ff37a59dc758ce79ca585f3353dc6f2f0b914591dab49153d"
+      },
+      "frame": {
+        "file": "assets/261-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/22HR.png",
+        "sha256": "c9e579470cddf1a3f2e09a6cc6e224517ea574d572d044cded2117c2336729f2"
+      },
+      "color": "#aedefb",
+      "nameColor": "#141432",
+      "salaryBorder": "#aedefb",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 256,
+      "code": "BTB",
+      "name": "BTB (Back to Back)",
+      "emblem": {
+        "file": "assets/256-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/btb.png",
+        "sha256": "a7eaeb2490049e1a6af25c23f6076fd435b48154f19b861c1d8287f22b85c329"
+      },
+      "frame": {
+        "file": "assets/256-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/BTB.png",
+        "sha256": "c68ef71c1c2bbb7f28e556e571f56897c069f69cb0acd6893c00841f2120d5a8"
+      },
+      "color": "#fff94a",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff94a",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 252,
+      "code": "CAP",
+      "name": "CAP (Captain)",
+      "emblem": {
+        "file": "assets/252-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/cap.png",
+        "sha256": "32c136b50d19e28de76cb293683c8e2043be8fb5d42ee7d9c4184c1e700a4f2f"
+      },
+      "frame": {
+        "file": "assets/252-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/CAP.png",
+        "sha256": "6cf91664a6cb1aaf1343aa4f2218e39095ec9ddb6ad84747efe116369c55e016"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 251,
+      "code": "EBS",
+      "name": "EBS (European Best Stars)",
+      "emblem": {
+        "file": "assets/251-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/ebs.png",
+        "sha256": "fd9c7df2001e7c12f1f09bfebd73b47bf68c6b61247e09da9c566ce8bfdd6e29"
+      },
+      "frame": {
+        "file": "assets/251-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/EBS.png",
+        "sha256": "7f04a5c8ab53393b7c281b908b181d81a9611d3a6ad1a81ae8b2ac3d6d48fbb3"
+      },
+      "color": "#ede7ad",
+      "nameColor": "#141432",
+      "salaryBorder": "#ede7ad",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 253,
+      "code": "BOE21",
+      "name": "BOE21 (Best of Europe 21)",
+      "emblem": {
+        "file": "assets/253-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/boe21.png",
+        "sha256": "7738c88070d96fc5941564e3607fa12b8bfda76224aa74deabdc70cc72e6eaf0"
+      },
+      "frame": {
+        "file": "assets/253-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/BOE21.png",
+        "sha256": "8c3bd76dac0634e86471bc75cc3151548d74c52fce5f14f47374ab951098e78c"
+      },
+      "color": "#530815",
+      "nameColor": "#141432",
+      "salaryBorder": "#530815",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 249,
+      "code": "NTG",
+      "name": "NTG (Nostalgia)",
+      "emblem": {
+        "file": "assets/249-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/ntg.png",
+        "sha256": "5290553d56d4b4f7851830469b7715b0292e9817b72b57e5161271087826cc5f"
+      },
+      "frame": {
+        "file": "assets/249-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/NTG.png",
+        "sha256": "f452c102808dc6a58e1c627bfe6a98d07445eca6a78389e0baeea715e7e06015"
+      },
+      "color": "#957d54",
+      "nameColor": "#141432",
+      "salaryBorder": "#957d54",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 246,
+      "code": "UP",
+      "name": "UP (Unsung Players)",
+      "emblem": {
+        "file": "assets/246-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/up.png",
+        "sha256": "eb9271f48c71aeda4fef5ca1918644984a22c052bb5d4745095eb382883e1ad2"
+      },
+      "frame": {
+        "file": "assets/246-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/UP.png",
+        "sha256": "92d9292e8f3ba711408dc68a358bc355e9b4c118e802bdf03735257ee9da6bb7"
+      },
+      "color": "#58ffd6",
+      "nameColor": "#141432",
+      "salaryBorder": "#58ffd6",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 237,
+      "code": "MC",
+      "name": "MC (Multi-League Champions)",
+      "emblem": {
+        "file": "assets/237-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/mc.png",
+        "sha256": "5a061c1186e3d2039c0f5f922940855140fff8ad52e6bd49b48740d85c0f9c12"
+      },
+      "frame": {
+        "file": "assets/237-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/MC.png",
+        "sha256": "7380294f45f814656b167213bd2596cf6f1ffae7f47351bbb69bfbde6fa169f2"
+      },
+      "color": "#080d39",
+      "nameColor": "#141432",
+      "salaryBorder": "#080d39",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 231,
+      "code": "VTR",
+      "name": "VTR (Veteran)",
+      "emblem": {
+        "file": "assets/231-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/vtr.png",
+        "sha256": "91e4f3e69c726ec7d839fc7255b97ba5c5933660db7fb5e525c54e358d6eafc5"
+      },
+      "frame": {
+        "file": "assets/231-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/VTR.png",
+        "sha256": "06199de83c53252e69f86de4a3c4fe8a4430de52df2afbf11ce7a055f25fb616"
+      },
+      "color": "#f1debd",
+      "nameColor": "#141432",
+      "salaryBorder": "#f1debd",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 233,
+      "code": "MOG",
+      "name": "MOG (Moments Of Glory)",
+      "emblem": {
+        "file": "assets/233-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/mog.png",
+        "sha256": "380af280fa2d73005f635849bf56ccfc84da24f6342c72f1d0cd3cce5e4e1d5c"
+      },
+      "frame": {
+        "file": "assets/233-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/MOG.png",
+        "sha256": "3def9c00d347da170fae707eb440bd7230a3010c7e6e30ef71c133af430beb8a"
+      },
+      "color": "#ff8125",
+      "nameColor": "#141432",
+      "salaryBorder": "#ff8125",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 254,
+      "code": "CFA",
+      "name": "CFA (Chelsea FC Ambassador)",
+      "emblem": {
+        "file": "assets/254-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/cfa.png",
+        "sha256": "ef23874fe7d1ab75508f5f313b4541a4551afed7d4ffa21a811aa434c81e5107"
+      },
+      "frame": {
+        "file": "assets/254-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/CFA.png",
+        "sha256": "7a4956a5ad2dca57f68b30a0837c2f70d969f2e9744c5ef85d90d96be30745ef"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 236,
+      "code": "LA",
+      "name": "LA (Liverpool Ambassador)",
+      "emblem": {
+        "file": "assets/236-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/la.png",
+        "sha256": "e71b3c6dfc6a03fb9efbd92a049e4e42a9088e289d50604727b61b388584c33d"
+      },
+      "frame": {
+        "file": "assets/236-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/LA.png",
+        "sha256": "5eff045c55f92f58c765d0db3afd5a03707de497022a12a08768aef1668d49e7"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 804,
+      "code": "23NG",
+      "name": "23NG (23 NEW GENERATION)",
+      "emblem": {
+        "file": "assets/804-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23ng.png",
+        "sha256": "2599e7ca167b1585b322b459ae8665d5a353bcb75e3053ba23e2d19c5fc7e054"
+      },
+      "frame": {
+        "file": "assets/804-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23NG.png",
+        "sha256": "59c327b07621192b5b3f75eba7593ebf7e7993d74f59f22d2c1fdb07977b608c"
+      },
+      "color": "#fff67a",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff67a",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 276,
+      "code": "22NG",
+      "name": "22NG (22 NEW GENERATION)",
+      "emblem": {
+        "file": "assets/276-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/22ng.png",
+        "sha256": "7798c0011d3857ecd9a1a446d72b55530b3952f9157d7c782275da01a51ad2ef"
+      },
+      "frame": {
+        "file": "assets/276-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/22NG.png",
+        "sha256": "709671999c63a02c176f744d52f08230213a9e5e1d0000ff966723c9ad5ff0a7"
+      },
+      "color": "#ffe066",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffe066",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 262,
+      "code": "21NG",
+      "name": "21NG (21 NEW GENERATION)",
+      "emblem": {
+        "file": "assets/262-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/21ng.png",
+        "sha256": "19c775980faca864614d413022a65e40125c1fad8842cc7b80e3d03747566437"
+      },
+      "frame": {
+        "file": "assets/262-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/21NG.png",
+        "sha256": "c25f9d5e7ed74d1876d7a5dbef4080c8d869e14bb30c1d763dbf4cb32950a77f"
+      },
+      "color": "#f5ff4e",
+      "nameColor": "#141432",
+      "salaryBorder": "#f5ff4e",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 238,
+      "code": "20NG",
+      "name": "20NG (20 NEW GENERATION)",
+      "emblem": {
+        "file": "assets/238-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/20ng.png",
+        "sha256": "e15b66077b31e6da37b9233bb773733e6495cd856e5f53ab2c71d0d27ed1514f"
+      },
+      "frame": {
+        "file": "assets/238-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/20NG.png",
+        "sha256": "bfc06706fb88263d5de3b4a83cd4a6a437a222701a44f54e81bdf44d30b33215"
+      },
+      "color": "#faff51",
+      "nameColor": "#141432",
+      "salaryBorder": "#faff51",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 219,
+      "code": "19NG",
+      "name": "19NG (19 NEW GENERATION)",
+      "emblem": {
+        "file": "assets/219-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/19ng.png",
+        "sha256": "e74e4ed7516ff96b20ef6a3e53f3931cba463076858808d664f9d6ff9dd5fc5e"
+      },
+      "frame": {
+        "file": "assets/219-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/19NG.png",
+        "sha256": "6d66799095707890e6e98f155bd5bff6307fda9e2c1ff7ead6dca1d555eae273"
+      },
+      "color": "#befd74",
+      "nameColor": "#141432",
+      "salaryBorder": "#befd74",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 218,
+      "code": "OTW",
+      "name": "OTW (Ones To Watch)",
+      "emblem": {
+        "file": "assets/218-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/otw.png",
+        "sha256": "b9839bab6256358a3e82d2324f45511089bfeed6ac7cc020fbba846aa8b79a56"
+      },
+      "frame": {
+        "file": "assets/218-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/OTW.png",
+        "sha256": "ab1336e4468d6ae02e311c9aa540a59481033547130875574945da84206f3910"
+      },
+      "color": "#fc5461",
+      "nameColor": "#141432",
+      "salaryBorder": "#fc5461",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 217,
+      "code": "COC",
+      "name": "COC (Competitor Of Continents)",
+      "emblem": {
+        "file": "assets/217-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/coc.png",
+        "sha256": "a604ae3bae7f87d156b98373a762ef58552bd6629d2d5cf0682ab102f32304f1"
+      },
+      "frame": {
+        "file": "assets/217-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/COC.png",
+        "sha256": "a3377b3fa1793c70f87fff05fd2b265dabad5fe5b4fa6bab32ae2c33745da6a6"
+      },
+      "color": "#ffdc74",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffdc74",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 216,
+      "code": "HOT",
+      "name": "HOT (Heroes Of the Team)",
+      "emblem": {
+        "file": "assets/216-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/hot.png",
+        "sha256": "78c8f4921d8c1ab284b3cb3e317537abf1451c0097dcd06cbf933e4667836836"
+      },
+      "frame": {
+        "file": "assets/216-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/HOT.png",
+        "sha256": "6e2138b8db12c31029c9d27d59897791b4c0606a92e4f1f67bf5c3f72da0ea41"
+      },
+      "color": "#fe2b38",
+      "nameColor": "#141432",
+      "salaryBorder": "#fe2b38",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 214,
+      "code": "TC",
+      "name": "TC (Tournament Champions)",
+      "emblem": {
+        "file": "assets/214-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/tc.png",
+        "sha256": "c69f02046cf7d46d9645ed3ee759eebb010e3c25c43f86844d3a016b7cd6ed79"
+      },
+      "frame": {
+        "file": "assets/214-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/TC.png",
+        "sha256": "71573be5c1a77e69ead0c87d0b1ce3bb159cfed5cf0b4b26c9891c657e66bb0a"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 213,
+      "code": "MCICON",
+      "name": "MCFC ICON (Man City ICON)",
+      "emblem": {
+        "file": "assets/213-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/mcicon.png",
+        "sha256": "0d8b0ec16152d6d0a9b88af4622b45687a76bce577ef1f9828f8aa9d56dd0d1c"
+      },
+      "frame": {
+        "file": "assets/213-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/MCICON.png",
+        "sha256": "bacbb1e3265ca711e70cc186ddf23b0004cfb17031e9a09eb9f8dd13850dc0e4"
+      },
+      "color": "#0f69af",
+      "nameColor": "#141432",
+      "salaryBorder": "#0f69af",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 210,
+      "code": "GR",
+      "name": "GR (Golden Rookies)",
+      "emblem": {
+        "file": "assets/210-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/gr.png",
+        "sha256": "de9539e241775dbc6f83719f8aced26e6deb43a306c6dd810882d0baff0b6764"
+      },
+      "frame": {
+        "file": "assets/210-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/GR.png",
+        "sha256": "2bd623d89ff69508680ea3fe61921daaa02bb8b17d79eb53bd1293337f0fb51e"
+      },
+      "color": "#61521a",
+      "nameColor": "#141432",
+      "salaryBorder": "#61521a",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 207,
+      "code": "TT",
+      "name": "TT (Top Transfer)",
+      "emblem": {
+        "file": "assets/207-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/tt.png",
+        "sha256": "29f09dbe8aaedc9f204ddfa4d8ac3799977c0dd3e2bdd3e743d0ce16403e1ed5"
+      },
+      "frame": {
+        "file": "assets/207-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/TT.png",
+        "sha256": "b0f3596d6da7b3295003cb8860ee815d9e7c388041b168fb42fdebc93455e617"
+      },
+      "color": "#d3c070",
+      "nameColor": "#141432",
+      "salaryBorder": "#d3c070",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 206,
+      "code": "TB",
+      "name": "TB (Tournament Best)",
+      "emblem": {
+        "file": "assets/206-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/tb.png",
+        "sha256": "6167646104703b90a736844c7ae394d9b4c08deba7bbe8adc8ea5cf8beb171b0"
+      },
+      "frame": {
+        "file": "assets/206-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/TB.png",
+        "sha256": "c9f8137b919e33cc37a1d8f8c772915491b2b8f81351008c71d1acc00fee7999"
+      },
+      "color": "#2a2c2e",
+      "nameColor": "#141432",
+      "salaryBorder": "#2a2c2e",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 202,
+      "code": "TKI",
+      "name": "TKI (Team Korea Icon)",
+      "emblem": {
+        "file": "assets/202-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/tki.png",
+        "sha256": "a0c02104dc36ba4cabf0adc75eec15feb8cbd782ec6506085ba2ea6169227d54"
+      },
+      "frame": {
+        "file": "assets/202-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/TKI.png",
+        "sha256": "72144292bf8b30b4aeda453e238e9d93dfb3e4e869f73a2b163e9c9ec7919c9e"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 201,
+      "code": "NHD",
+      "name": "NHD (National Hero Debut)",
+      "emblem": {
+        "file": "assets/201-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/nhd.png",
+        "sha256": "d0bd6fdd55d377596f9ca98a85db7fda431a262f364ed6ae0473fb33912a8fcc"
+      },
+      "frame": {
+        "file": "assets/201-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/NHD.png",
+        "sha256": "92d54755e0a3a47daa6c761d79141d1c6c40c0174331d7e3002d0e4d86ac23ca"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 854,
+      "code": "26TOTY",
+      "name": "26 TOTY (26 Team Of The Year)",
+      "emblem": {
+        "file": "assets/854-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/26toty.png",
+        "sha256": "fa04638a9b2628ba645101979c1e15697870467eb1c84f3d644fa1a7dca410b8"
+      },
+      "frame": {
+        "file": "assets/854-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/26TOTY.png",
+        "sha256": "8f44d0a7bd449617c8a85528b71de7560ca39c4d3ce5aaedfa2814561f17665c"
+      },
+      "color": "#f5e5a7",
+      "nameColor": "#fff",
+      "salaryBorder": "#f5e5a7",
+      "salaryFill": "rgba(21,26,54,.8)"
+    },
+    {
+      "id": 855,
+      "code": "26TOTN",
+      "name": "26 TOTY-N (26 Team Of The Nominated)",
+      "emblem": {
+        "file": "assets/855-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/26totn.png",
+        "sha256": "c728970ef737a74e2d8fad3e618173bd940dbd71b784bb3a59b48d517c3c54d7"
+      },
+      "frame": {
+        "file": "assets/855-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/26TOTN.png",
+        "sha256": "9c3c849df750f278b512276746374ea55045538ff41679f1cbf5746c9ba39d57"
+      },
+      "color": "#fff",
+      "nameColor": "#fff",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(23,28,58,.8)"
+    },
+    {
+      "id": 831,
+      "code": "25TOTY",
+      "name": "25 TOTY (25 Team Of The Year)",
+      "emblem": {
+        "file": "assets/831-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25toty.png",
+        "sha256": "e12e5aa80f24f2e8f4742e33ebad0880c1df5f53ae6d235a3f45dcd5c569717f"
+      },
+      "frame": {
+        "file": "assets/831-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25TOTY.png",
+        "sha256": "a417e3aaab42d7146111fa02c3b7691e3f580d1ede76288c8b3f098e3c4901b9"
+      },
+      "color": "#ffee90",
+      "nameColor": "#ffee90",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 832,
+      "code": "25TOTN",
+      "name": "25 TOTY-N (25 Team Of The Nominated)",
+      "emblem": {
+        "file": "assets/832-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25totn.png",
+        "sha256": "89c51bc2bc97cbe41754cbbc2b500a2bab8a634769f1fa1eec3497825d4a7734"
+      },
+      "frame": {
+        "file": "assets/832-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25TOTN.png",
+        "sha256": "9116b3a4323bc0f0c504cd40b5cebd285487c164d8ab93c0d7839acb7494e75d"
+      },
+      "color": "#fff",
+      "nameColor": "#fff",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 807,
+      "code": "24TOTY",
+      "name": "24 TOTY (24 Team Of The Year)",
+      "emblem": {
+        "file": "assets/807-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/24toty.png",
+        "sha256": "f0221e42e3ef5b54da3960f6aec6ce65130bfee5f9d773af1f4f43197377cd1a"
+      },
+      "frame": {
+        "file": "assets/807-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/24TOTY.png",
+        "sha256": "cf4e4a3707fe66b525c1d232596f081ca38247ec7c6420872eb5438929ef20f5"
+      },
+      "color": "#ffee90",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 808,
+      "code": "24TOTN",
+      "name": "24 TOTY-N (24 Team Of The Nominated)",
+      "emblem": {
+        "file": "assets/808-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/24totn.png",
+        "sha256": "b3b3d5330d1ab0c0434d127ce552a97136d570e888ac163e44dbf5b01f87c9ca"
+      },
+      "frame": {
+        "file": "assets/808-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/24TOTN.png",
+        "sha256": "47668110f526359bab7926a35067e619347e18a2db263b3692ca5cd681467f64"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 278,
+      "code": "23TOTY",
+      "name": "23 TOTY (23 Team Of The Year)",
+      "emblem": {
+        "file": "assets/278-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23toty.png",
+        "sha256": "a90bfa3f78ac50be0c07cf46e01a310d06a3eab9fc961354fe93e8304ea2dd27"
+      },
+      "frame": {
+        "file": "assets/278-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23TOTY.png",
+        "sha256": "e31e17df9e4a5909209eaf510bc86ec0b5489ed395054b9b489d5d7eb84135c6"
+      },
+      "color": "#ffee90",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 279,
+      "code": "23TOTN",
+      "name": "23 TOTY-N (23 Team Of The Nominated)",
+      "emblem": {
+        "file": "assets/279-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23totn.png",
+        "sha256": "26260991cf7aed2f7e81fff258ce66999d5918eb1d350cd0f6e065fe7b7577e2"
+      },
+      "frame": {
+        "file": "assets/279-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23TOTN.png",
+        "sha256": "804889086256ad00c875e33fc0c43138cd177a55201ea3b5232dc41fc7ea0c42"
+      },
+      "color": "#ffee90",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 258,
+      "code": "22TOTY",
+      "name": "22 TOTY (22 Team Of The Year)",
+      "emblem": {
+        "file": "assets/258-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/22toty.png",
+        "sha256": "cc1d8559c1cd1a7142cf4b7798be20ef3c0a68c4c553ce7ee0dad014b202dffd"
+      },
+      "frame": {
+        "file": "assets/258-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/22TOTY.png",
+        "sha256": "95ae5df21d02c7a5e3214bb3913226b0e67cbd31c1f2c15d272bba5ee6cabdd8"
+      },
+      "color": "#ffee90",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 259,
+      "code": "22TOTN",
+      "name": "22 TOTY-N (22 Team Of The Nominated)",
+      "emblem": {
+        "file": "assets/259-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/22totn.png",
+        "sha256": "7304fcde88a67065da986004b1caeff3be40d18fd13100b3dd0a4012b01de0b9"
+      },
+      "frame": {
+        "file": "assets/259-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/22TOTN.png",
+        "sha256": "f3a41c22efe43b059a73d763d49644c2e50ea98d558a623bf00d5b356bd5ab8d"
+      },
+      "color": "#ffee90",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 240,
+      "code": "21TOTY",
+      "name": "21 TOTY (21 Team Of The Year)",
+      "emblem": {
+        "file": "assets/240-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/21toty.png",
+        "sha256": "f7501cb68398d0defcbd7a36c6fa6232d7e02c3657066becc83e4858f50ec126"
+      },
+      "frame": {
+        "file": "assets/240-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/21TOTY.png",
+        "sha256": "3027df2f2b97529fc4c32e43cc4b3c5188a568d8d49387857bf3ad4fa7772f32"
+      },
+      "color": "#ffee90",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 241,
+      "code": "21TOTN",
+      "name": "21 TOTY-N (21 Team Of The Nominated)",
+      "emblem": {
+        "file": "assets/241-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/21totn.png",
+        "sha256": "1085b480357974d5e48584a032819a94224514924598fa5f173f1b023ceb5304"
+      },
+      "frame": {
+        "file": "assets/241-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/21TOTN.png",
+        "sha256": "d1ac7220882488c54ebdeda100864dbd5dadeb5efe8674f340540ae0e6557d26"
+      },
+      "color": "#ffee90",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 220,
+      "code": "20TOTY",
+      "name": "20 TOTY (20 Team Of The Year)",
+      "emblem": {
+        "file": "assets/220-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/20toty.png",
+        "sha256": "d189a5a45b6bdd0e9969386b1c2e94848dfcdce0db227f6f78fb87e39363898e"
+      },
+      "frame": {
+        "file": "assets/220-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/20TOTY.png",
+        "sha256": "46aff07d3cca8276d7b16fa1e41ada7c04611d251e20f6a3da9c07a4b9ab95cf"
+      },
+      "color": "#ffee90",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 222,
+      "code": "20TOTN",
+      "name": "20 TOTY-N (20 Team Of The Nominated)",
+      "emblem": {
+        "file": "assets/222-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/20totn.png",
+        "sha256": "4069f220cb2b4c119179e5655412c567e9e166a7dfa4f1d7eb36e1e2037b7e65"
+      },
+      "frame": {
+        "file": "assets/222-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/20TOTN.png",
+        "sha256": "c2e783e32450732153af95e88ec46b8a7d98ee795f834a996f3ba202d848a444"
+      },
+      "color": "#ffee90",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 211,
+      "code": "19TOTY",
+      "name": "19 TOTY (19 Team Of The Year)",
+      "emblem": {
+        "file": "assets/211-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/19toty.png",
+        "sha256": "90315fe50274b315168eb426c43b6c19fb1b7bd3ac1ca69184fd8da27c06a175"
+      },
+      "frame": {
+        "file": "assets/211-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/19TOTY.png",
+        "sha256": "6a7f3a07464216ced62cc1fa847ff624766b3141157397969e1e3d49ddb18cb6"
+      },
+      "color": "#ffee90",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 212,
+      "code": "18TOTY",
+      "name": "18 TOTY (18 Team Of The Year)",
+      "emblem": {
+        "file": "assets/212-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/18toty.png",
+        "sha256": "7dfd078a874517d1b7149c2ec15cf8f97be97c4b24ae47351987ac7234e3dae5"
+      },
+      "frame": {
+        "file": "assets/212-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/18TOTY.png",
+        "sha256": "d3919fd6f6cbcf16a7d885c0c33bf5beadb93188b33d5a684a7b3dcdb2f647ed"
+      },
+      "color": "#d0b361",
+      "nameColor": "#141432",
+      "salaryBorder": "#d0b361",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 866,
+      "code": "26TOTS",
+      "name": "26 TOTS (26 Team Of The Season)",
+      "emblem": {
+        "file": "assets/866-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/26tots.png",
+        "sha256": "13245bd4546f4b53467d84e0433b7918a186dd1d5a5a8da378c33030af753864"
+      },
+      "frame": {
+        "file": "assets/866-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/26TOTS.png",
+        "sha256": "9795e84f2d71f38e3108a5cbfc798858246a831af0200449b593072ec0c10d12"
+      },
+      "color": "#f8e9b3",
+      "nameColor": "#f8e9b3",
+      "salaryBorder": "#f8e9b3",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 844,
+      "code": "25TOTS",
+      "name": "25 TOTS (25 Team Of The Season)",
+      "emblem": {
+        "file": "assets/844-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25tots.png",
+        "sha256": "88ed247084fad66e4b6e74f300da2b0b32ae849806134a45650e82052679efba"
+      },
+      "frame": {
+        "file": "assets/844-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25TOTS.png",
+        "sha256": "e771aba1f9b312e54a63ca20cef1252abb6049bb72e7a2d16a12fc4f112544cb"
+      },
+      "color": "#f8e9b3",
+      "nameColor": "#f8e9b3",
+      "salaryBorder": "#f8e9b3",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 820,
+      "code": "24TOTS",
+      "name": "24 TOTS (24 Team Of The Season)",
+      "emblem": {
+        "file": "assets/820-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/24tots.png",
+        "sha256": "1bb4a57d18c65e19b44ea4d3c1784127d4d622b09045c5926698f2bc77d5c85e"
+      },
+      "frame": {
+        "file": "assets/820-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/24TOTS.png",
+        "sha256": "0537ec40a2d46814b8ab51f3b9c70d383a010b91b6a05a36242e80ab3cc6bcb3"
+      },
+      "color": "#ffee90",
+      "nameColor": "#fff",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 287,
+      "code": "23TOTS",
+      "name": "23 TOTS (23 Team Of The Season)",
+      "emblem": {
+        "file": "assets/287-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23tots.png",
+        "sha256": "3b4e7bd3e6f89e360f9ef94442498e6d29a13ec98ec9975265fda422a8688c86"
+      },
+      "frame": {
+        "file": "assets/287-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23TOTS.png",
+        "sha256": "fc2988328ec012c2638627894310f18c3db71aaf15d6fa96bafcc5cbecc35138"
+      },
+      "color": "#ffee90",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffee90",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 267,
+      "code": "22TOTS",
+      "name": "22 TOTS (22 Team Of The Season)",
+      "emblem": {
+        "file": "assets/267-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/22tots.png",
+        "sha256": "a619c7d2dc3b44478020eebfed356f63ab66c1b764d5121e68dd73bff22a01a8"
+      },
+      "frame": {
+        "file": "assets/267-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/22TOTS.png",
+        "sha256": "e001b4acab48a7f88e1d00271e9e99c6dd689625b9a1de5121082ae350f40e03"
+      },
+      "color": "#eedc82",
+      "nameColor": "#141432",
+      "salaryBorder": "#eedc82",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 250,
+      "code": "21TOTS",
+      "name": "21 TOTS (21 Team Of The Season)",
+      "emblem": {
+        "file": "assets/250-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/21tots.png",
+        "sha256": "72c00a5b58b0ccd122f99d50b36c63af65bf3f7bccda05d84e6ba477f8932ad8"
+      },
+      "frame": {
+        "file": "assets/250-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/21TOTS.png",
+        "sha256": "975121cb8f2828d11ac60f918574dd89b7625d6deeb18c92cce6e3895c440ca0"
+      },
+      "color": "#eedc82",
+      "nameColor": "#141432",
+      "salaryBorder": "#eedc82",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 230,
+      "code": "20TOTS",
+      "name": "20 TOTS (20 Team Of The Season)",
+      "emblem": {
+        "file": "assets/230-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/20tots.png",
+        "sha256": "8fdfd2fe4ebe76f3c984fa7199a10496d5557510c1fe44120ccfd49965258c01"
+      },
+      "frame": {
+        "file": "assets/230-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/20TOTS.png",
+        "sha256": "d4179cbe80088a32bfd9dce194d70266f6b2d5a10fbbd57f98be37703f3881c5"
+      },
+      "color": "#eedc82",
+      "nameColor": "#141432",
+      "salaryBorder": "#eedc82",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 215,
+      "code": "19TOTS",
+      "name": "19 TOTS (19 Team Of The Season)",
+      "emblem": {
+        "file": "assets/215-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/19tots.png",
+        "sha256": "cde4c5756f161380ded7ec33313ad8b1101e5850c48b728f8f4e6a51de118d27"
+      },
+      "frame": {
+        "file": "assets/215-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/19TOTS.png",
+        "sha256": "fda767367e05db9bde7b74dcd3374693f9a0aaf77ad338f78da16327376f0679"
+      },
+      "color": "#eedc82",
+      "nameColor": "#141432",
+      "salaryBorder": "#eedc82",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 856,
+      "code": "25UCL",
+      "name": "25 UCL (25 UEFA Champions League)",
+      "emblem": {
+        "file": "assets/856-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25ucl.png",
+        "sha256": "211101dc30694abaed21844805980a0954d9cb6da304f412a199eafd2d187d78"
+      },
+      "frame": {
+        "file": "assets/856-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25UCL.png",
+        "sha256": "c5b653b725cffb721a6cb52f90ab4885835f5563c7be580d32051b3a3b16a205"
+      },
+      "color": "#fff",
+      "nameColor": "#fff",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 834,
+      "code": "24UCL",
+      "name": "24 UCL (24 UEFA Champions League)",
+      "emblem": {
+        "file": "assets/834-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/24ucl.png",
+        "sha256": "5a2fc03de946a218fd6b5ea60f94095ad0a2669d427631a2625b3e29e355fc9f"
+      },
+      "frame": {
+        "file": "assets/834-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/24UCL.png",
+        "sha256": "52d0b174bf56bc8c6592d080f4b5a273c35d8d7c90daa7874ee4facf49173d3c"
+      },
+      "color": "#fff",
+      "nameColor": "#fff",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 810,
+      "code": "23UCL",
+      "name": "23 UCL (23 UEFA Champions League)",
+      "emblem": {
+        "file": "assets/810-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23ucl.png",
+        "sha256": "2a6c9d07058995261ea81244ab1be44e9e34da6a5baf425b5f1f5252a232b532"
+      },
+      "frame": {
+        "file": "assets/810-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23UCL.png",
+        "sha256": "e8eb0fc95f857c15421f5e330a867c9d31872d966b722310b457fca80d87280a"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 280,
+      "code": "22UCL",
+      "name": "22 UCL (22 UEFA Champions League)",
+      "emblem": {
+        "file": "assets/280-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/22ucl.png",
+        "sha256": "830e3046e4046343507b2d38683cec6bea9d068c5c464c5b150f26d838c68008"
+      },
+      "frame": {
+        "file": "assets/280-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/22UCL.png",
+        "sha256": "f71abe48513db3cc4d718f162005b9a9f7d1cf4ccdfba6c9d024ba9b2e77098c"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 260,
+      "code": "21UCL",
+      "name": "21 UCL (21 UEFA Champions League)",
+      "emblem": {
+        "file": "assets/260-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/21ucl.png",
+        "sha256": "795a173647b9da992a89072caddb5fbcf21376d852997ecf473173e82e082ff4"
+      },
+      "frame": {
+        "file": "assets/260-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/21UCL.png",
+        "sha256": "ffb4be00ef72a8abbebaaf0c8dad7f92fd5b674266d244addbf0a1ddf3b1479c"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 242,
+      "code": "20UCL",
+      "name": "20 UCL (20 UEFA Champions League)",
+      "emblem": {
+        "file": "assets/242-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/20ucl.png",
+        "sha256": "c810eaa8d2279eee10e63089f04212d45d273e90aa6e12b4363cbb794b62373f"
+      },
+      "frame": {
+        "file": "assets/242-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/20UCL.png",
+        "sha256": "6bce0b38f9398a100d803a0e022305cf5b7f94d5a7685a97b3e0652db3113500"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 221,
+      "code": "19UCL",
+      "name": "19 UCL (19 UEFA Champions League)",
+      "emblem": {
+        "file": "assets/221-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/19ucl.png",
+        "sha256": "bab97b53ce099fe0a43431f7475039016c3ae002293bf1d46869ca0a37cde55c"
+      },
+      "frame": {
+        "file": "assets/221-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/19UCL.png",
+        "sha256": "e4448d3f878c875e2861fa74cd9dce6c498d2ebe84293d64cf9d71f420f4037b"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 234,
+      "code": "LH",
+      "name": "LH (Loyal Heroes)",
+      "emblem": {
+        "file": "assets/234-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/lh.png",
+        "sha256": "4c29b42870d2b0d0ccc26ef2485b333175235d2b01bbfde55835b80fdb1ca16d"
+      },
+      "frame": {
+        "file": "assets/234-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/LH.png",
+        "sha256": "4021cdded25bf8d01d2fb77202958301e7c496eaf2f894b438a1edba3ababc0d"
+      },
+      "color": "#f6b3a3",
+      "nameColor": "#141432",
+      "salaryBorder": "#f6b3a3",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 225,
+      "code": "TKL",
+      "name": "TKL (TEAM K LEAGUE)",
+      "emblem": {
+        "file": "assets/225-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/tkl.png",
+        "sha256": "e5ae9a132ec871bebd6e1bc568835fce5f595c99c0ba8f1c33bd0a5c076050dd"
+      },
+      "frame": {
+        "file": "assets/225-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/TKL.png",
+        "sha256": "a955bdc48d6575ce0e9dc08d1a80aaf321a2120a6f12a2823857114be50c4352"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 806,
+      "code": "23KFA",
+      "name": "23 KFA (23 KFA)",
+      "emblem": {
+        "file": "assets/806-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23kfa.png",
+        "sha256": "7d6a1b425db29557d0852ae9cc7fb38704aecdf0f33505cd9307edc5ee63ac00"
+      },
+      "frame": {
+        "file": "assets/806-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23KFA.png",
+        "sha256": "2fbd0cc3e7c7fb3838e2060ad8ce59173d8634efd4fcdf27076ee3ed314ad305"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 293,
+      "code": "22KFA",
+      "name": "22 KFA (22 KFA)",
+      "emblem": {
+        "file": "assets/293-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/22kfa.png",
+        "sha256": "43821d84236a1d55964c849fd5a2079c6f07e4665e63d8122df696ff2401d536"
+      },
+      "frame": {
+        "file": "assets/293-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/22KFA.png",
+        "sha256": "d8d1ee220581a3c95607139fe5a45ffb7d7f9a320ba5a03502ab911aa54adead"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 294,
+      "code": "21KFA",
+      "name": "21 KFA (21 KFA)",
+      "emblem": {
+        "file": "assets/294-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/21kfa.png",
+        "sha256": "ff1376960b4c89c823f37aad09e4056fd594a232e6a037357500070ded342547"
+      },
+      "frame": {
+        "file": "assets/294-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/21KFA.png",
+        "sha256": "9b7c48636eacd626a324002dceb54d1e05d60b4855e10e48a7bf707f33cef64c"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 295,
+      "code": "2019KFA",
+      "name": "19 KFA (19 KFA)",
+      "emblem": {
+        "file": "assets/295-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/2019kfa.png",
+        "sha256": "f5b5c2c959170c7719f6c0ab4447b337e471b8e3b222cf3cccabfe4b8b50d28d"
+      },
+      "frame": {
+        "file": "assets/295-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/2019KFA.png",
+        "sha256": "60bb6e0a277f48dac956b7d1fa0a756de696cd09f5f45c25f2908d6fd1bb56b5"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 298,
+      "code": "KFA",
+      "name": "18 KFA (18 KFA)",
+      "emblem": {
+        "file": "assets/298-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/kfa.png",
+        "sha256": "9ed573dd5d8b6c856b463f3021c1ac0bde3eaf60c67749fb0dbc1b30bcf8d7be"
+      },
+      "frame": {
+        "file": "assets/298-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/KFA.png",
+        "sha256": "5f8ebb46473863f36506198072b3784c9e28a83dd86b937ede11b77909ba88e4"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 297,
+      "code": "MCFC",
+      "name": "MCFC (17-18 Man City Champions)",
+      "emblem": {
+        "file": "assets/297-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/mcfc.png",
+        "sha256": "8c3b7ff6368d48e0bd8434fe7863e294165263caa65e4465f949cbd414c3ec1b"
+      },
+      "frame": {
+        "file": "assets/297-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/MCFC.png",
+        "sha256": "8eb629220bcf31cd2f6169371440da2930242ef2ca6387a45cf5d84483d1d02b"
+      },
+      "color": "#00285e",
+      "nameColor": "#141432",
+      "salaryBorder": "#00285e",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 247,
+      "code": "2012KH",
+      "name": "2012 KH (2012 KH)",
+      "emblem": {
+        "file": "assets/247-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/2012kh.png",
+        "sha256": "6d5f536bfc629365c6f8f347a5cec10e9adeddd5b779a02d1a9ea0bff2c8b408"
+      },
+      "frame": {
+        "file": "assets/247-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/2012KH.png",
+        "sha256": "34644103ceeaa936c499f7a1e2ac70e8f9cff26fea89d09a151e396537900ede"
+      },
+      "color": "#e4d58c",
+      "nameColor": "#141432",
+      "salaryBorder": "#e4d58c",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 518,
+      "code": "26KL",
+      "name": "26KLeague (26KLeague)",
+      "emblem": {
+        "file": "assets/518-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/26kl.png",
+        "sha256": "f2a0ee6fc064ccb87abc17b4714d39a09853bc6d745d325162103c84cb9b3608"
+      },
+      "frame": {
+        "file": "assets/518-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/26KL.png",
+        "sha256": "a98153baf386db993c09e43bf0f738d70504e19df939bb7fb7be231a5a99a680"
+      },
+      "color": "#fff",
+      "nameColor": "#fff",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 516,
+      "code": "25KL",
+      "name": "25KLeague (25KLeague)",
+      "emblem": {
+        "file": "assets/516-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25kl.png",
+        "sha256": "68de39f8f4482e0b456710d9e768c71027660aa94d0b0388af5144d207d6897a"
+      },
+      "frame": {
+        "file": "assets/516-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25KL.png",
+        "sha256": "59fa9bc8dad64bb567d6ce6ca6be7161db5619c4b4053aa9d33e111be3b684b6"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 514,
+      "code": "24KL",
+      "name": "24KLeague (24KLeague)",
+      "emblem": {
+        "file": "assets/514-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/24kl.png",
+        "sha256": "fb3d06ee0785d21f561701b9eec38208964eca1040f5a32de70a7304620b742b"
+      },
+      "frame": {
+        "file": "assets/514-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/24KL.png",
+        "sha256": "6f3acc35feef23080eb7e4adfbf2b6a3a50cd9afdfec1d790b65fdc0b9381bcf"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 512,
+      "code": "23KL",
+      "name": "23KLeague (23KLeague)",
+      "emblem": {
+        "file": "assets/512-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23kl.png",
+        "sha256": "d9d587e05bf3f5e247a0a0352ee9b065c5557e07c198cf638efbc0cf34b692fd"
+      },
+      "frame": {
+        "file": "assets/512-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23KL.png",
+        "sha256": "2cbc1b9f84b707c99157437ba04c5a2f58f75096ad31c24940636213f31e1702"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 510,
+      "code": "22KL",
+      "name": "22KLeague (22KLeague)",
+      "emblem": {
+        "file": "assets/510-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/22kl.png",
+        "sha256": "c2f6be6db8196bfd220d53a841613e9896f29148c4ee581166eef19181102903"
+      },
+      "frame": {
+        "file": "assets/510-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/22KL.png",
+        "sha256": "cdde4e58f3be4cd941e5bdc442397a823cbc1d422c63b2d1e6d374cf3b9d8808"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 507,
+      "code": "21KL",
+      "name": "21KLeague (21KLeague)",
+      "emblem": {
+        "file": "assets/507-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/21kl.png",
+        "sha256": "e04614ad91a9d97dfe1ee5ba587793f6110bc2f1b848cf2700a457b3ea90dbc6"
+      },
+      "frame": {
+        "file": "assets/507-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/21KL.png",
+        "sha256": "a63d3c7100c924baf7e69cfe4595dfc284f22b4f0b027c2edc48a8bb4f7386c8"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 504,
+      "code": "20KL",
+      "name": "20KLeague (20KLeague)",
+      "emblem": {
+        "file": "assets/504-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/20kl.png",
+        "sha256": "8069c4d47749489f6aef6dc5da1be2da1efd38a887eb1948f5d447d8d0cbcc27"
+      },
+      "frame": {
+        "file": "assets/504-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/20KL.png",
+        "sha256": "96bf502424a129dc034c45cabce4a2bc100b4ab8bf2ebe7f2f08fa55c298491c"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 853,
+      "code": "25KB",
+      "name": "25KB (25 K-League Best)",
+      "emblem": {
+        "file": "assets/853-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25kb.png",
+        "sha256": "07476f597bb676593a6487b718c0a7a5f934b3594745a19b2ce558bed5988eba"
+      },
+      "frame": {
+        "file": "assets/853-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25KB.png",
+        "sha256": "4d4ff862dc95bee08fa874b4794f464213c24bb39835ea9d290d58128f51ef56"
+      },
+      "color": "#ffeba8",
+      "nameColor": "#fff",
+      "salaryBorder": "#ffeba8",
+      "salaryFill": "rgba(0,0,0,0)"
+    },
+    {
+      "id": 830,
+      "code": "24KLB",
+      "name": "24KB (24 K-League Best)",
+      "emblem": {
+        "file": "assets/830-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/24klb.png",
+        "sha256": "45401c10d7be065576c024d779ebaab6925ea6746c641350549e0a1c0b981be9"
+      },
+      "frame": {
+        "file": "assets/830-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/24KLB.png",
+        "sha256": "4f15e042dd27b5958bbca84efe72cf6b32581583b7588b4a4f01f01548dd5eb5"
+      },
+      "color": "#ffeba8",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffeba8",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 805,
+      "code": "23KLB",
+      "name": "23KB (23 K-League Best)",
+      "emblem": {
+        "file": "assets/805-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23klb.png",
+        "sha256": "7518b8ce8fd4bc5a0254a4eddd472bdae18b878ab0c71f503c67fb02bc575745"
+      },
+      "frame": {
+        "file": "assets/805-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23KLB.png",
+        "sha256": "4f15e042dd27b5958bbca84efe72cf6b32581583b7588b4a4f01f01548dd5eb5"
+      },
+      "color": "#ffeba8",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffeba8",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 277,
+      "code": "22KLB",
+      "name": "22KB (22 K-League Best)",
+      "emblem": {
+        "file": "assets/277-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/22klb.png",
+        "sha256": "3d01f097e5f15b8135374b9a4cf4539d28c26d9eefc5a2e7e2cc2c9c66a8093a"
+      },
+      "frame": {
+        "file": "assets/277-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/22KLB.png",
+        "sha256": "1a4ae4906a3e4d7a3d40c51b964ed286128137640fa096a3a457dae4b86a700e"
+      },
+      "color": "#ffeba8",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffeba8",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 257,
+      "code": "21KLB",
+      "name": "21KB (21 K-League Best)",
+      "emblem": {
+        "file": "assets/257-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/21klb.png",
+        "sha256": "a050c12fbc61f939ce55d5d8e81b1da2a52b1243ec317c9bab9d609d62aa717a"
+      },
+      "frame": {
+        "file": "assets/257-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/21KLB.png",
+        "sha256": "1fefdfdc71eb2628bbc057b6f6b7a84788da478aeac32de7efadc6a5e7f4db99"
+      },
+      "color": "#ffeba8",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffeba8",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 239,
+      "code": "20KLB",
+      "name": "20KB (20 K-League Best)",
+      "emblem": {
+        "file": "assets/239-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/20klb.png",
+        "sha256": "c6a0fd6794e6de983234b6d9b76a90a8a6487a441290d0eb91267c51b3252e62"
+      },
+      "frame": {
+        "file": "assets/239-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/20KLB.png",
+        "sha256": "9320567810eb48f8cd204d3e74d5d558310587e15e1043774a0850278f5d8510"
+      },
+      "color": "#ffeba8",
+      "nameColor": "#141432",
+      "salaryBorder": "#ffeba8",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 517,
+      "code": "25PLA",
+      "name": "25 PL (25 Premium Live)",
+      "emblem": {
+        "file": "assets/517-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/25pla.png",
+        "sha256": "fee54b0285a205290e9c828af899a44d9206fda94e666599f28e73b5ce748a38"
+      },
+      "frame": {
+        "file": "assets/517-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/25PLA.png",
+        "sha256": "d17392f472bd9817ae6cff6657b35cb4df9687d87c6cad39b23bce903252236a"
+      },
+      "color": "#fffcde",
+      "nameColor": "#fff",
+      "salaryBorder": "#fffcde",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 515,
+      "code": "24PLA",
+      "name": "24 PL (24 Premium Live)",
+      "emblem": {
+        "file": "assets/515-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/24pla.png",
+        "sha256": "8583d996fd5504fcc628a171134f38024df3951a79124de1ee3bc32310927845"
+      },
+      "frame": {
+        "file": "assets/515-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/24PLA.png",
+        "sha256": "668e285aebea8eba7f0ee84ad83310955dc27abc6257dd0fa83c98be7143f9f4"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 513,
+      "code": "23PLA",
+      "name": "23 PL (23 Premium Live)",
+      "emblem": {
+        "file": "assets/513-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23pla.png",
+        "sha256": "5ad2245f77056ba60f80c0b182c4cf4aed8b5e03aca9a2d83a4427f8ede8dc00"
+      },
+      "frame": {
+        "file": "assets/513-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23PLA.png",
+        "sha256": "677f72f6fcfdc93fc19cedb1f6e94854ae06fdde529334c7c1f4f3b5fa773529"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 511,
+      "code": "22PLA",
+      "name": "22 PL (22 Premium Live)",
+      "emblem": {
+        "file": "assets/511-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/22pla.png",
+        "sha256": "c273c56a25ee393c1243750f9a1cbd5ef4ca119b27f5320916d6e2a5565f846c"
+      },
+      "frame": {
+        "file": "assets/511-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/22PLA.png",
+        "sha256": "d073132934f09d508435a687d47cfbc870b56b5f5d4800655e6c197bc3bc2c94"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 508,
+      "code": "21PLA",
+      "name": "21 PL (21 Premium Live)",
+      "emblem": {
+        "file": "assets/508-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/21pla.png",
+        "sha256": "3f3932dfd8b962b24f2ae6cf1c3805e54a70353aed9ac5d8ca86a4b5e4baf90f"
+      },
+      "frame": {
+        "file": "assets/508-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/21PLA.png",
+        "sha256": "6267d127cab686c1bd8e7a0e0cfc8c23d0d691978e319b66dd6af04e9b77867d"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 506,
+      "code": "20PLA",
+      "name": "20 PLA (20 Premium Live)",
+      "emblem": {
+        "file": "assets/506-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/20pla.png",
+        "sha256": "521516ac01200b18852135cd33382d04bf7408cfdc400d83435bdcd3bede11b6"
+      },
+      "frame": {
+        "file": "assets/506-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/20PLA.png",
+        "sha256": "18e48f81190f5f6220b3c60c913324920ec30f2d360e372d51a14cf4ec1e9db5"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 503,
+      "code": "19PLS",
+      "name": "19 PLS (19 Premium Live Spring)",
+      "emblem": {
+        "file": "assets/503-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/19pls.png",
+        "sha256": "1a30d9e30981a2f082aad037e4e6ccd8eb82c5948c4491e569121cfd790d0636"
+      },
+      "frame": {
+        "file": "assets/503-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/19PLS.png",
+        "sha256": "b4c9460d5e22ba4e332790b280f18cb38c6340a5ec9b0b4f6346e7b3da302a5e"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 502,
+      "code": "19PLA",
+      "name": "19 PLA (19 Premium Live Autumn)",
+      "emblem": {
+        "file": "assets/502-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/19pla.png",
+        "sha256": "de406eb634bdafc5680d793315265c564520b774c735f7c0d9cb88f1a186c877"
+      },
+      "frame": {
+        "file": "assets/502-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/19PLA.png",
+        "sha256": "d073132934f09d508435a687d47cfbc870b56b5f5d4800655e6c197bc3bc2c94"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 501,
+      "code": "18PLS",
+      "name": "18 PLS (18 Premium Live Spring)",
+      "emblem": {
+        "file": "assets/501-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/18pls.png",
+        "sha256": "0b666ebc61969f810f837c8a64ce3d8c578c4e659153d8edfb053ad8e219519c"
+      },
+      "frame": {
+        "file": "assets/501-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/18PLS.png",
+        "sha256": "2c07e4cb01f15cf4dbd80fc5380b5390b4d9964fff31f0d7104e2b8832b80bc7"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 500,
+      "code": "PLC",
+      "name": "18 PLA (18 Premium Live Autumn)",
+      "emblem": {
+        "file": "assets/500-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/plc.png",
+        "sha256": "089e34064047f159b627702d60756a1dcf198cec09efbffde3884b9bb2df21d2"
+      },
+      "frame": {
+        "file": "assets/500-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/PLC.png",
+        "sha256": "d073132934f09d508435a687d47cfbc870b56b5f5d4800655e6c197bc3bc2c94"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 300,
+      "code": "LIVE",
+      "name": "25 LIVE (25 LIVE)",
+      "emblem": {
+        "file": "assets/300-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/live.png",
+        "sha256": "f6ef2319b82783c9e5a4ca6fc439d130de78b704f542148c4b643b1c9812a293"
+      },
+      "frame": {
+        "file": "assets/300-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/LIVE.png",
+        "sha256": "c5fef28ecafcf29e1409eda27dd83a09a410ecf7329e5f9ebd900e1d4315d6b5"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 324,
+      "code": "24",
+      "name": "24 LIVE (24 LIVE)",
+      "emblem": {
+        "file": "assets/324-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/24.png",
+        "sha256": "0b53253617bf6671bbfde07476510a76f3b0e9a8ea5ab6d5c1e6a26b676550b7"
+      },
+      "frame": {
+        "file": "assets/324-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/24.png",
+        "sha256": "7149c3677718bbca66ca194094dc4833944cb234865806dc54f1049c6727085e"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 323,
+      "code": "23",
+      "name": "23 LIVE (23 LIVE)",
+      "emblem": {
+        "file": "assets/323-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/23.png",
+        "sha256": "9aaebfa9e1c5bca225ec95795abd3b28e76acb8d756b602acf514bd90f386cca"
+      },
+      "frame": {
+        "file": "assets/323-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/23.png",
+        "sha256": "7149c3677718bbca66ca194094dc4833944cb234865806dc54f1049c6727085e"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 322,
+      "code": "22",
+      "name": "22 LIVE (22 LIVE)",
+      "emblem": {
+        "file": "assets/322-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/22.png",
+        "sha256": "2af6488d366cb6f4f84513913e7e837922821ae5e9cc9df712534af5ac73f9ff"
+      },
+      "frame": {
+        "file": "assets/322-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/22.png",
+        "sha256": "7149c3677718bbca66ca194094dc4833944cb234865806dc54f1049c6727085e"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 321,
+      "code": "21",
+      "name": "21 LIVE (21 LIVE)",
+      "emblem": {
+        "file": "assets/321-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/21.png",
+        "sha256": "1c9eab5737d5a911cf5bd2e8873066afa01a0f493d8100680852d07387039fea"
+      },
+      "frame": {
+        "file": "assets/321-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/21.png",
+        "sha256": "7149c3677718bbca66ca194094dc4833944cb234865806dc54f1049c6727085e"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 320,
+      "code": "20",
+      "name": "20 LIVE (20 LIVE)",
+      "emblem": {
+        "file": "assets/320-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/20.png",
+        "sha256": "ed24079a5596a2f27b6b0c522c55a85f22f3ef68401c883aefc218fc94fb48e8"
+      },
+      "frame": {
+        "file": "assets/320-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/20.png",
+        "sha256": "7149c3677718bbca66ca194094dc4833944cb234865806dc54f1049c6727085e"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 319,
+      "code": "19",
+      "name": "19 LIVE (19 LIVE)",
+      "emblem": {
+        "file": "assets/319-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/19.png",
+        "sha256": "7530d89c1edae99b43054e381f3c581f830a2ba1b076f4245bd6e5ba20b6e8ee"
+      },
+      "frame": {
+        "file": "assets/319-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/19.png",
+        "sha256": "7149c3677718bbca66ca194094dc4833944cb234865806dc54f1049c6727085e"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 318,
+      "code": "18",
+      "name": "18 LIVE (18 LIVE)",
+      "emblem": {
+        "file": "assets/318-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/18.png",
+        "sha256": "06c8fb2dd2b9943acb4d7ccfe96d717f80747d711a22bafb5e52d89e76678a1d"
+      },
+      "frame": {
+        "file": "assets/318-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/18.png",
+        "sha256": "7149c3677718bbca66ca194094dc4833944cb234865806dc54f1049c6727085e"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 317,
+      "code": "17",
+      "name": "17 LIVE (17 LIVE)",
+      "emblem": {
+        "file": "assets/317-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/17.png",
+        "sha256": "4801bc9f87c688bddd3735b55b758b8f33a1fd17cf96dea57042a635a11c2087"
+      },
+      "frame": {
+        "file": "assets/317-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/17.png",
+        "sha256": "7149c3677718bbca66ca194094dc4833944cb234865806dc54f1049c6727085e"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 812,
+      "code": "LKI",
+      "name": "LKI (LKI)",
+      "emblem": {
+        "file": "assets/812-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/lki.png",
+        "sha256": "fe7ad81d7d2e00c835302914ff52224050bff06c7a0277afa456a39d6350cd84"
+      },
+      "frame": {
+        "file": "assets/812-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/LKI.png",
+        "sha256": "073fa4767211ec80326485e8c3e9f919dbb8bb3c0049f8310ebe0cb330b77ca1"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    },
+    {
+      "id": 879,
+      "code": "LKI2",
+      "name": "LKI2 (LKI2)",
+      "emblem": {
+        "file": "assets/879-emblem.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/lki2.png",
+        "sha256": "fe7ad81d7d2e00c835302914ff52224050bff06c7a0277afa456a39d6350cd84"
+      },
+      "frame": {
+        "file": "assets/879-frame.png",
+        "source": "https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/card/LKI2.png",
+        "sha256": "073fa4767211ec80326485e8c3e9f919dbb8bb3c0049f8310ebe0cb330b77ca1"
+      },
+      "color": "#fff",
+      "nameColor": "#141432",
+      "salaryBorder": "#fff",
+      "salaryFill": "rgba(10,20,41,.8)"
+    }
+  ]
+}
