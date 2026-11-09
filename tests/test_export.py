@@ -9,6 +9,17 @@ from gksave import agg, export
 from gksave.db import connect_memory
 
 
+def test_export_creates_ads_txt_matching_the_page_publisher(tmp_path, monkeypatch):
+    payload = {"generated_at": "2026-11-09", "leaderboard": [], "same_player": [],
+               "defense": {}, "leaderboard_count": 0}
+    monkeypatch.setattr(export, "build_payload", lambda *args, **kwargs: payload)
+    export.export(None, tmp_path)
+    html = (tmp_path / "index.html").read_text()
+    publisher = re.search(r'name="google-adsense-account" content="ca-(pub-\d{16})"', html)[1]
+    assert (tmp_path / "ads.txt").read_text() == f"google.com, {publisher}, DIRECT, f08c47fec0942fa0\n"
+    assert f"adsbygoogle.js?client=ca-{publisher}" in html
+
+
 def test_export_omits_concentrated_cards_from_all_outputs(tmp_path, monkeypatch):
     model_calls = []
     original = agg._expected_shots_cte

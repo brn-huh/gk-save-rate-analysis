@@ -247,6 +247,10 @@ def export(
     log("export: HTML 생성·저장 중")
     shutil.copytree(render.MAKER_DIR, out_dir / "player-maker", dirs_exist_ok=True)
     (out_dir / "index.html").write_text(render.build_html(slim), encoding="utf-8")
+    (out_dir / "ads.txt").write_text(
+        f"google.com, {render.ADSENSE_PUBLISHER_ID}, DIRECT, f08c47fec0942fa0\n",
+        encoding="utf-8",
+    )
 
     # sitemap — 페이지가 한 장뿐이라 URL 도 하나다. lastmod 를 export 시각으로 갱신해
     # 데이터가 바뀐 걸 검색엔진에 알린다(robots.txt 의 Sitemap: 이 이 파일을 가리킨다).

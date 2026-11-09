@@ -1,6 +1,7 @@
+# shortcut: 정적 배포의 광고 도메인 허용 목록은 도메인 변경 시 재점검한다. 요청별 nonce 발급 서버 도입 시 strict CSP로 전환한다.
 /*
   X-Robots-Tag: noai, noimageai
-  Content-Security-Policy: default-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://openapi.nexon.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://fco.dn.nexoncdn.co.kr https://ssl.nexon.com; connect-src 'self' https://open.api.nexon.com; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://openapi.nexon.com https://*.googlesyndication.com https://*.doubleclick.net https://www.google.com https://*.googleadservices.com https://*.adtrafficquality.google; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://fco.dn.nexoncdn.co.kr https://ssl.nexon.com https://*.googlesyndication.com https://*.doubleclick.net https://www.google.com https://*.googleadservices.com https://*.adtrafficquality.google; connect-src 'self' https://open.api.nexon.com https://*.googlesyndication.com https://*.doubleclick.net https://www.google.com https://*.googleadservices.com https://*.adtrafficquality.google; frame-src https://*.googlesyndication.com https://*.doubleclick.net https://www.google.com https://*.googleadservices.com https://*.adtrafficquality.google; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin

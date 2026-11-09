@@ -256,6 +256,21 @@ cd /Users/jwkim/workspace/gk-save-rate-analysis
 
 ---
 
+## 애드센스 재심사 전 확인
+
+- `gksave export`는 페이지의 공개 게시자 ID와 일치하는 `ads.txt`를 함께 만든다.
+  배포 후 `/ads.txt`가 200으로 응답하고 애드센스 계정의 게시자 ID와 같은지 확인한다.
+- CSP는 `vercel.json`과 `out/_headers`에 동일하게 유지한다. 현재 정적 배포에서는
+  Google 광고 도메인을 명시적으로 허용하며, 전체 HTTPS 허용이나 보안 헤더 삭제는 하지 않는다.
+  광고 도메인이 바뀌면 차단될 수 있다. 요청별 nonce를 발급하는 서버를 도입할 때
+  [Google 공식 strict CSP 방식](https://support.google.com/adsense/answer/16283098?hl=ko)으로 전환한다.
+- 배포 후 브라우저 Console에서 CSP 차단을 확인하고 Network에서 `adsbygoogle.js`가
+  정상적으로 요청되는지 확인한다. 승인 전 광고가 표시되지 않는 것과 스크립트 차단은 구분한다.
+- Cloudflare에서 일부 자동화 요청에 `403 / error code: 1010`이 발생했다.
+  이것만으로 Google 봇 차단을 확정할 수는 없다. 실제 `Google-Display-Ads-Bot`과
+  `Mediapartners-Google`의 접근 여부를 확인하고, 차단됐다면 해당 보안 규칙만 조정한다.
+  User-Agent 문자열만 보고 봇을 신뢰하거나 방화벽 전체를 해제하지 않는다.
+
 ## 전체 흐름
 
 ```

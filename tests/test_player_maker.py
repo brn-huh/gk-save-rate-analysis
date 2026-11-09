@@ -161,3 +161,20 @@ def test_hosting_policies_allow_local_wasm_without_javascript_eval():
     assert f'Content-Security-Policy: {csp}' in (root / 'out/_headers').read_text()
     assert "'wasm-unsafe-eval'" in csp and "'unsafe-eval'" not in csp
     assert "font-src 'self'" in csp
+
+
+def test_hosting_policies_allow_adsense_without_allowing_arbitrary_origins():
+    root = Path(__file__).resolve().parents[1]
+    config = json.loads((root / 'vercel.json').read_text())
+    csp = next(h['value'] for h in config['headers'][0]['headers'] if h['key'] == 'Content-Security-Policy')
+    directives = dict(part.strip().split(None, 1) for part in csp.split(';') if ' ' in part.strip())
+    for directive in ('script-src', 'connect-src', 'frame-src', 'img-src'):
+        sources = directives[directive].split()
+        assert 'https://*.googlesyndication.com' in sources
+        assert 'https://*.doubleclick.net' in sources
+        assert 'https://www.google.com' in sources
+        assert 'https://*.googleadservices.com' in sources
+        assert 'https://*.adtrafficquality.google' in sources
+        assert '*' not in sources and 'https:' not in sources and 'http:' not in sources
+    for directive in ('default-src', 'object-src', 'base-uri', 'frame-ancestors', 'form-action'):
+        assert directives[directive] == "'none'"

@@ -17,7 +17,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from .config import MAX_USER_MATCH_PERCENT, SITE_URL
+from .config import ADSENSE_PUBLISHER_ID, MAX_USER_MATCH_PERCENT, SITE_URL
 
 IMAGE_CDN = "https://fco.dn.nexoncdn.co.kr/live/externalAssets/common"
 MAKER_DIR = Path(__file__).parent / "player_maker"
@@ -211,6 +211,7 @@ def build_html(payload: dict[str, Any]) -> str:
     meta = escape(f"{period}총 경기 {total:,}건")
     values = {
         "__SITE_URL__": SITE_URL,
+        "__ADSENSE_PUBLISHER_ID__": ADSENSE_PUBLISHER_ID,
         "__MAX_USER_MATCH_PERCENT__": str(MAX_USER_MATCH_PERCENT),
         "__FAVICON__": FAVICON,
         "__PLATINUM__": PLATINUM,
@@ -230,8 +231,8 @@ def build_html(payload: dict[str, Any]) -> str:
 _TEMPLATE = r"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="google-adsense-account" content="ca-pub-1645070512024900">
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1645070512024900" crossorigin="anonymous"></script>
+<meta name="google-adsense-account" content="ca-__ADSENSE_PUBLISHER_ID__">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-__ADSENSE_PUBLISHER_ID__" crossorigin="anonymous"></script>
 <title>FC온라인 GK 선방률 순위</title>
 <meta name="description" content="FC온라인 공식경기 실데이터로 뽑은 골키퍼 선방률·GSAx 리더보드. 선수·시즌·강화단계별 선방률, 거리 구간별·슛 타입별 상세, 급여 대비 가성비까지 비교합니다.">
 <link rel="canonical" href="__SITE_URL__">
@@ -757,7 +758,7 @@ _TEMPLATE = r"""<!doctype html>
     <dt>선방률</dt>
     <dd>상대의 유효슛 중 막아낸 비율. <b>선방 ÷ (선방 + 실점)</b>으로 계산합니다. 값이 높을수록 잘 막은 것. 단, 이 순위의 선방률은 <b>보정하지 않은 값</b>이라 카드 성능뿐 아니라 <b>그 카드를 쓴 유저의 실력·수비 라인·상대 슛 난이도</b>가 섞여 있으니 카드 순위가 아니라 <b>참고용</b>으로 봐주세요.</dd>
     <dt>GSAx / 100</dt>
-    <dd>Goals Saved Above Expected — <b>슛 난이도를 보정</b>한 지표입니다. 거리·각도로 계산한 '기대 실점'보다 실제로 얼마나 더(또는 덜) 막았는지를 유효슛 100개 기준으로 환산합니다. <b>+면 기대보다 선방, −면 기대보다 실점</b>. 유저 실력 교란을 줄인, 선방률보다 공정한 비교값입니다.</dd>
+    <dd>Goals Saved Above Expected — <b>슛 타입과 거리 구간으로 슛 난이도를 일부 보정</b>한 지표입니다. 전체 표본의 슛을 거리순으로 5개 구간에 나누고, 각 슛 타입×거리 구간의 평균 선방률로 기대 선방 수를 계산합니다. 실제 선방 수에서 기대 선방 수를 뺀 값을 유효슛 100개 기준으로 환산하며, <b>+면 기대보다 더 선방, −면 기대보다 덜 선방</b>한 것입니다. 슛 각도와 유저 실력을 직접 보정하지 않으며, 유저·전술·상대 수준의 영향은 남습니다.</dd>
     <dt>경기수 · 게이트</dt>
     <dd>경기수 = 그 카드로 수집·집계된 경기 수(= 통계 표본). 경기수가 적으면 우연(뽀록)일 수 있어 신뢰도가 낮습니다. 그래서 최소 <b id="gateN"></b>경기 이상(게이트)인 카드만 순위에 올립니다. 리더보드 위 <b>경기수 ≥</b> 입력칸에서 100~50000 사이 기준을 직접 정해 <b>뽀록 상위권을 걸러</b> 볼 수 있습니다.</dd>
     <dt>신뢰구간 (±%p)</dt>
@@ -783,7 +784,7 @@ _TEMPLATE = r"""<!doctype html>
   </details>
   <details><summary>강화 효과 (유저 내 비교)</summary>
     <p id="geDetail"></p>
-    <p>같은 유저가 같은 카드를 강화단계만 올렸을 때 선방률이 얼마나 변하는지를 짝지어 비교한 값입니다. 유저 실력 차이를 제거했기 때문에 <b>강화 그 자체의 효과</b>에 가장 가깝습니다.</p>
+    <p>같은 유저가 같은 카드를 서로 다른 강화단계로 사용한 기록을 짝지어 선방률 차이를 비교한 값입니다. 유저 간 실력 차이의 영향을 줄이지만, 시점·전술·상대가 달라질 수 있으므로 <b>강화 자체의 인과적 효과로 단정할 수 없습니다.</b></p>
   </details>
 
   <h2>주의</h2>
